@@ -2,7 +2,7 @@ package printer
 
 import logic.{FOL, Formula, Term}
 
-/** Pretty printer for FOL formulas and terms - Phase 11
+/** Pretty printer for FOL formulas and terms
   * 
   * From fol.ml print_term and print_fol_formula functions.
   * Converts parsed structures back into readable strings.

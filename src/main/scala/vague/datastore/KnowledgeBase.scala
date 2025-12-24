@@ -1,6 +1,6 @@
 package vague.datastore
 
-/** Knowledge Base - Phase 13.1
+/** Knowledge Base
   * 
   * A lightweight, in-memory datastore for relational facts.
   * Inspired by relational databases and RDF triple stores,

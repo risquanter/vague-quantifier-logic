@@ -2,7 +2,7 @@ package vague.sampling
 
 import munit.FunSuite
 
-/** Test suite for HDR Sampler - Phase 13.2
+/** Test suite for HDR Sampler
   * 
   * Tests the HDR (Hubbard Decision Research) PRNG integration.
   */

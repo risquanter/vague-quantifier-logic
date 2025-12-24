@@ -2,7 +2,7 @@ package vague.datastore
 
 import vague.datastore.RelationValue.*
 
-/** Risk Management Domain - Phase 13.1
+/** Risk Management Domain
   * 
   * Example knowledge base for risk management, containing:
   * - Components (software/hardware modules)

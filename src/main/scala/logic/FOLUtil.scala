@@ -1,6 +1,6 @@
 package logic
 
-/** Utility functions for FOL terms and formulas - Phase 10
+/** Utility functions for FOL terms and formulas
   * 
   * From fol.ml, this implements:
   * - Free variables (fv, fvt, var)

@@ -5,7 +5,7 @@ import logic.{FOL, Formula, Term}
 import printer.FOLPrinter.*
 import parser.FOLParser
 
-/** Test suite for FOL Pretty Printer - Phase 11
+/** Test suite for FOL Pretty Printer
   * 
   * Tests:
   * - Term printing (variables, constants, functions, infix operators)

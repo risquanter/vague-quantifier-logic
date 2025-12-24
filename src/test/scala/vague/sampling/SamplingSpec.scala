@@ -2,7 +2,7 @@ package vague.sampling
 
 import munit.FunSuite
 
-/** Test suite for Sampling Infrastructure - Phase 13.2
+/** Test suite for Sampling Infrastructure
   * 
   * Based on Fermüller, Hofer, and Ortiz (2017).
   * "Querying with Vague Quantifiers Using Probabilistic Semantics"

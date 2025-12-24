@@ -5,7 +5,7 @@ import logic.{FOL, Formula, Term}
 import semantics.FOLSemantics.*
 import parser.FOLParser
 
-/** Test suite for FOL Semantics - Phase 12
+/** Test suite for FOL Semantics
   * 
   * Tests the formal semantics of first-order logic:
   * - Domain and interpretation setup

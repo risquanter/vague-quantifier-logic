@@ -3,7 +3,7 @@ package vague.datastore
 import munit.FunSuite
 import vague.datastore.RelationValue.*
 
-/** Test suite for Knowledge Base - Phase 13.1
+/** Test suite for Knowledge Base
   * 
   * Based on Fermüller, Hofer, and Ortiz (2017).
   * "Querying with Vague Quantifiers Using Probabilistic Semantics"

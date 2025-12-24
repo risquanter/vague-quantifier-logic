@@ -2,7 +2,7 @@ package semantics
 
 import logic.{FOL, Formula, Term}
 
-/** Semantics (Model Theory) for First-Order Logic - Phase 12
+/** Semantics (Model Theory) for First-Order Logic
   * 
   * Implements the formal semantics of FOL:
   * - Domain: non-empty set of objects

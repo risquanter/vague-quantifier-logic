@@ -5,7 +5,7 @@ import parser.FOLAtomParser
 import util.StringUtil.explode
 import lexer.Lexer.lex
 
-/** Complete FOL parser API - Phase 9
+/** Complete FOL parser API
   * 
   * This is the public API that users will interact with.
   * It wires together all the parsing components:

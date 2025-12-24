@@ -1,6 +1,6 @@
 package vague.datastore
 
-/** Relation schema definition - Phase 13.1
+/** Relation schema definition
   * 
   * Defines the schema for relations in a knowledge base.
   * Each relation has a name, arity, and position types.
