@@ -209,7 +209,7 @@ Following the same OCaml→Scala patterns, we'll organize vague quantifier code:
 ```
 src/main/scala/vague/
 ├── logic/           # NEW: Vague quantifier ADTs (extends logic/)
-│   ├── VagueQuantifierType.scala  # enum (like Term, Formula)
+│   ├── Quantifier.scala  # enum (like Term, Formula)
 │   └── VagueQuery.scala           # case class (like FOL)
 ├── parser/          # NEW: Vague query parsing (extends parser/)
 │   └── VagueQueryParser.scala     # object (like FOLParser)
@@ -275,7 +275,7 @@ package vague.logic
   * 
   * Paper reference: Definition 1 (Section 5.2)
   */
-enum VagueQuantifierType:
+enum Quantifier:
   /** Approximately k/n (Q[~#]) - "about k/n" 
     * 
     * Satisfied when: |prop - k/n| ≤ ε
@@ -294,24 +294,24 @@ enum VagueQuantifierType:
     */
   case AtMost(k: Int, n: Int, tolerance: Double)
 
-object VagueQuantifierType:
+object Quantifier:
   /** Smart constructors (OCaml pattern: mk_* functions)
     * 
     * OCaml reference: formulas.ml has mk_and, mk_or, etc.
     */
-  def mkAbout(k: Int, n: Int, tol: Double = 0.1): VagueQuantifierType = 
+  def mkAbout(k: Int, n: Int, tol: Double = 0.1): Quantifier = 
     require(n > 0, "Denominator must be positive")
     require(k >= 0 && k <= n, "k must be in [0, n]")
     require(tol >= 0 && tol <= 1, "Tolerance must be in [0, 1]")
     About(k, n, tol)
   
-  def mkAtLeast(k: Int, n: Int, tol: Double = 0.1): VagueQuantifierType = 
+  def mkAtLeast(k: Int, n: Int, tol: Double = 0.1): Quantifier = 
     require(n > 0, "Denominator must be positive")
     require(k >= 0 && k <= n, "k must be in [0, n]")
     require(tol >= 0 && tol <= 1, "Tolerance must be in [0, 1]")
     AtLeast(k, n, tol)
   
-  def mkAtMost(k: Int, n: Int, tol: Double = 0.1): VagueQuantifierType = 
+  def mkAtMost(k: Int, n: Int, tol: Double = 0.1): Quantifier = 
     require(n > 0, "Denominator must be positive")
     require(k >= 0 && k <= n, "k must be in [0, n]")
     require(tol >= 0 && tol <= 1, "Tolerance must be in [0, 1]")
@@ -324,7 +324,7 @@ object VagueQuantifierType:
   val aboutOneThird: VagueQuantifierType = About(1, 3, 0.1)     // Q[~#]^{1/3}
   
   /** Target proportion (k/n) */
-  def targetProportion(q: VagueQuantifierType): Double = q match
+  def targetProportion(q: Quantifier): Double = q match
     case About(k, n, _) => k.toDouble / n.toDouble
     case AtLeast(k, n, _) => k.toDouble / n.toDouble
     case AtMost(k, n, _) => k.toDouble / n.toDouble
@@ -336,7 +336,7 @@ object VagueQuantifierType:
     * @param epsilon Precision parameter from sampling
     * @return true if quantifier accepts proportion
     */
-  def accepts(q: VagueQuantifierType, prop: Double, epsilon: Double): Boolean = 
+  def accepts(q: Quantifier, prop: Double, epsilon: Double): Boolean = 
     q match
       case About(k, n, _) =>
         val target = k.toDouble / n.toDouble
@@ -349,10 +349,10 @@ object VagueQuantifierType:
         prop <= threshold + epsilon
 ```
 
-**Test:** `vague/logic/VagueQuantifierTypeSpec.scala`
+**Test:** `vague/logic/QuantifierSpec.scala`
 ```scala
-class VagueQuantifierTypeSpec extends munit.FunSuite:
-  import VagueQuantifierType.*
+class QuantifierSpec extends munit.FunSuite:
+  import Quantifier.*
   
   test("create About quantifier") {
     val q = mkAbout(3, 4)
@@ -420,7 +420,7 @@ import logic.{FOL, Formula, Term}
   * @param answerVars Free variables y (answer variables)
   */
 case class VagueQuery(
-  quantifier: VagueQuantifierType,
+  quantifier: Quantifier,
   variable: String,
   range: FOL,
   scope: Formula[FOL],
@@ -502,7 +502,7 @@ object VagueQuery:
   def example1: VagueQuery =
     import Formula.*, Term.*
     VagueQuery(
-      quantifier = VagueQuantifierType.mkAtLeast(3, 4),
+      quantifier = Quantifier.mkAtLeast(3, 4),
       variable = "x",
       range = FOL("country", List(Var("x"))),
       scope = Exists("y", And(
@@ -521,7 +521,7 @@ object VagueQuery:
   def example3Skeleton: VagueQuery =
     import Formula.*, Term.*
     VagueQuery(
-      quantifier = VagueQuantifierType.mkAbout(1, 2),
+      quantifier = Quantifier.mkAbout(1, 2),
       variable = "x",
       range = FOL("capital", List(Var("x"))),
       scope = True,  // Placeholder - would be complex formula
@@ -926,7 +926,7 @@ object VagueSemantics:
   
   /** Check if proportion satisfies quantifier */
   private def checkQuantifier(
-    q: VagueQuantifierType,
+    q: Quantifier,
     prop: Double,
     epsilon: Double
   ): Boolean = q match
@@ -1063,7 +1063,7 @@ src/main/scala/
 │   └── FOLSemantics.scala   # object FOLSemantics (OCaml: let rec holds = ...)
 ├── vague/
 │   ├── logic/               # NEW: Vague ADTs (mirrors logic/)
-│   │   ├── VagueQuantifierType.scala   # enum (pattern: Term, Formula)
+│   │   ├── Quantifier.scala   # enum (pattern: Term, Formula)
 │   │   └── VagueQuery.scala            # case class (pattern: FOL)
 │   ├── parser/              # NEW: Vague parsing (mirrors parser/)
 │   │   └── VagueQueryParser.scala      # object (pattern: FOLParser)
@@ -1085,7 +1085,7 @@ src/test/scala/              # Test structure mirrors main/
 │   └── FOLSpec.scala
 ├── vague/
 │   ├── logic/
-│   │   ├── VagueQuantifierTypeSpec.scala
+│   │   ├── QuantifierSpec.scala
 │   │   └── VagueQuerySpec.scala
 │   └── semantics/
 │       ├── RangeExtractorSpec.scala
@@ -1104,7 +1104,7 @@ src/test/scala/              # Test structure mirrors main/
 | `(* OCaml comment *)` | `/** Paper reference: Section X */` | Reference comments |
 
 **Key architectural decisions:**
-1. ✅ Enums for sum types (VagueQuantifierType like Term, Formula)
+1. ✅ Enums for sum types (Quantifier like Term, Formula)
 2. ✅ Case classes for product types (VagueQuery like FOL)
 3. ✅ Objects for modules (VagueSemantics like FOLSemantics)
 4. ✅ Pattern matching for evaluation (exhaustive matches)
