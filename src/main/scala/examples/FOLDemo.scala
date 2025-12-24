@@ -336,7 +336,7 @@ def arithmeticModelDemo(): Unit =
     }
   )
   
-  println("  Functions: +, *")
+  println("  Functions: constants (1-10), +, *")
   println("  Predicates: =, even, prime, <")
   println()
   

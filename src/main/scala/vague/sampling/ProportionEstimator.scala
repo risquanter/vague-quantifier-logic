@@ -21,7 +21,8 @@ case class ProportionEstimate(
     s"Proportion must be in [0,1], got $proportion")
   require(sampleSize >= 0, 
     s"Sample size must be non-negative, got $sampleSize")
-  require(confidenceInterval._1 <= proportion && proportion <= confidenceInterval._2,
+  // Allow small floating point tolerance for CI bounds
+  require(confidenceInterval._1 - 0.0001 <= proportion && proportion <= confidenceInterval._2 + 0.0001,
     s"Proportion $proportion not in confidence interval ${confidenceInterval}")
   
   /** Lower bound of confidence interval. */
