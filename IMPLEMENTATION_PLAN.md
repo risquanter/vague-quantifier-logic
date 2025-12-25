@@ -1104,34 +1104,265 @@ src/test/scala/              # Test structure mirrors main/
 | `(* OCaml comment *)` | `/** Paper reference: Section X */` | Reference comments |
 
 **Key architectural decisions:**
-1. ✅ Enums for sum types (Quantifier like Term, Formula)
-2. ✅ Case classes for product types (VagueQuery like FOL)
-3. ✅ Objects for modules (VagueSemantics like FOLSemantics)
-4. ✅ Pattern matching for evaluation (exhaustive matches)
-5. ✅ Companion smart constructors (mk* pattern)
-6. ✅ Reference comments (paper sections like OCaml references)
-7. ✅ Test structure mirrors source structure
+1. ✅ Enums for sum types (Quantifier like Term, Formula) - IMPLEMENTED
+2. ✅ Case classes for product types (VagueQuery like FOL) - IMPLEMENTED
+3. ✅ Objects for modules (VagueSemantics like FOLSemantics) - IMPLEMENTED
+4. ✅ Pattern matching for evaluation (exhaustive matches) - IMPLEMENTED
+5. ✅ Companion smart constructors (mk* pattern) - IMPLEMENTED
+6. ✅ Reference comments (paper sections like OCaml references) - IMPLEMENTED
+7. ✅ Test structure mirrors source structure - IMPLEMENTED
 
 ---
 
-## Success Criteria
+## Success Criteria (Updated)
 
-✅ **Architectural Consistency:**
-- Follow enum/case class/object pattern
-- Mirror logic/ → parser/ → semantics/ structure
-- Same naming conventions (mk* constructors, etc.)
-- Consistent documentation style
+### ✅ **Phase 1-4: Core Implementation** - COMPLETE
+- ✅ Architectural consistency with OCaml→Scala patterns
+- ✅ Enum/case class/object design implemented
+- ✅ FOL integration via FOLSemantics.holds()
+- ✅ 229 tests passing (100% success rate)
+- ✅ Type-safe formula handling (Formula[FOL])
+- ✅ Statistical evaluation with sampling support
+- ✅ Numeric constant handling
+- ✅ FOLUtil integration for variable extraction
 
-✅ **Functional Requirements:**
-- Parse paper syntax: `Q x (R, φ)`
-- Evaluate using FOLSemantics.holds()
-- Pass all tests
-- Working paper examples
+### 📋 **Phase 5: Parser** - PENDING
+- [ ] Parse paper syntax: `Q[op]^{k/n} x (R, φ)(y)`
+- [ ] Lexer extensions for special tokens
+- [ ] Combinator-based parsing following FOLParser patterns
+- [ ] Integration tests with paper examples
+- [ ] Error handling and validation
+
+### 📋 **Phase 6: Paper Examples** - PENDING
+- [ ] MONDIAL-style geography dataset
+- [ ] Paper queries q₁, q₃ implemented
+- [ ] Exact and sampling evaluation demonstrations
+- [ ] Output formatting and visualization
+- [ ] Validation against paper expected results
+
+### 📋 **Phase 7: Documentation** - PENDING
+- [ ] README.md updated with vague quantifier section
+- [ ] Detailed guide in docs/VagueQuantifiers.md
+- [ ] Scaladoc review and completion
+- [ ] Examples README with usage instructions
+- [ ] Architecture diagram
 
 ---
 
-## Next Action
+## Test Coverage Summary
 
-Ready to start with **Phase 1, Step 1.1: VagueQuantifierType enum**?
+| Component | Tests | Status |
+|-----------|-------|--------|
+| Quantifier | 40 | ✅ Passing |
+| VagueQuery | 29 | ✅ Passing |
+| RangeExtractor | 21 | ✅ Passing |
+| ScopeEvaluator | 26 | ✅ Passing |
+| VagueSemantics | 15 | ✅ Passing |
+| Other vague components | 98 | ✅ Passing |
+| **Total** | **229** | **✅ 100%** |
 
-This will create `vague/logic/VagueQuantifierType.scala` following the OCaml-transpiled style (enum with companion object).
+Core FOL infrastructure: 358+ tests (all passing)
+**Grand Total: 587+ tests passing**
+
+---
+
+## Next Recommended Action
+
+**Option A: Phase 5 (Parser)** - Most logical next step
+- Enables paper syntax usage
+- Completes the DSL experience
+- Medium complexity, well-defined scope
+- Can leverage existing FOLParser infrastructure
+
+**Option B: Phase 6 (Examples) without parser** - Validate functionality
+- Use VagueQuery constructors directly
+- Demonstrate end-to-end evaluation
+- Defer parsing as "nice to have"
+- Lower complexity, immediate value
+
+**Option C: Phase 7 (Documentation)** - Polish what exists
+- Document current functionality
+- Prepare for release/sharing
+- Can add parser later
+- Lowest technical risk
+
+**Recommendation: Option A (Parser)** for completeness, then B, then C.
+
+---
+
+## Implementation Status (Updated: December 25, 2025)
+
+### ✅ Completed Phases
+
+#### **Phase 1: Vague Logic ADTs** ✅ COMPLETE
+- ✅ Step 1.1: `Quantifier.scala` enum with About/AtLeast/AtMost variants (40 tests passing)
+- ✅ Step 1.2: `VagueQuery.scala` case class with validation (29 tests passing)
+- **Total: 69 tests, all passing**
+
+#### **Phase 2: Range Extraction** ✅ COMPLETE
+- ✅ `RangeExtractor.scala` - Extracts D_R from KB (21 tests passing)
+- ✅ Handles substitutions for answer variables
+- ✅ Supports Boolean and unary queries
+- ✅ Numeric constant handling implemented
+
+#### **Phase 3: Scope Evaluation** ✅ COMPLETE
+- ✅ `ScopeEvaluator.scala` - Evaluates scope formulas using FOLSemantics (26 tests passing)
+- ✅ Integration with FOL model theory via `KnowledgeBaseModel`
+- ✅ Statistical proportion calculation
+
+#### **Phase 4: Vague Semantics** ✅ COMPLETE
+- ✅ `VagueSemantics.scala` - Complete query evaluation orchestration (15 tests passing)
+- ✅ Sampling and exact evaluation modes
+- ✅ Quantifier satisfaction checking
+- ✅ `VagueResult` with confidence metadata
+
+#### **Recent Optimizations** ✅ COMPLETE
+- ✅ Numeric constant handling in RangeExtractor (parse integers as RelationValue.Num)
+- ✅ Variable extraction using FOLUtil.varFOL (consistency with FOL infrastructure)
+- ⚠️ getDomain optimization deferred (requires position-aware analysis)
+
+**Current Test Status: 229 tests passing (all vague domain tests)**
+
+---
+
+### 🔄 Remaining Phases
+
+#### **Phase 5: Vague Query Parser** 📋 NEXT
+**Goal:** Parse paper syntax `Q[op]^{k/n} x (R(x,y'), φ(x,y))(y)` into VagueQuery objects
+
+**Files to create:**
+- `src/main/scala/vague/parser/VagueQueryParser.scala`
+- `src/test/scala/vague/parser/VagueQueryParserSpec.scala`
+
+**Requirements:**
+1. Parse quantifier notation: `Q[>=]^{3/4}`, `Q[~]^{1/2}`, `Q[<=]^{1/3}`
+2. Parse variable binding: `x` (quantified variable)
+3. Parse range predicate: `R(x,y')` using existing FOL term parsing
+4. Parse scope formula: `φ(x,y)` using `FOLParser.parse()`
+5. Parse optional answer variables: `(y)` or `(y1, y2, ...)`
+6. Validate syntax and create VagueQuery instance
+
+**Example inputs:**
+```scala
+// Boolean query (no answer variables)
+"Q[>=]^{3/4} x (country(x), exists y (hasGDP_agr(x,y) /\\ y<=20))"
+
+// Unary query with answer variable
+"Q[~]^{1/2} x (capital(x, y), large(x))(y)"
+
+// Multiple answer variables
+"Q[>=]^{2/3} x (borders(x, y, z), conflict(x))(y, z)"
+```
+
+**Design approach:**
+1. Lexer extension for special tokens: `Q`, `[`, `]`, `^`, `{`, `/`, `}`
+2. Combinator-based parsing following existing `FOLParser` patterns
+3. Reuse FOL term/formula parsing infrastructure
+4. Smart constructor validation via `VagueQuery.mk()`
+
+**Estimated complexity:** Medium (reuses FOL parsing infrastructure)
+
+---
+
+#### **Phase 6: Paper Examples with MONDIAL-Style Data** 📋 PENDING
+**Goal:** Implement complete examples from paper Section 5.2 with realistic data
+
+**Files to create:**
+- `src/main/scala/examples/PaperExamplesDemo.scala`
+- `src/main/scala/vague/datastore/MONDIALProxy.scala` (geography dataset)
+- `src/test/scala/examples/PaperExamplesSpec.scala`
+
+**Requirements:**
+1. Create MONDIAL-style geography dataset:
+   - Countries (name, continent, gdp_agr, population)
+   - Cities (name, country, population, latitude, longitude)
+   - Relations: borders, capital, hasGDP_agr, largeCountry, largeCity
+
+2. Implement paper queries programmatically:
+   - **q₁**: Boolean query - "At least about 3/4 of countries have low agricultural GDP"
+   - **q₃**: Unary query - "About half of capital cities are large"
+   - Additional queries demonstrating all quantifier types
+
+3. Demonstrate both evaluation modes:
+   - Exact evaluation (small D_R)
+   - Sampling evaluation (large D_R with confidence intervals)
+
+4. Output formatting:
+   - Query syntax display
+   - Evaluation results (satisfied/not satisfied)
+   - Proportion and confidence intervals
+   - Sample details
+
+**Design approach:**
+- Use existing `KnowledgeBase` infrastructure
+- Build queries using `VagueQuery` constructors (parser in Phase 5)
+- Reuse `VagueSemantics.holds()` for evaluation
+- Compare with paper expected results
+
+**Estimated complexity:** Medium (data creation + query design)
+
+---
+
+#### **Phase 7: Documentation and Polish** 📋 PENDING
+**Goal:** Comprehensive documentation for vague quantifier extension
+
+**Files to update/create:**
+- Update `README.md` with vague quantifier section
+- Create `docs/VagueQuantifiers.md` - detailed guide
+- Add paper references and examples
+- Code documentation review
+
+**Requirements:**
+1. README updates:
+   - Add "Vague Quantifiers" section
+   - Quick start examples
+   - Architecture overview
+   - Test status (229+ tests)
+
+2. Detailed guide (`docs/VagueQuantifiers.md`):
+   - Paper background (Definition 1, Definition 2)
+   - Architecture explanation (logic → semantics → evaluation)
+   - API documentation with examples
+   - Sampling vs exact evaluation guide
+   - Integration with FOL semantics
+   - Performance considerations
+
+3. Code documentation:
+   - Ensure all public APIs have scaladoc
+   - Paper section references in comments
+   - Usage examples in class/object docs
+
+4. Examples README:
+   - How to run paper examples
+   - Expected output
+   - Data format documentation
+
+**Estimated complexity:** Low-Medium (mostly writing)
+
+---
+
+## Priority and Dependencies
+
+```
+Phase 1-4: ✅ COMPLETE (229 tests passing)
+    ↓
+Phase 5: Parser 📋 NEXT (no dependencies, can start immediately)
+    ↓
+Phase 6: Paper Examples (depends on Phase 5 for parsing, or can use constructors)
+    ↓
+Phase 7: Documentation (depends on Phases 5-6 for completeness)
+```
+
+**Recommended Next Steps:**
+1. **Immediate**: Phase 5 (Parser) - enables paper syntax usage
+2. **Near-term**: Phase 6 (Paper Examples) - validates end-to-end functionality
+3. **Final**: Phase 7 (Documentation) - polish and release preparation
+
+**Alternative Approach:**
+- Can proceed with Phase 6 using `VagueQuery` constructors (skip parser temporarily)
+- Demonstrates functionality while deferring parsing complexity
+- Parser can be added later as syntactic sugar
+
+---
+
+## Success Criteria (Updated)
