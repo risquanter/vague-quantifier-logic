@@ -1225,19 +1225,29 @@ Core FOL infrastructure: 358+ tests (all passing)
 - ✅ OCaml continuation-passing style maintained
 - ✅ Direct integration with FormulaParser and FOLAtomParser
 
+#### **Phase 6: Cybersecurity Examples** ✅ COMPLETE
+- ✅ `CyberSecurityDomain.scala` - Realistic domain with 21 assets, 20 risks, 16 mitigations
+- ✅ `CyberSecurityExamples.scala` - Four executable demonstration queries
+- ✅ Example 1: "At least 3/4 of assets have critical risks" - ✅ SATISFIED (86%)
+- ✅ Example 2: "About half of risks have mitigations" - ✅ SATISFIED (50%, with answer set)
+- ✅ Example 3: "At most 1/3 of critical assets have unmitigated risks" - ❌ NOT SATISFIED (63%, security issue)
+- ✅ Example 4: "At least 90% of high-value assets have patched mitigations" - ❌ NOT SATISFIED (75%)
+- ✅ End-to-end demonstration: Parser → Evaluation → Results
+- ✅ Working demo: `sbt "runMain vague.examples.demo"`
+
 #### **Recent Optimizations** ✅ COMPLETE
 - ✅ Numeric constant handling in RangeExtractor (parse integers as RelationValue.Num)
 - ✅ Variable extraction using FOLUtil.varFOL (consistency with FOL infrastructure)
 - ⚠️ getDomain optimization deferred (requires position-aware analysis)
 
-**Current Test Status: 270 tests passing (100% vague domain success rate)**
+**Current Test Status: 270 tests passing (100% success rate) + 4 working examples**
 
 ---
 
-### 🔄 Remaining Phases
+### 🔄 Current Phase
 
-#### **Phase 6: Paper Examples with Real Data** 📋 NEXT
-**Goal:** Execute paper queries q₁ and q₃ with realistic MONDIAL-style data
+#### **Phase 7: Documentation** 📋 IN PROGRESS
+**Goal:** Comprehensive documentation for users and developers
 
 **Files to create:**
 - `src/main/scala/vague/parser/VagueQueryParser.scala`
