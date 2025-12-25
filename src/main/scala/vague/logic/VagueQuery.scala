@@ -1,6 +1,6 @@
 package vague.logic
 
-import logic.{FOL, Formula, Term}
+import logic.{FOL, Formula, Term, FOLUtil}
 
 /** Vague quantifier query from paper Definition 1 (Section 5.2)
   * 
@@ -46,28 +46,14 @@ case class VagueQuery(
   
   /** Extract all variables from scope formula φ(x,y)
     * 
-    * OCaml reference: fol.ml has var/fv for variable extraction
-    * OCaml pattern: recursive function with pattern matching
+    * Uses FOLUtil.fvFOL to get free variables, consistent with FOL infrastructure.
+    * Returns all variables (free and bound) by using varFOL which includes quantified variables.
+    * 
+    * Note: We want ALL variables here (including bound ones) since this is used for
+    * determining which variables appear in the scope formula, regardless of binding.
     */
   def scopeVars: Set[String] =
-    def extractFromTerm(t: Term): Set[String] = t match
-      case Term.Var(name) => Set(name)
-      case Term.Fn(_, args) => args.flatMap(extractFromTerm).toSet
-      case Term.Const(_) => Set.empty
-    
-    def extractFromFormula(f: Formula[FOL]): Set[String] = f match
-      case Formula.False | Formula.True => Set.empty
-      case Formula.Atom(fol) => 
-        fol.terms.flatMap(extractFromTerm).toSet
-      case Formula.Not(p) => extractFromFormula(p)
-      case Formula.And(p, q) => extractFromFormula(p) ++ extractFromFormula(q)
-      case Formula.Or(p, q) => extractFromFormula(p) ++ extractFromFormula(q)
-      case Formula.Imp(p, q) => extractFromFormula(p) ++ extractFromFormula(q)
-      case Formula.Iff(p, q) => extractFromFormula(p) ++ extractFromFormula(q)
-      case Formula.Forall(x, p) => extractFromFormula(p) + x
-      case Formula.Exists(x, p) => extractFromFormula(p) + x
-    
-    extractFromFormula(scope)
+    FOLUtil.varFOL(scope).toSet
   
   /** Check if query is Boolean (no answer variables) 
     * 

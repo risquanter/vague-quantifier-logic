@@ -3,6 +3,7 @@ package vague.semantics
 import logic.{FOL, Term}
 import vague.datastore.{KnowledgeBase, RelationValue, RelationTuple}
 import vague.logic.VagueQuery
+import logic.Formula
 
 /** Range Extraction (D_R)
   * 
@@ -105,9 +106,12 @@ object RangeExtractor:
         substitution.get(v)  // Substitute if available, else wildcard
       
       case Term.Const(c) =>
-        // Constants in range: try to parse as RelationValue
-        // For now, treat as string constant (TODO: handle numeric constants)
-        Some(RelationValue.Const(c))
+        // Constants in range: parse as RelationValue
+        // Try to parse as integer; if successful use Num, otherwise Const
+        Some(c.toIntOption match {
+          case Some(n) => RelationValue.Num(n)
+          case None => RelationValue.Const(c)
+        })
       
       case Term.Fn(_, _) =>
         // Function terms not supported in KB queries
@@ -201,8 +205,10 @@ object RangeExtractor:
     kb: KnowledgeBase,
     query: VagueQuery
   ): Set[Map[String, RelationValue]] =
-    // For now, use active domain for all answer variables
-    // TODO: Could optimize by using getDomain for specific relations
+    // Use active domain for all answer variables
+    // Note: Could optimize by using getDomain for specific relations/positions,
+    // but this requires analyzing which answer variables appear at which positions
+    // in the range predicate. Using activeDomain is simpler and always correct.
     val domain = kb.activeDomain.toList
     
     def generateForVars(vars: List[String]): Set[Map[String, RelationValue]] =
