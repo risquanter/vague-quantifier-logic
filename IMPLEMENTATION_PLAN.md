@@ -1216,19 +1216,28 @@ Core FOL infrastructure: 358+ tests (all passing)
 - ✅ Quantifier satisfaction checking
 - ✅ `VagueResult` with confidence metadata
 
+#### **Phase 5: Vague Query Parser** ✅ COMPLETE
+- ✅ `VagueQueryParser.scala` - Parse paper syntax `Q[op]^{k/n} x (R, φ)(y)` (41 tests passing)
+- ✅ Supports all quantifier operators: About (~), AtLeast (>=), AtMost (<=)
+- ✅ Custom tolerance syntax: `Q[~]^{1/2}[0.05]`
+- ✅ Complex FOL formulas in scope (∧, ∨, ¬, ∃, ∀, ⟹, ⟺)
+- ✅ Paper examples (q₁, q₃) parsing correctly
+- ✅ OCaml continuation-passing style maintained
+- ✅ Direct integration with FormulaParser and FOLAtomParser
+
 #### **Recent Optimizations** ✅ COMPLETE
 - ✅ Numeric constant handling in RangeExtractor (parse integers as RelationValue.Num)
 - ✅ Variable extraction using FOLUtil.varFOL (consistency with FOL infrastructure)
 - ⚠️ getDomain optimization deferred (requires position-aware analysis)
 
-**Current Test Status: 229 tests passing (all vague domain tests)**
+**Current Test Status: 270 tests passing (100% vague domain success rate)**
 
 ---
 
 ### 🔄 Remaining Phases
 
-#### **Phase 5: Vague Query Parser** 📋 NEXT
-**Goal:** Parse paper syntax `Q[op]^{k/n} x (R(x,y'), φ(x,y))(y)` into VagueQuery objects
+#### **Phase 6: Paper Examples with Real Data** 📋 NEXT
+**Goal:** Execute paper queries q₁ and q₃ with realistic MONDIAL-style data
 
 **Files to create:**
 - `src/main/scala/vague/parser/VagueQueryParser.scala`
