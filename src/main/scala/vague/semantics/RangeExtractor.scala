@@ -71,16 +71,26 @@ object RangeExtractor:
   
   /** Build query pattern for KB lookup
     * 
+    * NOTE: This is NOT FOL formula substitution (that's FOLUtil.subst).
+    * This converts FOL range terms to KB query patterns for database lookup.
+    * 
     * Converts FOL range predicate to KB query pattern:
-    * - Quantified variable x → None (wildcard)
-    * - Free variables with substitution → Some(value)
+    * - Quantified variable x → None (wildcard - we're searching for these!)
+    * - Free variables with substitution → Some(value) (specific value from answer tuple)
     * - Free variables without substitution → None (wildcard)
+    * - Constants → Some(value) (specific constant)
+    * 
+    * Why not use FOLUtil.subst()?
+    * - FOLUtil.subst() replaces variables with terms in formulas
+    * - This builds a database query pattern (List[Option[RelationValue]])
+    * - Different data structures and different purposes!
     * 
     * Example:
     *   Range: capital(x, y)
     *   Quantified: x
     *   Substitution: {y → "France"}
     *   Pattern: [None, Some(Const("France"))]
+    *   Meaning: "Find all x where capital(x, France) holds in KB"
     */
   private def buildPattern(
     range: FOL,
