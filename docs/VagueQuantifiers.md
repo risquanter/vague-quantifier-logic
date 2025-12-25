@@ -733,6 +733,8 @@ val sample = sampler.sample(population, sampleSize = 1000)
 - Parallel query evaluation
 - Cross-platform reproducibility requirements
 
+**Design Documentation**: For detailed analysis of HDR integration strategies (including Fisher-Yates shuffle, index mapping, inclusion probability, and reservoir sampling approaches), see [HDRSamplingIntegration.md](HDRSamplingIntegration.md).
+
 
 ### Optimization Tips
 
