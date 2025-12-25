@@ -107,7 +107,7 @@ class VagueQueryParserSpec extends munit.FunSuite:
   }
   
   test("parse query with existential quantifier in scope") {
-    val q = parse("Q[>=]^{3/4} x (country(x), exists y (hasGDP(x, y) /\\ y < 20))")
+    val q = parse("Q[>=]^{3/4} x (country(x), exists y . (hasGDP(x, y) /\\ y < 20))")
     
     q.scope match
       case Formula.Exists(y, _) =>
@@ -116,7 +116,7 @@ class VagueQueryParserSpec extends munit.FunSuite:
   }
   
   test("parse query with universal quantifier in scope") {
-    val q = parse("Q[~]^{1/2} x (country(x), forall y (city(y) ==> inCountry(y, x)))")
+    val q = parse("Q[~]^{1/2} x (country(x), forall y . (city(y) ==> inCountry(y, x)))")
     
     q.scope match
       case Formula.Forall(y, _) =>
@@ -143,7 +143,7 @@ class VagueQueryParserSpec extends munit.FunSuite:
   // ==================== Paper Examples ====================
   
   test("paper example q1: Boolean query with existential") {
-    val q = parse("""Q[>=]^{3/4} x (country(x), exists y (hasGDP_agr(x, y) /\ y <= 20))""")
+    val q = parse("""Q[>=]^{3/4} x (country(x), exists y . (hasGDP_agr(x, y) /\ y <= 20))""")
     
     assertQueryStructure(q, "x", "country", Nil)
     assert(q.isBoolean)
@@ -336,7 +336,7 @@ class VagueQueryParserSpec extends munit.FunSuite:
   
   test("parse query with multiple quantifiers in scope") {
     val q = parse("""Q[~]^{1/2} x (country(x), 
-                     forall y (city(y) ==> exists z (serves(z, y) /\ inCountry(z, x))))""")
+                     forall y . (city(y) ==> exists z . (serves(z, y) /\ inCountry(z, x))))""")
     
     q.scope match
       case Formula.Forall(_, Formula.Imp(_, Formula.Exists(_, _))) => // Success
@@ -358,6 +358,6 @@ class VagueQueryParserSpec extends munit.FunSuite:
   test("parse handles multiline input") {
     val q = parse("""Q[>=]^{3/4} x 
                     (country(x), 
-                     exists y (hasGDP_agr(x, y) /\ y <= 20))""")
+                     exists y . (hasGDP_agr(x, y) /\ y <= 20))""")
     assertQueryStructure(q, "x", "country", Nil)
   }

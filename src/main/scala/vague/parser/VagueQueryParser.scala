@@ -2,7 +2,7 @@ package vague.parser
 
 import vague.logic.{VagueQuery, Quantifier}
 import logic.{FOL, Formula, Term}
-import parser.{FOLParser, TermParser, FOLAtomParser}
+import parser.{FOLAtomParser, FormulaParser}
 import lexer.Lexer
 import util.StringUtil.explode
 
@@ -57,14 +57,17 @@ object VagueQueryParser:
     // 3. Parse opening paren: (
     val afterParen1 = expect("(", afterVar)
     
-    // 4. Parse range predicate: R(x,y')
-    val (range, afterRange) = parseRangePredicate(afterParen1)
+    // 4. Parse range predicate: R(x,y') using FOL atom parser
+    val (range, afterRange) = FOLAtomParser.parseAtom(List(), afterParen1)
     
     // 5. Parse comma: ,
     val afterComma = expect(",", afterRange)
     
-    // 6. Parse scope formula: φ(x,y)
-    val (scope, afterScope) = parseScopeFormula(afterComma)
+    // 6. Parse scope formula: φ(x,y) using FormulaParser directly
+    val (scope, afterScope) = FormulaParser.parse(
+      FOLAtomParser.parseInfixAtom,
+      FOLAtomParser.parseAtom
+    )(afterComma)
     
     // 7. Parse closing paren: )
     val afterParen2 = expect(")", afterScope)
@@ -96,8 +99,13 @@ object VagueQueryParser:
         val afterBrace = expect("}", afterN)
         
         // Optional tolerance [ε]
+        // Handle both "0.05" (single token) and "0" "." "05" (three tokens from lexer)
         val (tolerance, afterTol) = afterBrace match
           case "[" :: tolStr :: "]" :: rest2 if isNumeric(tolStr) =>
+            (tolStr.toDouble, rest2)
+          case "[" :: intPart :: "." :: fracPart :: "]" :: rest2 
+            if intPart.forall(_.isDigit) && fracPart.forall(_.isDigit) =>
+            val tolStr = s"$intPart.$fracPart"
             (tolStr.toDouble, rest2)
           case _ =>
             (0.1, afterBrace)  // Default tolerance
@@ -120,43 +128,9 @@ object VagueQueryParser:
       case v :: rest if isIdentifier(v) => (v, rest)
       case _ => throw new Exception(s"Expected variable, got: ${tokens.headOption.getOrElse("EOF")}")
   
-  /** Parse range predicate as FOL atom
-    * 
-    * Parses: predicate(term1, term2, ...)
-    * Example: country(x), capital(x, y)
-    */
-  private def parseRangePredicate(tokens: List[String]): (FOL, List[String]) =
-    tokens match
-      case pred :: "(" :: rest if isIdentifier(pred) =>
-        // Parse terms until closing paren
-        val (terms, afterTerms) = parseTermList(rest)
-        val afterParen = expect(")", afterTerms)
-        (FOL(pred, terms), afterParen)
-      
-      case pred :: rest if isIdentifier(pred) =>
-        // Predicate with no arguments
-        (FOL(pred, Nil), rest)
-      
-      case _ =>
-        throw new Exception(s"Expected range predicate, got: ${tokens.take(3).mkString(" ")}")
+
   
-  /** Parse scope formula using FOLParser
-    * 
-    * Delegates to existing FOL parser for full formula parsing.
-    * Parses until closing paren that matches the opening paren of the query.
-    */
-  private def parseScopeFormula(tokens: List[String]): (Formula[FOL], List[String]) =
-    // Find matching closing paren (accounting for nested parens)
-    val (formulaTokens, remaining) = extractUntilMatchingParen(tokens, 0)
-    
-    if formulaTokens.isEmpty then
-      throw new Exception("Expected scope formula")
-    
-    // Parse using FOLParser
-    val formulaStr = formulaTokens.mkString(" ")
-    val formula = FOLParser.parse(formulaStr)
-    
-    (formula, remaining)
+
   
   /** Parse optional answer variables: (y₁, ..., yₘ)
     * 
@@ -189,64 +163,12 @@ object VagueQueryParser:
     
     parseList(tokens, Nil)
   
-  // Helper functions
+  // Helper functions (OCaml-style)
   
-  /** Parse comma-separated list of terms */
-  private def parseTermList(tokens: List[String]): (List[Term], List[String]) =
-    def parseTerm(tokens: List[String]): (Term, List[String]) =
-      tokens match
-        case v :: rest if isIdentifier(v) =>
-          (Term.Var(v), rest)
-        case n :: rest if isNumeric(n) =>
-          (Term.Const(n), rest)
-        case _ =>
-          throw new Exception(s"Expected term, got: ${tokens.headOption.getOrElse("EOF")}")
-    
-    def parseList(tokens: List[String], acc: List[Term]): (List[Term], List[String]) =
-      tokens match
-        case ")" :: _ =>
-          (acc, tokens)
-        case _ =>
-          val (term, afterTerm) = parseTerm(tokens)
-          afterTerm match
-            case "," :: rest =>
-              parseList(rest, acc :+ term)
-            case ")" :: _ =>
-              (acc :+ term, afterTerm)
-            case _ =>
-              throw new Exception(s"Expected ',' or ')' after term, got: ${afterTerm.headOption.getOrElse("EOF")}")
-    
-    // Handle empty list
-    if tokens.headOption.contains(")") then
-      (Nil, tokens)
-    else
-      parseList(tokens, Nil)
-  
-  /** Extract tokens until matching closing paren
+  /** Extract tokens until matching closing parenme and return rest)
     * 
-    * Handles nested parentheses correctly.
-    * 
-    * @param tokens Token stream
-    * @param depth Current nesting depth
-    * @return (tokens inside parens, remaining tokens including closing paren)
+    * OCaml equivalent pattern from fol.ml
     */
-  private def extractUntilMatchingParen(tokens: List[String], depth: Int): (List[String], List[String]) =
-    tokens match
-      case Nil =>
-        throw new Exception("Unmatched parenthesis")
-      case "(" :: rest =>
-        val (inner, remaining) = extractUntilMatchingParen(rest, depth + 1)
-        ("(" :: inner, remaining)
-      case ")" :: rest if depth == 1 =>
-        (Nil, ")" :: rest)
-      case ")" :: rest =>
-        val (inner, remaining) = extractUntilMatchingParen(rest, depth - 1)
-        (")" :: inner, remaining)
-      case token :: rest =>
-        val (inner, remaining) = extractUntilMatchingParen(rest, depth)
-        (token :: inner, remaining)
-  
-  /** Expect specific token */
   private def expect(expected: String, tokens: List[String]): List[String] =
     tokens match
       case `expected` :: rest => rest
