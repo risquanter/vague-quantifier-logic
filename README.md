@@ -100,13 +100,20 @@ val query = VagueQueryParser.parse(
   "Q[>=]^{3/4} x (asset(x), exists r . (has_risk(x, r) /\\ critical_risk(r)))"
 )
 
-// Evaluate on a knowledge base
+// Exact evaluation (use entire range - deterministic)
 val domain = CyberSecurityDomain.kb
 val result = VagueSemantics.holdsExact(query, domain)
 
 println(s"Satisfied: ${result.satisfied}")
 println(s"Proportion: ${result.actualProportion}")
 println(s"Range size: ${result.rangeSize}")
+
+// Sampling evaluation (for large datasets - probabilistic)
+val sampledResult = VagueSemantics.holdsWithSampling(
+  query, domain,
+  sampleSize = 1000,
+  seed = Some(42L)  // Optional: for reproducibility
+)
 
 // Run complete demo
 // sbt "runMain vague.examples.demo"
@@ -121,6 +128,8 @@ Q[>=]^{3/4} x (asset(x), exists r . (has_risk(x, r) /\ critical_risk(r)))
 ```
 
 **Result**: ✅ SATISFIED (86% of assets have critical risks)
+
+**Note**: All examples use exact evaluation (`holdsExact`). Sampling evaluation (`holdsWithSampling`) is available for large datasets but not currently demonstrated.
 
 See `src/main/scala/vague/examples/` for more examples.
 
@@ -172,7 +181,6 @@ src/test/scala/             # Comprehensive test suite (270+ vague tests)
 
 ## Implementation Phases
 
-### Core FOL (Completed)
 ### Core FOL (Completed)
 
 - ✅ Phase 1-4: Core types, utilities, lexer, combinators

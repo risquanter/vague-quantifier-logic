@@ -646,31 +646,93 @@ val result = VagueSemantics.holdsExact(query, domain)
 
 ### Exact vs Sampling Evaluation
 
-**Exact Evaluation** (`holdsExact`):
-- Uses entire range D_R
-- Precise proportion calculation
-- Suitable for small-medium datasets (< 10,000 elements)
-- No statistical uncertainty
+The implementation provides **two evaluation modes**, selected by the user:
 
-**Sampling Evaluation** (`holdsWithSampling`):
-- Uses random sample S ⊂ D_R
-- Approximate proportion with confidence intervals
-- Suitable for large datasets
-- Configurable sample size and random seed
+#### **1. Exact Evaluation** (`holdsExact`)
+
+Uses the entire range D_R as the sample (S = D_R):
 
 ```scala
-// For large datasets (millions of rows)
+val result = VagueSemantics.holdsExact(query, kb)
+```
+
+**Characteristics:**
+- **Deterministic**: Same result every time
+- **Precise**: Calculates exact proportion Prop_D(D_R, φ)
+- **No statistical uncertainty**: No confidence intervals needed
+- **Performance**: O(|D_R| × |φ|) - evaluates scope for every element
+- **Use when**: D_R is small-medium (< 10,000 elements) or precision is critical
+
+**All current examples use exact evaluation** - see `CyberSecurityExamples.scala`
+
+#### **2. Sampling Evaluation** (`holdsWithSampling`)
+
+Uses a random sample S ⊂ D_R of specified size:
+
+```scala
 val result = VagueSemantics.holdsWithSampling(
   query, kb,
   sampleSize = 1000,    // Sample 1000 elements
-  seed = Some(42L)      // Reproducible results
+  seed = Some(42L)      // Optional: reproducible results
+)
+```
+
+**Characteristics:**
+- **Probabilistic**: Different results on repeated evaluation (unless seed provided)
+- **Approximate**: Estimates proportion with statistical confidence
+- **Statistical uncertainty**: Results subject to confidence intervals (ε, α)
+- **Performance**: O(min(sampleSize, |D_R|) × |φ|) - only evaluates scope for sample
+- **Use when**: D_R is very large (millions of elements) or speed is critical
+
+**User decides**: The choice between exact and sampling is **explicitly made by the user** via which API method they call.
+
+### Sampling Implementation Details
+
+The implementation currently uses **simple random sampling** in `VagueSemantics.selectSample()`:
+
+```scala
+// Random sampling with shuffle
+val rng = params.randomSeed match
+  case Some(seed) => new Random(seed)
+  case None => new Random()
+
+rng.shuffle(range.toList).take(actualSize).toSet
+```
+
+**However**, the codebase includes a **sophisticated HDR sampler** (not currently integrated into VagueSemantics):
+
+#### HDR Sampler (Available but Not Used)
+
+Located in `vague/sampling/HDRSampler.scala`, based on Hubbard (2019):
+
+```scala
+import vague.sampling.HDRSampler
+
+val sampler = HDRSampler.forEntityVar[RelationValue](
+  entityId = 123L,  // Domain/organization ID
+  varId = 456L      // Relation/variable ID
 )
 
-// Check statistical significance
-if result.satisfied then
-  println("Query satisfied (with sampling)")
-  // Consider: confidence intervals, margin of error
+val sample = sampler.sample(population, sampleSize = 1000)
 ```
+
+**HDR Advantages over standard Random:**
+- **Counter-based**: Direct access to trial N without computing trials 0..N-1
+- **Multi-dimensional**: Independent sequences for different entities/variables
+- **Reproducible**: Same results across platforms and languages
+- **Parallel-friendly**: No shared state between threads
+- **Tested**: Passes Dieharder statistical randomness tests
+
+**Current Status**: HDR sampler exists with full test coverage (`HDRSamplerSpec.scala`) but is **not integrated** into `VagueSemantics.selectSample()`. Integration would require:
+1. Passing `SamplingParams` (with HDR entity/var IDs) to evaluation
+2. Using `HDRSampler` instead of `scala.util.Random` in `selectSample()`
+3. Updating API to accept `hdrEntityId` and `hdrVarId` parameters
+
+**Why not integrated?** The simple random sampling is sufficient for current use cases (small-medium datasets with exact evaluation). HDR would be valuable for:
+- Large-scale Monte Carlo simulations
+- Parallel query evaluation
+- Cross-platform reproducibility requirements
+
 
 ### Optimization Tips
 
