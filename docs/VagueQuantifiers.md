@@ -116,14 +116,21 @@ The implementation follows a clean separation of concerns:
 ┌──────────────────────┐                   ┌──────────────────────┐
 │  RangeExtractor      │                   │  ScopeEvaluator      │
 │  Extract D_R from KB │                   │  Evaluate φ using    │
-│  Handle substitution │                   │  FOL semantics       │
-└──────────────────────┘                   └──────────────────────┘
-           │                                          │
-           ▼                                          ▼
-    ┌─────────────┐                          ┌──────────────┐
-    │ Knowledge   │                          │ FOLSemantics │
-    │ Base        │                          │ (Tarski)     │
-    └─────────────┘                          └──────────────┘
+│  Uses:               │                   │  EvaluationContext   │
+│  - DomainExtraction  │                   │  - Wraps Model+Val   │
+└──────┬───────────────┘                   └──────┬───────────────┘
+       │                                          │
+       ▼                                          ▼
+┌──────────────────┐                   ┌────────────────────────┐
+│ DomainExtraction │                   │  EvaluationContext     │
+│ Pattern queries  │                   │  FOL evaluation helper │
+└──────┬───────────┘                   └──────┬─────────────────┘
+       │                                      │
+       ▼                                      ▼
+    ┌─────────────┐                    ┌──────────────┐
+    │ Knowledge   │                    │ FOLSemantics │
+    │ Base        │                    │ (Tarski)     │
+    └─────────────┘                    └──────────────┘
 ```
 
 ### Component Responsibilities
@@ -146,11 +153,13 @@ The implementation follows a clean separation of concerns:
 4. **RangeExtractor** (`vague/semantics/RangeExtractor.scala`):
    - Extract D_R = {d | KB ⊨ R(d, c)} from knowledge base
    - Handle answer variable substitution
+   - Uses DomainExtraction utility for pattern-based queries
    - Support Boolean and unary queries
 
 5. **ScopeEvaluator** (`vague/semantics/ScopeEvaluator.scala`):
-   - Evaluate φ(x, c) using FOL semantics
-   - Calculate Prop_D(S, φ)
+   - Evaluate φ(x, c) using EvaluationContext (FOL semantics wrapper)
+   - Calculate Prop_D(S, φ) as proportion (Double)
+   - Uses holdsWithRelationValue extension for KB integration
    - Batch evaluation for efficiency
 
 6. **KnowledgeBase** (`vague/datastore/KnowledgeBase.scala`):
@@ -212,18 +221,27 @@ val result = VagueSemantics.holdsExact(query, kb)
 ```scala
 // Inside RangeExtractor.scala
 def extractRange(
-  rangeAtom: FOL,           // asset(x)
-  quantifiedVar: String,    // "x"
   kb: KnowledgeBase,
-  answerTuple: Map[String, RelationValue] = Map.empty
+  query: VagueQuery,
+  substitution: Map[String, RelationValue] = Map.empty
 ): Set[RelationValue] = {
+  val range = query.range
+  val quantifiedVar = query.variable
   
-  // Query KB: "Give me all values where asset(?) holds"
-  val pattern = List(None)  // Wildcard for x
-  val results = kb.query("asset", pattern)
+  // Build query pattern: replace variables with values or wildcards
+  val pattern = buildPattern(range, quantifiedVar, substitution)
+  // Example for asset(x): List(None) - wildcard for x
   
-  // Extract the values
-  results.map(_.values(0))  // Get first column
+  // Find position of quantified variable
+  val quantVarPosition = findVariablePosition(range, quantifiedVar)
+  
+  // Use DomainExtraction utility for pattern-based extraction
+  DomainExtraction.extractFromPatternAtPosition(
+    kb,
+    range.predicate,  // "asset"
+    pattern,          // List(None)
+    quantVarPosition  // 0
+  )
 }
 
 // Returns: {server1, server2, workstation1, laptop1}
@@ -238,28 +256,38 @@ def extractRange(
 ```scala
 // Inside ScopeEvaluator.scala
 def calculateProportion(
-  scopeFormula: Formula[FOL],  // exists r . (has_risk(x,r) /\ critical_risk(r))
-  quantifiedVar: String,       // "x"
-  range: Set[RelationValue],   // {server1, server2, workstation1, laptop1}
-  kb: KnowledgeBase,
-  answerTuple: Map[String, RelationValue] = Map.empty
-): (Int, Int) = {
+  sample: Set[RelationValue],  // {server1, server2, workstation1, laptop1}
+  formula: Formula[FOL],       // exists r . (has_risk(x,r) /\ critical_risk(r))
+  variable: String,            // "x"
+  model: Model[Any],           // FOL model from KB
+  substitution: Map[String, Any] = Map.empty
+): Double = {
   
-  var satisfyingCount = 0
-  
-  // Check EACH element in range
-  for (element <- range) {
-    // Substitute x = element in scope formula
-    val substituted = scopeFormula.substitute("x" -> element)
-    // Example: exists r . (has_risk(server1, r) /\ critical_risk(r))
+  if sample.isEmpty then 0.0
+  else
+    // Count elements satisfying the formula
+    val satisfying = sample.count { elem =>
+      evaluateForElement(formula, elem, variable, model, substitution)
+    }
     
-    // Evaluate using FOL semantics
-    val holds = FOLSemantics.holds(kb, List(), substituted)
-    
-    if (holds) satisfyingCount += 1
-  }
+    // Return proportion as Double
+    satisfying.toDouble / sample.size.toDouble
+}
+
+// Helper: evaluateForElement uses EvaluationContext
+def evaluateForElement(
+  formula: Formula[FOL],
+  element: RelationValue,
+  variable: String,
+  model: Model[Any],
+  substitution: Map[String, Any]
+): Boolean = {
+  // Create evaluation context with answer variable bindings
+  val ctx = EvaluationContext(model, substitution)
   
-  (satisfyingCount, range.size)
+  // Use extension method for RelationValue integration
+  // This combines: conversion, binding, and FOL evaluation
+  ctx.holdsWithRelationValue(formula, variable, element)
 }
 ```
 
@@ -285,7 +313,7 @@ def calculateProportion(
    - Check: has_risk(laptop1, outdated_library) ✓ BUT critical_risk(outdated_library) ✗
    - **Result: FALSE** ✗
 
-**Result**: (satisfyingCount=2, rangeSize=4)
+**Result**: proportion = 2.0 / 4.0 = 0.5
 
 #### Step 4: VagueSemantics.holdsExact() - Check quantifier
 
@@ -327,13 +355,13 @@ VagueSemantics.holdsExact()
      │
      ├─ 2. Call ScopeEvaluator
      │      Input: exists r.(has_risk(x,r) /\ critical_risk(r))
-     │             Range: {server1, server2, workstation1, laptop1}
-     │      Process:
+     │             Sample: {server1, server2, workstation1, laptop1}
+     │      Process (via EvaluationContext):
      │         ├─ Check server1 → TRUE ✓
      │         ├─ Check server2 → TRUE ✓
      │         ├─ Check workstation1 → FALSE ✗
      │         └─ Check laptop1 → FALSE ✗
-     │      Output: (2, 4)
+     │      Output: proportion = 0.5 (2 satisfying / 4 total)
      │
      └─ 3. Check Quantifier
             actualProportion = 2/4 = 0.5
@@ -359,6 +387,27 @@ This design mirrors the paper's mathematical definition:
 - D_R extraction (Definition 2, range predicate)
 - Prop_D calculation (Definition 3, scope evaluation)  
 - Quantifier satisfaction check (Definition 1, threshold comparison)
+
+### Utility Layer (Refactored 2024)
+
+The implementation uses utility modules for common operations:
+
+1. **DomainExtraction** (`vague/semantics/DomainExtraction.scala`):
+   - Reusable KB domain query operations
+   - Used by RangeExtractor for pattern-based extraction
+   - Functions: `extractFromPatternAtPosition()`, `extractActiveDomain()`, etc.
+
+2. **EvaluationContext** (`semantics/EvaluationContext.scala`):
+   - Wrapper for FOL Model + Valuation
+   - Simplifies formula evaluation with variable bindings
+   - Extension method `holdsWithRelationValue()` for KB integration
+   - Used by ScopeEvaluator for cleaner evaluation code
+
+3. **RelationValueUtil** (`vague/datastore/RelationValueUtil.scala`):
+   - Type-safe conversions between KB types (RelationValue) and FOL types (Any)
+   - Functions: `toDomainValue()`, `fromDomainValue()`, `toDomainSet()`
+
+These utilities eliminate code duplication and provide reusable infrastructure for FOL ↔ KB integration. See [Architecture.md](Architecture.md) for detailed refactoring documentation.
 
 ---
 
