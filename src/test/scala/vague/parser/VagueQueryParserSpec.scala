@@ -361,3 +361,89 @@ class VagueQueryParserSpec extends munit.FunSuite:
                      exists y . (hasGDP_agr(x, y) /\ y <= 20))""")
     assertQueryStructure(q, "x", "country", Nil)
   }
+  
+  // ==================== Safe API Tests ====================
+  
+  test("parseEither succeeds on valid query") {
+    val result = parseEither("Q[~]^{1/2} x (country(x), large(x))")
+    
+    result match
+      case Right(query) =>
+        assertQueryStructure(query, "x", "country", Nil)
+        query.quantifier match
+          case Quantifier.About(1, 2, 0.1) => // Success
+          case _ => fail("Expected About(1, 2, 0.1)")
+      case Left(error) =>
+        fail(s"Expected success, got error: ${error.formatted}")
+  }
+  
+  test("parseEither returns error on invalid quantifier operator") {
+    val result = parseEither("Q[==]^{1/2} x (country(x), large(x))")
+    
+    result match
+      case Left(error) =>
+        assert(error.message.contains("Invalid quantifier operator"))
+        assert(error.message.contains("=="))
+      case Right(_) =>
+        fail("Expected parse error")
+  }
+  
+  test("parseEither returns error on unexpected tokens") {
+    val result = parseEither("Q[~]^{1/2} x (country(x), large(x)) extra tokens")
+    
+    result match
+      case Left(error) =>
+        assert(error.message.contains("Unexpected tokens"))
+        assert(error.message.contains("extra"))
+      case Right(_) =>
+        fail("Expected parse error")
+  }
+  
+  test("parseResult returns Success on valid query") {
+    val result = parseResult("Q[~]^{1/2} x (country(x), large(x))")
+    
+    result match
+      case vague.result.VagueResult.Success(query) =>
+        assertQueryStructure(query, "x", "country", Nil)
+      case vague.result.VagueResult.Failure(error) =>
+        fail(s"Expected success, got error: ${error.formatted}")
+  }
+  
+  test("parseResult returns Failure on invalid query") {
+    val result = parseResult("Q[invalid]^{1/2} x (country(x), large(x))")
+    
+    result match
+      case vague.result.VagueResult.Failure(error) =>
+        assert(error.message.contains("Invalid quantifier operator"))
+      case vague.result.VagueResult.Success(_) =>
+        fail("Expected parse error")
+  }
+  
+  test("parseResult can be composed with for-comprehension") {
+    val result = for
+      q1 <- parseResult("Q[~]^{1/2} x (country(x), large(x))")
+      q2 <- parseResult("Q[>=]^{3/4} y (city(y), populous(y))")
+    yield (q1, q2)
+    
+    result match
+      case vague.result.VagueResult.Success((q1, q2)) =>
+        assertEquals(q1.variable, "x")
+        assertEquals(q2.variable, "y")
+      case vague.result.VagueResult.Failure(error) =>
+        fail(s"Expected success, got error: ${error.formatted}")
+  }
+  
+  test("parseResult for-comprehension short-circuits on first error") {
+    val result = for
+      q1 <- parseResult("Q[~]^{1/2} x (country(x), large(x))")
+      q2 <- parseResult("Q[invalid]^{3/4} y (city(y), populous(y))")  // This will fail
+      q3 <- parseResult("Q[~]^{1/3} z (person(z), tall(z))")
+    yield (q1, q2, q3)
+    
+    result match
+      case vague.result.VagueResult.Failure(error) =>
+        assert(error.message.contains("Invalid quantifier operator"))
+      case vague.result.VagueResult.Success(_) =>
+        fail("Expected parse error")
+  }
+

@@ -1,5 +1,6 @@
 package vague.logic
 
+import vague.error.VagueError
 import logic.{FOL, Formula, Term, FOLUtil}
 
 /** Vague quantifier query from paper Definition 1 (Section 5.2)
@@ -65,6 +66,51 @@ case class VagueQuery(
   def isUnary: Boolean = answerVars.length == 1
 
 object VagueQuery:
+  /** Smart constructor with validation (safe internal)
+    * 
+    * @param q Quantifier Q[op]^{k/n}
+    * @param x Quantified variable
+    * @param r Range predicate R(x,y')
+    * @param phi Scope predicate φ(x,y)
+    * @param y Answer variables
+    * @return Either error or validated VagueQuery
+    */
+  def mkSafe(
+    q: Quantifier,
+    x: String,
+    r: FOL,
+    phi: Formula[FOL],
+    y: List[String] = Nil
+  ): Either[VagueError, VagueQuery] =
+    val query = VagueQuery(q, x, r, phi, y)
+    
+    // Validation: x should appear in range
+    if !query.rangeVars.contains(x) then
+      return Left(VagueError.ValidationError(
+        s"Quantified variable '$x' must appear in range predicate ${r.predicate}",
+        "quantified_variable",
+        Map(
+          "variable" -> x,
+          "range_predicate" -> r.predicate,
+          "range_vars" -> query.rangeVars.mkString(", ")
+        )
+      ))
+    
+    // Paper constraint: y' ⊆ y (range vars minus x ⊆ answer vars)
+    val rangeVarsMinusX = query.rangeVars - x
+    if !rangeVarsMinusX.subsetOf(y.toSet) then
+      return Left(VagueError.ValidationError(
+        s"Range variables ${rangeVarsMinusX.mkString(",")} must be subset of answer variables ${y.mkString(",")}",
+        "answer_variables",
+        Map(
+          "range_vars" -> rangeVarsMinusX.mkString(", "),
+          "answer_vars" -> y.mkString(", "),
+          "missing_vars" -> (rangeVarsMinusX -- y.toSet).mkString(", ")
+        )
+      ))
+    
+    Right(query)
+  
   /** Smart constructor with validation (OCaml pattern)
     * 
     * OCaml reference: formulas.ml has mk_* constructors
@@ -76,6 +122,7 @@ object VagueQuery:
     * @param phi Scope predicate φ(x,y)
     * @param y Answer variables
     * @return Validated VagueQuery
+    * @throws VagueException if validation fails
     */
   def mk(
     q: Quantifier,
@@ -84,22 +131,9 @@ object VagueQuery:
     phi: Formula[FOL],
     y: List[String] = Nil
   ): VagueQuery =
-    val query = VagueQuery(q, x, r, phi, y)
-    
-    // Validation: x should appear in range
-    require(
-      query.rangeVars.contains(x),
-      s"Quantified variable '$x' must appear in range predicate ${r.predicate}"
-    )
-    
-    // Paper constraint: y' ⊆ y (range vars minus x ⊆ answer vars)
-    val rangeVarsMinusX = query.rangeVars - x
-    require(
-      rangeVarsMinusX.subsetOf(y.toSet),
-      s"Range variables ${rangeVarsMinusX.mkString(",")} must be subset of answer variables ${y.mkString(",")}"
-    )
-    
-    query
+    mkSafe(q, x, r, phi, y) match
+      case Right(query) => query
+      case Left(error) => throw error.toThrowable
   
   /** Example: q₁ from paper (Boolean query)
     * 

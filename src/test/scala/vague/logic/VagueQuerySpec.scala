@@ -2,6 +2,7 @@ package vague.logic
 
 import munit.FunSuite
 import logic.{FOL, Formula, Term}
+import vague.error.VagueException
 
 class VagueQuerySpec extends FunSuite:
   import VagueQuery.*, Quantifier.*, Formula.*, Term.*
@@ -126,7 +127,7 @@ class VagueQuerySpec extends FunSuite:
   // ==================== Validation Tests ====================
   
   test("mk validates quantified variable in range") {
-    val error = intercept[IllegalArgumentException] {
+    val error = intercept[VagueException] {
       mk(
         mkAbout(1, 2),
         "x",
@@ -138,7 +139,7 @@ class VagueQuerySpec extends FunSuite:
   }
   
   test("mk validates range variables subset of answer vars") {
-    val error = intercept[IllegalArgumentException] {
+    val error = intercept[VagueException] {
       mk(
         mkAbout(1, 2),
         "x",
