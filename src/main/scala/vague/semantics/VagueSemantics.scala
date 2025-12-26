@@ -5,6 +5,8 @@ import semantics.FOLSemantics
 import vague.datastore.{KnowledgeBase, KnowledgeSource, RelationValue}
 import vague.logic.{Quantifier, VagueQuery}
 import vague.bridge.{KnowledgeBaseModel, KnowledgeSourceModel}
+import vague.error.{VagueError, VagueException}
+import vague.result.VagueResult as VagueResultMonad
 import scala.util.Random
 
 /** Result of evaluating a vague quantifier query
@@ -15,7 +17,7 @@ import scala.util.Random
   * @param sampleSize Size of the sample used (may equal rangeSize for exact evaluation)
   * @param satisfyingCount Number of elements in sample that satisfy the scope formula
   */
-case class VagueResult(
+case class QueryResult(
   satisfied: Boolean,
   actualProportion: Double,
   rangeSize: Int,
@@ -83,7 +85,7 @@ object VagueSemantics:
     source: KnowledgeSource,
     answerTuple: Map[String, RelationValue],
     params: EvaluationParams = EvaluationParams()
-  ): VagueResult =
+  ): QueryResult =
     
     // Step 1: Extract range D_R using range predicate R
     val rangeElements = RangeExtractor.extractRange(
@@ -97,7 +99,7 @@ object VagueSemantics:
     
     // Handle empty range
     if rangeElements.isEmpty then
-      return VagueResult(
+      return QueryResult(
         satisfied = false,
         actualProportion = 0.0,
         rangeSize = 0,
@@ -129,13 +131,147 @@ object VagueSemantics:
       answerTuple
     )
     
-    VagueResult(
+    QueryResult(
       satisfied = satisfied,
       actualProportion = proportion,
       rangeSize = rangeElements.size,
       sampleSize = sample.size,
       satisfyingCount = satisfyingCount
     )
+  
+  /** Evaluate a vague quantifier query (safe internal implementation)
+    * 
+    * Returns Either[VagueError, QueryResult] for structured error handling.
+    * 
+    * @param query The vague query to evaluate
+    * @param source The knowledge source to evaluate against
+    * @param answerTuple The answer tuple c to substitute for answer variables in φ
+    * @param params Evaluation parameters (sampling, etc.)
+    * @return Either error or result containing satisfaction and metadata
+    */
+  private def holdsInternal(
+    query: VagueQuery,
+    source: KnowledgeSource,
+    answerTuple: Map[String, RelationValue],
+    params: EvaluationParams
+  ): Either[VagueError, QueryResult] =
+    try
+      // Step 1: Extract range D_R using range predicate R
+      val rangeElementsResult = RangeExtractor.extractRangeSafe(
+        source,
+        query,
+        answerTuple
+      )
+      
+      rangeElementsResult.flatMap { rangeElements =>
+        // Convert source to FOL Model for scope evaluation
+        val model = KnowledgeSourceModel.toModel(source)
+        
+        // Handle empty range
+        if rangeElements.isEmpty then
+          Left(VagueError.EmptyRangeError(
+            query.range.predicate,
+            s"${query.variable} with substitution ${answerTuple}",
+            Some("Check that the relation exists and has data matching the criteria")
+          ))
+        else
+          // Step 2: Select sample S
+          val sample = selectSample(rangeElements, params)
+          
+          // Step 3: Calculate Prop_D(S, φ(x,c))
+          val proportionResult = ScopeEvaluator.calculateProportionSafe(
+            sample,
+            query.scope,
+            query.variable,
+            model,
+            answerTuple
+          )
+          
+          proportionResult.map { proportion =>
+            // Step 4: Check quantifier condition
+            val satisfied = checkQuantifier(query.quantifier, proportion)
+            
+            // Calculate satisfying count for metadata
+            val satisfyingCount = ScopeEvaluator.countSatisfying(
+              sample,
+              query.scope,
+              query.variable,
+              model,
+              answerTuple
+            )
+            
+            QueryResult(
+              satisfied = satisfied,
+              actualProportion = proportion,
+              rangeSize = rangeElements.size,
+              sampleSize = sample.size,
+              satisfyingCount = satisfyingCount
+            )
+          }
+      }
+    catch
+      case e: VagueException => Left(e.error)
+      case e: Exception =>
+        Left(VagueError.EvaluationError(
+          s"Unexpected error during query evaluation: ${e.getMessage}",
+          "query_evaluation",
+          Some(e),
+          Map("query" -> query.toString)
+        ))
+  
+  /** Evaluate a vague quantifier query (Either API for Scala/FP users)
+    * 
+    * Returns structured errors instead of throwing exceptions.
+    * Use this API for composable error handling with Either or effect systems.
+    * 
+    * @param query The vague query to evaluate
+    * @param source The knowledge source to evaluate against
+    * @param answerTuple The answer tuple c to substitute for answer variables in φ
+    * @param params Evaluation parameters (sampling, etc.)
+    * @return Either[VagueError, QueryResult]
+    * 
+    * Example:
+    * {{{
+    * holdsEither(query, source, Map.empty) match
+    *   case Right(result) => println(s"Satisfied: ${result.satisfied}")
+    *   case Left(EmptyRangeError(msg, _, _)) => println(s"No data: $msg")
+    *   case Left(error) => println(s"Error: ${error.formatted}")
+    * }}}
+    */
+  def holdsEither(
+    query: VagueQuery,
+    source: KnowledgeSource,
+    answerTuple: Map[String, RelationValue] = Map.empty,
+    params: EvaluationParams = EvaluationParams()
+  ): Either[VagueError, QueryResult] =
+    holdsInternal(query, source, answerTuple, params)
+  
+  /** Evaluate a vague quantifier query (VagueResult API for composition)
+    * 
+    * Returns VagueResult monad for functional composition with for-comprehensions.
+    * Use this API when composing multiple query evaluations or integrating with effect systems.
+    * 
+    * @param query The vague query to evaluate
+    * @param source The knowledge source to evaluate against
+    * @param answerTuple The answer tuple c to substitute for answer variables in φ
+    * @param params Evaluation parameters (sampling, etc.)
+    * @return VagueResult[QueryResult]
+    * 
+    * Example:
+    * {{{
+    * for
+    *   result1 <- holdsSafe(query1, source)
+    *   result2 <- holdsSafe(query2, source)
+    * yield (result1.satisfied && result2.satisfied)
+    * }}}
+    */
+  def holdsSafe(
+    query: VagueQuery,
+    source: KnowledgeSource,
+    answerTuple: Map[String, RelationValue] = Map.empty,
+    params: EvaluationParams = EvaluationParams()
+  ): VagueResultMonad[QueryResult] =
+    VagueResultMonad.fromEither(holdsInternal(query, source, answerTuple, params))
   
   /** Backward-compatible wrapper for KnowledgeBase
     * 
@@ -150,7 +286,7 @@ object VagueSemantics:
     kb: KnowledgeBase,
     answerTuple: Map[String, RelationValue],
     params: EvaluationParams = EvaluationParams()
-  ): VagueResult =
+  ): QueryResult =
     val source = KnowledgeSource.fromKnowledgeBase(kb)
     holds(query, source, answerTuple, params)
 
@@ -226,7 +362,7 @@ object VagueSemantics:
     query: VagueQuery,
     source: KnowledgeSource,
     answerTuple: Map[String, RelationValue] = Map.empty
-  ): VagueResult =
+  ): QueryResult =
     holds(query, source, answerTuple, EvaluationParams(useSampling = false))
 
   /** Convenience method for sampling evaluation with specified sample size using KnowledgeSource
@@ -244,7 +380,7 @@ object VagueSemantics:
     sampleSize: Int,
     answerTuple: Map[String, RelationValue] = Map.empty,
     seed: Option[Long] = None
-  ): VagueResult =
+  ): QueryResult =
     holds(
       query, 
       source, 
@@ -259,7 +395,7 @@ object VagueSemantics:
     query: VagueQuery,
     kb: KnowledgeBase,
     answerTuple: Map[String, RelationValue] = Map.empty
-  ): VagueResult =
+  ): QueryResult =
     holdsExact(query, KnowledgeSource.fromKnowledgeBase(kb), answerTuple)
 
   /** Backward-compatible sampling evaluation for KnowledgeBase
@@ -271,5 +407,5 @@ object VagueSemantics:
     sampleSize: Int,
     answerTuple: Map[String, RelationValue] = Map.empty,
     seed: Option[Long] = None
-  ): VagueResult =
+  ): QueryResult =
     holdsWithSampling(query, KnowledgeSource.fromKnowledgeBase(kb), sampleSize, answerTuple, seed)

@@ -3,6 +3,7 @@ package vague.semantics
 import logic.{FOL, Term}
 import vague.datastore.{KnowledgeBase, KnowledgeSource, RelationValue, RelationTuple}
 import vague.logic.VagueQuery
+import vague.error.{VagueError, VagueException}
 import logic.Formula
 
 /** Range Extraction (D_R)
@@ -39,7 +40,74 @@ import logic.Formula
   */
 object RangeExtractor:
   
-  /** Extract range domain D_R from knowledge source
+  /** Extract range domain D_R from knowledge source (safe internal implementation)
+    * 
+    * @param source The knowledge source to query
+    * @param query The vague query containing the range predicate
+    * @param substitution Values for free variables (answer variables from query)
+    * @return Either error or set of domain elements satisfying the range predicate
+    */
+  private def extractRangeInternal(
+    source: KnowledgeSource,
+    query: VagueQuery,
+    substitution: Map[String, RelationValue]
+  ): Either[VagueError, Set[RelationValue]] =
+    try
+      val range = query.range
+      val quantifiedVar = query.variable
+      
+      // Build query pattern: replace variables with values or wildcards
+      val patternResult = buildPatternSafe(range, quantifiedVar, substitution)
+      
+      patternResult.flatMap { pattern =>
+        // Find position of quantified variable
+        findVariablePositionSafe(range, quantifiedVar).flatMap { quantVarPosition =>
+          // Use DomainExtraction utility for pattern-based extraction
+          try
+            Right(DomainExtraction.extractFromPatternAtPosition(
+              source,
+              range.predicate,
+              pattern,
+              quantVarPosition
+            ))
+          catch
+            case e: VagueException => Left(e.error)
+            case e: Exception =>
+              Left(VagueError.DataStoreError(
+                s"Error extracting range from data store: ${e.getMessage}",
+                "range_extraction",
+                Some(range.predicate),
+                Some(e)
+              ))
+        }
+      }
+    catch
+      case e: VagueException => Left(e.error)
+      case e: Exception =>
+        Left(VagueError.EvaluationError(
+          s"Error during range extraction: ${e.getMessage}",
+          "range_extraction",
+          Some(e),
+          Map("predicate" -> query.range.predicate)
+        ))
+  
+  /** Extract range domain D_R from knowledge source (Either API)
+    * 
+    * Returns Either for structured error handling.
+    * 
+    * @param source The knowledge source to query
+    * @param query The vague query containing the range predicate
+    * @param substitution Values for free variables
+    * @return Either[VagueError, Set[RelationValue]]
+    */
+  def extractRangeSafe(
+    source: KnowledgeSource,
+    query: VagueQuery,
+    substitution: Map[String, RelationValue] = Map.empty
+  ): Either[VagueError, Set[RelationValue]] =
+    extractRangeInternal(source, query, substitution)
+  
+  /** Extract range domain D_R from knowledge source (throwing API)
     * 
     * Given a vague query and a substitution for free variables,
     * extract all domain elements that satisfy the range predicate.
@@ -54,28 +122,71 @@ object RangeExtractor:
     * @param query The vague query containing the range predicate
     * @param substitution Values for free variables (answer variables from query)
     * @return Set of domain elements satisfying the range predicate
+    * @throws VagueException if extraction fails
     */
   def extractRange(
     source: KnowledgeSource,
     query: VagueQuery,
     substitution: Map[String, RelationValue] = Map.empty
   ): Set[RelationValue] =
-    val range = query.range
-    val quantifiedVar = query.variable
-    
-    // Build query pattern: replace variables with values or wildcards
-    val pattern = buildPattern(range, quantifiedVar, substitution)
-    
-    // Find position of quantified variable
-    val quantVarPosition = findVariablePosition(range, quantifiedVar)
-    
-    // Use DomainExtraction utility for pattern-based extraction
-    DomainExtraction.extractFromPatternAtPosition(
-      source,
-      range.predicate,
-      pattern,
-      quantVarPosition
-    )
+    extractRangeInternal(source, query, substitution) match
+      case Right(result) => result
+      case Left(error) => throw error.toThrowable
+  
+  /** Build query pattern for source lookup (safe version)
+    * 
+    * @return Either error or query pattern
+    */
+  private def buildPatternSafe(
+    range: FOL,
+    quantifiedVar: String,
+    substitution: Map[String, RelationValue]
+  ): Either[VagueError, List[Option[RelationValue]]] =
+    try
+      // Check for function terms first
+      range.terms.collectFirst {
+        case Term.Fn(f, args) => (f, args)
+      } match {
+        case Some((f, args)) =>
+          Left(VagueError.EvaluationError(
+            s"Function terms in range predicates are not supported: $f",
+            "pattern_building",
+            None,
+            Map(
+              "function" -> f,
+              "args" -> args.toString,
+              "suggestion" -> "Use only variables and constants in range predicates"
+            )
+          ))
+        case None =>
+          val pattern = range.terms.map {
+            case Term.Var(v) if v == quantifiedVar =>
+              None  // Wildcard for quantified variable
+            
+            case Term.Var(v) =>
+              substitution.get(v)  // Substitute if available, else wildcard
+            
+            case Term.Const(c) =>
+              // Constants in range: parse as RelationValue
+              Some(c.toIntOption match {
+                case Some(n) => RelationValue.Num(n)
+                case None => RelationValue.Const(c)
+              })
+            
+            case Term.Fn(_, _) =>
+              // Should never reach here due to check above
+              None
+          }
+          Right(pattern)
+      }
+    catch
+      case e: Exception =>
+        Left(VagueError.EvaluationError(
+          s"Error building query pattern: ${e.getMessage}",
+          "pattern_building",
+          Some(e),
+          Map.empty
+        ))
   
   /** Build query pattern for source lookup
     * 
@@ -105,26 +216,30 @@ object RangeExtractor:
     quantifiedVar: String,
     substitution: Map[String, RelationValue]
   ): List[Option[RelationValue]] =
-    range.terms.map {
-      case Term.Var(v) if v == quantifiedVar =>
-        None  // Wildcard for quantified variable
-      
-      case Term.Var(v) =>
-        substitution.get(v)  // Substitute if available, else wildcard
-      
-      case Term.Const(c) =>
-        // Constants in range: parse as RelationValue
-        // Try to parse as integer; if successful use Num, otherwise Const
-        Some(c.toIntOption match {
-          case Some(n) => RelationValue.Num(n)
-          case None => RelationValue.Const(c)
-        })
-      
-      case Term.Fn(_, _) =>
-        // Function terms not supported in KB queries
-        throw new UnsupportedOperationException(
-          "Function terms in range predicates not yet supported"
-        )
+    buildPatternSafe(range, quantifiedVar, substitution) match
+      case Right(pattern) => pattern
+      case Left(error) => throw error.toThrowable
+  
+  /** Find position of quantified variable in range predicate (safe version)
+    * 
+    * @return Either error or position index
+    */
+  private def findVariablePositionSafe(range: FOL, quantifiedVar: String): Either[VagueError, Int] =
+    range.terms.indexWhere {
+      case Term.Var(v) => v == quantifiedVar
+      case _ => false
+    } match {
+      case -1 =>
+        Left(VagueError.ValidationError(
+          s"Quantified variable $quantifiedVar not found in range ${range.predicate}",
+          "quantified_variable",
+          Map(
+            "variable" -> quantifiedVar,
+            "range_predicate" -> range.predicate,
+            "range_terms" -> range.terms.toString
+          )
+        ))
+      case pos => Right(pos)
     }
   
   /** Find position of quantified variable in range predicate
@@ -137,16 +252,9 @@ object RangeExtractor:
     *   capital(y, x) with quantified var x → position 1
     */
   private def findVariablePosition(range: FOL, quantifiedVar: String): Int =
-    range.terms.indexWhere {
-      case Term.Var(v) => v == quantifiedVar
-      case _ => false
-    } match {
-      case -1 =>
-        throw new IllegalStateException(
-          s"Quantified variable $quantifiedVar not found in range ${range.predicate}"
-        )
-      case pos => pos
-    }
+    findVariablePositionSafe(range, quantifiedVar) match
+      case Right(pos) => pos
+      case Left(error) => throw error.toThrowable
   
   /** Extract range for Boolean queries (no free variables)
     * 

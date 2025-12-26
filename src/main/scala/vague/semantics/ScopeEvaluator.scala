@@ -4,6 +4,7 @@ import logic.{FOL, Formula}
 import semantics.{Model, Valuation, FOLSemantics, EvaluationContext}
 import semantics.holdsWithRelationValue  // Extension method
 import vague.datastore.{RelationValue, RelationValueUtil}
+import vague.error.{VagueError, VagueException}
 import RelationValueUtil.*
 
 /** Evaluate scope formula using FOL semantics (paper Definition 2).
@@ -63,6 +64,60 @@ object ScopeEvaluator:
     // 3. Formula evaluation via FOLSemantics
     ctx.holdsWithRelationValue(formula, variable, element)
   
+  /** Calculate proportion (safe internal implementation)
+    * 
+    * @return Either error or proportion in [0, 1]
+    */
+  private def calculateProportionInternal(
+    sample: Set[RelationValue],
+    formula: Formula[FOL],
+    variable: String,
+    model: Model[Any],
+    substitution: Map[String, Any]
+  ): Either[VagueError, Double] =
+    try
+      if sample.isEmpty then
+        Left(VagueError.EmptyRangeError(
+          "sample",
+          "<empty>",
+          Some("Ensure range extraction returns non-empty result")
+        ))
+      else
+        val satisfying = sample.count(elem =>
+          evaluateForElement(formula, elem, variable, model, substitution)
+        )
+        Right(satisfying.toDouble / sample.size.toDouble)
+    catch
+      case e: VagueException => Left(e.error)
+      case e: Exception =>
+        Left(VagueError.EvaluationError(
+          s"Error calculating proportion: ${e.getMessage}",
+          "proportion_calculation",
+          Some(e),
+          Map(
+            "sample_size" -> sample.size.toString,
+            "variable" -> variable
+          )
+        ))
+  
+  /** Calculate proportion (Either API for structured error handling)
+    * 
+    * @param sample Sample S ⊆ D_R
+    * @param formula Scope formula φ(x,y)
+    * @param variable Quantified variable x
+    * @param model FOL model (from KB)
+    * @param substitution Values for answer variables y
+    * @return Either[VagueError, Double] - proportion in [0, 1]
+    */
+  def calculateProportionSafe(
+    sample: Set[RelationValue],
+    formula: Formula[FOL],
+    variable: String,
+    model: Model[Any],
+    substitution: Map[String, Any] = Map.empty
+  ): Either[VagueError, Double] =
+    calculateProportionInternal(sample, formula, variable, model, substitution)
+  
   /** Calculate proportion (paper's Prop_D)
     * 
     * Prop_D(S, φ(x,c)) = |{x ∈ S | D ⊨ φ(x,c)}| / |S|
@@ -83,6 +138,7 @@ object ScopeEvaluator:
     * @param model FOL model (from KB)
     * @param substitution Values for answer variables y
     * @return Proportion in [0, 1]
+    * @throws VagueException if evaluation fails
     */
   def calculateProportion(
     sample: Set[RelationValue],
@@ -93,10 +149,9 @@ object ScopeEvaluator:
   ): Double =
     if sample.isEmpty then 0.0
     else
-      val satisfying = sample.count(elem =>
-        evaluateForElement(formula, elem, variable, model, substitution)
-      )
-      satisfying.toDouble / sample.size.toDouble
+      calculateProportionInternal(sample, formula, variable, model, substitution) match
+        case Right(proportion) => proportion
+        case Left(error) => throw error.toThrowable
   
   /** Batch evaluation (optimization for large samples)
     * 

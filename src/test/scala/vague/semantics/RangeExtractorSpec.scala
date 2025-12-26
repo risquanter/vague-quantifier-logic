@@ -1,6 +1,7 @@
 package vague.semantics
 
 import munit.FunSuite
+import vague.error.VagueException
 import logic.{FOL, Formula, Term}
 import vague.logic.{VagueQuery, Quantifier}
 import vague.datastore.{KnowledgeBase, KnowledgeSource, Relation, RelationTuple, RelationValue, PositionType}
@@ -347,7 +348,7 @@ class RangeExtractorSpec extends FunSuite:
       Formula.True
     )
     
-    intercept[IllegalStateException] {
+    intercept[VagueException] {
       extractRangeBoolean(kb, query)
     }
   }
