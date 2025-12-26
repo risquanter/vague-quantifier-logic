@@ -4,6 +4,7 @@ import scala.reflect.ClassTag
 import vague.quantifier.VagueQuantifier
 import vague.datastore.{KnowledgeSource, RelationValue, RelationValueUtil}
 import vague.sampling.SamplingParams
+import vague.semantics.DomainExtraction
 import RelationValueUtil.*
 
 /** Query DSL for vague quantifier queries over knowledge bases.

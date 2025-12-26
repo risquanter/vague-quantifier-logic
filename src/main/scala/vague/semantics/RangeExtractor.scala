@@ -63,12 +63,16 @@ object RangeExtractor:
     // Build query pattern: replace variables with values or wildcards
     val pattern = buildPattern(range, quantifiedVar, substitution)
     
-    // Query KB for matching tuples
-    val matchingTuples = kb.query(range.predicate, pattern)
-    
-    // Extract values at quantified variable position
+    // Find position of quantified variable
     val quantVarPosition = findVariablePosition(range, quantifiedVar)
-    matchingTuples.map(_.values(quantVarPosition))
+    
+    // Use DomainExtraction utility for pattern-based extraction
+    DomainExtraction.extractFromPatternAtPosition(
+      kb,
+      range.predicate,
+      pattern,
+      quantVarPosition
+    )
   
   /** Build query pattern for KB lookup
     * 
