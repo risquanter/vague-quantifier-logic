@@ -1,7 +1,8 @@
 package vague.semantics
 
 import logic.{FOL, Formula}
-import semantics.{Model, Valuation, FOLSemantics}
+import semantics.{Model, Valuation, FOLSemantics, EvaluationContext}
+import semantics.holdsWithRelationValue  // Extension method
 import vague.datastore.{RelationValue, RelationValueUtil}
 import RelationValueUtil.*
 
@@ -52,25 +53,15 @@ object ScopeEvaluator:
     model: Model[Any],
     substitution: Map[String, Any] = Map.empty
   ): Boolean =
-    // Convert RelationValue to domain value
-    val elementValue: Any = toDomainValue(element)
+    // Create evaluation context with substitution (answer variables)
+    val ctx = EvaluationContext(model, substitution)
     
-    // Build valuation: σ{x ↦ element} ∪ substitution
-    // OCaml pattern: (x |-> a) v updates valuation
-    // Paper: σ{x ↦ element} means "extend σ with x mapped to element"
-    val valuation = Valuation(
-      Map(variable -> elementValue) ++ substitution
-    )
-    
-    // THE KEY INTEGRATION: Use FOLSemantics.holds()
-    // OCaml reference: holds (domain,func,pred) v fm
-    // Scala translation: FOLSemantics.holds(formula, model, valuation)
-    // 
-    // This is where vague quantifiers integrate with FOL:
-    // - Scope predicates are Formula[FOL], not Scala functions
-    // - Evaluation uses Tarski semantics via FOLSemantics
-    // - Model comes from KB via KnowledgeBaseModel.toModel
-    FOLSemantics.holds(formula, model, valuation)
+    // THE KEY INTEGRATION: Use EvaluationContext.holdsWithRelationValue()
+    // This combines:
+    // 1. RelationValue → domain value conversion
+    // 2. Variable binding (σ{x ↦ element})
+    // 3. Formula evaluation via FOLSemantics
+    ctx.holdsWithRelationValue(formula, variable, element)
   
   /** Calculate proportion (paper's Prop_D)
     * 
@@ -102,9 +93,6 @@ object ScopeEvaluator:
   ): Double =
     if sample.isEmpty then 0.0
     else
-      // OCaml pattern: count elements satisfying predicate
-      // OCaml: length (filter predicate list)
-      // Scala: sample.count(elem => evaluateForElement(...))
       val satisfying = sample.count(elem =>
         evaluateForElement(formula, elem, variable, model, substitution)
       )
