@@ -2,9 +2,10 @@ package vague.semantics
 
 import logic.{FOL, Formula}
 import semantics.{Model, Valuation, FOLSemantics}
-import vague.datastore.RelationValue
+import vague.datastore.{RelationValue, RelationValueUtil}
+import RelationValueUtil.*
 
-/** Evaluate scope formula using FOL semantics (paper Definition 2)
+/** Evaluate scope formula using FOL semantics (paper Definition 2).
   * 
   * Prop_D(S, φ(x,c)) = |{x ∈ S | D ⊨ φ(x,c)}| / |S|
   * 
@@ -52,9 +53,7 @@ object ScopeEvaluator:
     substitution: Map[String, Any] = Map.empty
   ): Boolean =
     // Convert RelationValue to domain value
-    val elementValue: Any = element match
-      case RelationValue.Const(name) => name
-      case RelationValue.Num(value) => value
+    val elementValue: Any = toDomainValue(element)
     
     // Build valuation: σ{x ↦ element} ∪ substitution
     // OCaml pattern: (x |-> a) v updates valuation

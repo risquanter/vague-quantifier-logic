@@ -1,6 +1,7 @@
 package printer
 
 import logic.{FOL, Formula, Term}
+import printer.PrinterUtil.*
 
 /** Pretty printer for FOL formulas and terms
   * 
@@ -59,11 +60,12 @@ object FOLPrinter:
           // Function application: f(arg1, arg2, ...)
           s"$f(${args.map(printTerm(_, 0)).mkString(", ")})"
   
+  /** Infix operators for terms */
+  private val termInfixOps = Set("+", "-", "*", "/", "^", "::")
+  
   /** Check if a function name is an infix operator */
   private def isInfixOp(f: String): Boolean =
-    f match
-      case "+" | "-" | "*" | "/" | "^" | "::" => true
-      case _ => false
+    PrinterUtil.isInfixOp(f, termInfixOps)
   
   /** Get precedence level for infix operators
     * 
@@ -85,10 +87,16 @@ object FOLPrinter:
   /** Print an infix term with proper precedence and parentheses */
   private def printInfixTerm(op: String, left: Term, right: Term, prec: Int): String =
     val opPrec = infixPrec(op)
-    val leftStr = printTerm(left, opPrec)
-    val rightStr = printTerm(right, opPrec)
-    val result = s"$leftStr $op $rightStr"
-    if prec > opPrec then s"($result)" else result
+    // Note: ^ is left-associative, others are right-associative
+    val rightAssoc = op != "^"
+    printBinaryInfix(
+      opPrec,
+      op,
+      leftPrec => printTerm(left, leftPrec),
+      rightPrec => printTerm(right, rightPrec),
+      prec,
+      rightAssoc
+    )
   
   // ==================== FOL Atom Printing ====================
   
@@ -110,11 +118,12 @@ object FOLPrinter:
     else
       s"$pred(${args.map(printTerm(_)).mkString(", ")})"
   
+  /** Infix relations for formulas */
+  private val formulaInfixRels = Set("=", "<", "<=", ">", ">=")
+  
   /** Check if a predicate is an infix relation */
   private def isInfixRel(pred: String): Boolean =
-    pred match
-      case "=" | "<" | "<=" | ">" | ">=" => true
-      case _ => false
+    PrinterUtil.isInfixOp(pred, formulaInfixRels)
   
   // ==================== Formula Printing ====================
   
@@ -170,7 +179,7 @@ object FOLPrinter:
   /** Print a prefix operator (negation) */
   private def printPrefix(opPrec: Int, op: String, p: Formula[FOL], prec: Int): String =
     val result = s"$op${printFormula(p, opPrec)}"
-    if prec > opPrec then s"($result)" else result
+    parenthesize(opPrec, prec, result)
   
   /** Print an infix binary operator
     * 
@@ -188,11 +197,15 @@ object FOLPrinter:
     right: Formula[FOL], 
     prec: Int
   ): String =
-    // For right-associative operators, left side needs higher precedence
-    val leftStr = printFormula(left, opPrec + 1)
-    val rightStr = printFormula(right, opPrec)
-    val result = s"$leftStr $op $rightStr"
-    if prec > opPrec then s"($result)" else result
+    // All formula operators are right-associative
+    printBinaryInfix(
+      opPrec,
+      op,
+      leftPrec => printFormula(left, leftPrec),
+      rightPrec => printFormula(right, rightPrec),
+      prec,
+      rightAssoc = true
+    )
   
   /** Print a quantified formula
     * 
@@ -212,7 +225,7 @@ object FOLPrinter:
     // Collect consecutive quantifiers of same type
     val (vars, innerBody) = collectQuantifiers(quant, x, body)
     val result = s"$quant ${vars.mkString(" ")}. ${printFormula(innerBody, 0)}"
-    if prec > 0 then s"($result)" else result
+    parenthesize(0, prec, result)
   
   /** Collect consecutive quantifiers of the same type
     * 

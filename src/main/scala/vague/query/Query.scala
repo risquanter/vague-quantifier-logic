@@ -2,8 +2,9 @@ package vague.query
 
 import scala.reflect.ClassTag
 import vague.quantifier.VagueQuantifier
-import vague.datastore.{KnowledgeSource, RelationValue}
+import vague.datastore.{KnowledgeSource, RelationValue, RelationValueUtil}
 import vague.sampling.SamplingParams
+import RelationValueUtil.*
 
 /** Query DSL for vague quantifier queries over knowledge bases.
   * 
@@ -62,10 +63,7 @@ case class VagueQuery[A: ClassTag](
         val domainValues = source.getDomain(relationName, position)
         
         // Convert RelationValues to the expected type A (typically String)
-        val population: Set[A] = domainValues.map {
-          case RelationValue.Const(name) => name.asInstanceOf[A]
-          case RelationValue.Num(value) => value.asInstanceOf[A]
-        }
+        val population: Set[A] = toDomainSetTyped[A](domainValues)
         
         // Evaluate quantifier with sampling
         val result = quantifier.evaluateWithSampling(population, predicate, params)
@@ -81,10 +79,7 @@ case class VagueQuery[A: ClassTag](
         // Use full active domain (all constants in KB)
         val domainValues = source.activeDomain
         
-        val population: Set[A] = domainValues.map {
-          case RelationValue.Const(name) => name.asInstanceOf[A]
-          case RelationValue.Num(value) => value.asInstanceOf[A]
-        }
+        val population: Set[A] = toDomainSetTyped[A](domainValues)
         
         val result = quantifier.evaluateWithSampling(population, predicate, params)
         

@@ -2,7 +2,8 @@ package vague.bridge
 
 import logic.{Term, Formula, FOL}
 import semantics.{Domain, Interpretation, Model, Valuation}
-import vague.datastore.{KnowledgeBase, RelationValue, RelationTuple}
+import vague.datastore.{KnowledgeBase, RelationValue, RelationTuple, RelationValueUtil}
+import RelationValueUtil.*
 
 /** Bridge between KnowledgeBase and FOL Model Theory.
   * 
@@ -61,10 +62,7 @@ object KnowledgeBaseModel:
     val activeDomain = kb.activeDomain
     
     // Convert RelationValues to their underlying values (String or Int)
-    val domainElements: Set[Any] = activeDomain.map {
-      case RelationValue.Const(name) => name
-      case RelationValue.Num(value) => value
-    }
+    val domainElements: Set[Any] = toDomainSet(activeDomain)
     
     val domain = Domain(domainElements)
     
@@ -102,11 +100,7 @@ object KnowledgeBaseModel:
       else
         try {
           // Convert Scala values back to RelationValues
-          val values = args.map {
-            case s: String => RelationValue.Const(s)
-            case i: Int => RelationValue.Num(i)
-            case _ => throw new IllegalArgumentException("Unsupported type")
-          }
+          val values = args.map(fromDomainValue)
         
           // Look up in KB
           val tuple = RelationTuple(values)
