@@ -1,24 +1,27 @@
 package vague.semantics
 
 import logic.{FOL, Term}
-import vague.datastore.{KnowledgeBase, RelationValue, RelationTuple}
+import vague.datastore.{KnowledgeBase, KnowledgeSource, RelationValue, RelationTuple}
 import vague.logic.VagueQuery
 import logic.Formula
 
 /** Range Extraction (D_R)
   * 
-  * Extracts the domain of quantification from a knowledge base based on the
+  * Extracts the domain of quantification from a knowledge source based on the
   * range predicate R(x,y') in a vague query Q x (R(x,y'), φ(x,y))(y).
   * 
   * From paper (Definition 2):
   *   D_R = {c ∈ ADom(D) | R(c,σ(y')) ∈ D}
   * 
   * Where:
-  * - ADom(D) is the active domain (all constants in the KB)
+  * - ADom(D) is the active domain (all constants in the source)
   * - R is the range relation
   * - c is a candidate for the quantified variable x
   * - σ(y') is the substitution for free variables y' in the range
-  * - D is the database (knowledge base)
+  * - D is the database (knowledge source)
+  * 
+  * Updated to work with KnowledgeSource abstraction, supporting
+  * in-memory, SQL, and other backend implementations.
   * 
   * OCaml reference: This component follows the relational query pattern
   * from fol.ml, where we extract tuples satisfying predicates.
@@ -26,17 +29,17 @@ import logic.Formula
   * Example:
   *   Query: Q[≥]^{3/4} x (country(x), ...)
   *   Range: country(x)
-  *   D_R: all elements c where country(c) holds in KB
+  *   D_R: all elements c where country(c) holds in source
   * 
   * Example with substitution:
   *   Query: Q[~#]^{1/2} x (capital(x), ...)(y)  where x is capital of y
   *   Range: capital(x)
   *   Substitution: {y → "France"}
-  *   D_R: all elements c where capital(c, "France") holds in KB
+  *   D_R: all elements c where capital(c, "France") holds in source
   */
 object RangeExtractor:
   
-  /** Extract range domain D_R from knowledge base
+  /** Extract range domain D_R from knowledge source
     * 
     * Given a vague query and a substitution for free variables,
     * extract all domain elements that satisfy the range predicate.
@@ -44,16 +47,16 @@ object RangeExtractor:
     * Algorithm:
     * 1. Identify the range relation R(x, y')
     * 2. Apply substitution σ to free variables y'
-    * 3. Query KB for all tuples matching R(?, σ(y'))
+    * 3. Query source for all tuples matching R(?, σ(y'))
     * 4. Extract values at the position of quantified variable x
     * 
-    * @param kb The knowledge base to query
+    * @param source The knowledge source to query
     * @param query The vague query containing the range predicate
     * @param substitution Values for free variables (answer variables from query)
     * @return Set of domain elements satisfying the range predicate
     */
   def extractRange(
-    kb: KnowledgeBase,
+    source: KnowledgeSource,
     query: VagueQuery,
     substitution: Map[String, RelationValue] = Map.empty
   ): Set[RelationValue] =
@@ -68,13 +71,13 @@ object RangeExtractor:
     
     // Use DomainExtraction utility for pattern-based extraction
     DomainExtraction.extractFromPatternAtPosition(
-      kb,
+      source,
       range.predicate,
       pattern,
       quantVarPosition
     )
   
-  /** Build query pattern for KB lookup
+  /** Build query pattern for source lookup
     * 
     * NOTE: This is NOT FOL formula substitution (that's FOLUtil.subst).
     * This converts FOL range terms to KB query patterns for database lookup.
@@ -150,22 +153,22 @@ object RangeExtractor:
     * Convenience method for Boolean queries where there are no
     * answer variables requiring substitution.
     */
-  def extractRangeBoolean(kb: KnowledgeBase, query: VagueQuery): Set[RelationValue] =
+  def extractRangeBoolean(source: KnowledgeSource, query: VagueQuery): Set[RelationValue] =
     require(query.isBoolean, "Query must be Boolean (no answer variables)")
-    extractRange(kb, query, Map.empty)
+    extractRange(source, query, Map.empty)
   
   /** Extract range with single answer variable
     * 
     * Convenience method for unary queries with one answer variable.
     */
   def extractRangeUnary(
-    kb: KnowledgeBase,
+    source: KnowledgeSource,
     query: VagueQuery,
     answerValue: RelationValue
   ): Set[RelationValue] =
     require(query.isUnary, "Query must be unary (single answer variable)")
     val answerVar = query.answerVars.head
-    extractRange(kb, query, Map(answerVar -> answerValue))
+    extractRange(source, query, Map(answerVar -> answerValue))
   
   /** Get all possible ranges for a query with answer variables
     * 
@@ -185,17 +188,17 @@ object RangeExtractor:
     *   )
     */
   def extractAllRanges(
-    kb: KnowledgeBase,
+    source: KnowledgeSource,
     query: VagueQuery
   ): Map[Map[String, RelationValue], Set[RelationValue]] =
     if query.isBoolean then
       // Boolean query: single range with empty substitution
-      Map(Map.empty -> extractRangeBoolean(kb, query))
+      Map(Map.empty -> extractRangeBoolean(source, query))
     else
       // Generate all possible substitutions for answer variables
-      val substitutions = generateSubstitutions(kb, query)
+      val substitutions = generateSubstitutions(source, query)
       substitutions.map { subst =>
-        subst -> extractRange(kb, query, subst)
+        subst -> extractRange(source, query, subst)
       }.toMap
   
   /** Generate all possible substitutions for answer variables
@@ -206,14 +209,14 @@ object RangeExtractor:
     * This is used internally by extractAllRanges.
     */
   private def generateSubstitutions(
-    kb: KnowledgeBase,
+    source: KnowledgeSource,
     query: VagueQuery
   ): Set[Map[String, RelationValue]] =
     // Use active domain for all answer variables
     // Note: Could optimize by using getDomain for specific relations/positions,
     // but this requires analyzing which answer variables appear at which positions
     // in the range predicate. Using activeDomain is simpler and always correct.
-    val domain = kb.activeDomain.toList
+    val domain = source.activeDomain.toList
     
     def generateForVars(vars: List[String]): Set[Map[String, RelationValue]] =
       vars match

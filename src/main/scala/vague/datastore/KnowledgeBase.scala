@@ -138,13 +138,13 @@ object KnowledgeBase:
     
     /** Add a fact using constant names */
     def withFact(relationName: String, values: String*): Builder =
-      val tuple = RelationTuple.fromConstants(values: _*)
+      val tuple = RelationTuple.fromConstants(values*)
       kb = kb.addFact(relationName, tuple)
       this
     
     /** Add a fact using RelationValues */
     def withFactValues(relationName: String, values: RelationValue*): Builder =
-      val tuple = RelationTuple.of(values: _*)
+      val tuple = RelationTuple.of(values*)
       kb = kb.addFact(relationName, tuple)
       this
     

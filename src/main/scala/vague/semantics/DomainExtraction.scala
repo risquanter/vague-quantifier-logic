@@ -1,8 +1,8 @@
 package vague.semantics
 
-import vague.datastore.{KnowledgeBase, RelationValue, RelationTuple}
+import vague.datastore.{KnowledgeBase, KnowledgeSource, RelationValue, RelationTuple}
 
-/** Shared utilities for domain extraction from knowledge bases.
+/** Shared utilities for domain extraction from knowledge sources.
   * 
   * Provides common operations used by both:
   * - RangeExtractor: FOL-based extraction with pattern matching
@@ -15,6 +15,9 @@ import vague.datastore.{KnowledgeBase, RelationValue, RelationTuple}
   * Design principle: Non-invasive additions that complement existing code,
   * not replacements. Both RangeExtractor and Query can continue using
   * their specialized logic while sharing these common utilities.
+  * 
+  * Updated to work with KnowledgeSource abstraction, supporting
+  * in-memory, SQL, and other backend implementations.
   */
 object DomainExtraction:
   
@@ -29,65 +32,65 @@ object DomainExtraction:
     * 
     * Example:
     * {{{
-    * // KB has: person("alice"), person("bob"), person("charlie")
-    * extractFromRelation(kb, "person", 0)
+    * // Source has: person("alice"), person("bob"), person("charlie")
+    * extractFromRelation(source, "person", 0)
     * // Returns: Set(Const("alice"), Const("bob"), Const("charlie"))
     * 
-    * // KB has: capital("paris", "france"), capital("berlin", "germany")
-    * extractFromRelation(kb, "capital", 0)  // Cities
+    * // Source has: capital("paris", "france"), capital("berlin", "germany")
+    * extractFromRelation(source, "capital", 0)  // Cities
     * // Returns: Set(Const("paris"), Const("berlin"))
-    * extractFromRelation(kb, "capital", 1)  // Countries
+    * extractFromRelation(source, "capital", 1)  // Countries
     * // Returns: Set(Const("france"), Const("germany"))
     * }}}
     * 
-    * @param kb Knowledge base to query
+    * @param source Knowledge source to query
     * @param relationName Name of the relation
     * @param position Zero-based position index
     * @return Set of values at that position
     */
   def extractFromRelation(
-    kb: KnowledgeBase,
+    source: KnowledgeSource,
     relationName: String,
     position: Int
   ): Set[RelationValue] =
-    kb.getDomain(relationName, position)
+    source.getDomain(relationName, position)
   
-  /** Extract the active domain (all constants used in KB).
+  /** Extract the active domain (all constants used in source).
     * 
     * Returns the union of all values appearing in any position
-    * of any relation in the knowledge base.
+    * of any relation in the knowledge source.
     * 
     * Used by:
     * - Query DSL: When domain is DomainSpec.ActiveDomain
-    * - General queries: When you want to quantify over "everything in KB"
+    * - General queries: When you want to quantify over "everything in source"
     * 
     * Example:
     * {{{
-    * // KB has: person("alice"), knows("alice", "bob"), age("bob", 30)
-    * extractActiveDomain(kb)
+    * // Source has: person("alice"), knows("alice", "bob"), age("bob", 30)
+    * extractActiveDomain(source)
     * // Returns: Set(Const("alice"), Const("bob"), Num(30))
     * }}}
     * 
-    * @param kb Knowledge base
-    * @return Set of all values in KB
+    * @param source Knowledge source
+    * @return Set of all values in source
     */
-  def extractActiveDomain(kb: KnowledgeBase): Set[RelationValue] =
-    kb.activeDomain
+  def extractActiveDomain(source: KnowledgeSource): Set[RelationValue] =
+    source.activeDomain
   
   /** Extract domain using pattern matching (for FOL range predicates).
     * 
-    * Query KB with a pattern where Some(value) means "must match this value"
+    * Query source with a pattern where Some(value) means "must match this value"
     * and None means "wildcard - extract these values".
     * 
     * Used by:
-    * - RangeExtractor: Converts FOL range predicates to KB queries
+    * - RangeExtractor: Converts FOL range predicates to source queries
     * 
     * Example:
     * {{{
-    * // KB has: capital("paris", "france"), capital("berlin", "germany")
+    * // Source has: capital("paris", "france"), capital("berlin", "germany")
     * // Pattern: [None, Some(Const("france"))]
     * // Meaning: "Find all x where capital(x, france)"
-    * extractWithPattern(kb, "capital", List(None, Some(Const("france"))))
+    * extractWithPattern(source, "capital", List(None, Some(Const("france"))))
     * // Returns: Set(Const("paris"))
     * }}}
     * 
@@ -96,17 +99,17 @@ object DomainExtraction:
     * - Filtering by specific values at other positions
     * - Full relational query capabilities
     * 
-    * @param kb Knowledge base to query
+    * @param source Knowledge source to query
     * @param relationName Name of the relation
     * @param pattern Query pattern (None = wildcard, Some(v) = must equal v)
     * @return Set of matching tuples (full tuples, not just wildcard positions)
     */
   def extractWithPattern(
-    kb: KnowledgeBase,
+    source: KnowledgeSource,
     relationName: String,
     pattern: List[Option[RelationValue]]
   ): Set[RelationTuple] =
-    kb.query(relationName, pattern)
+    source.query(relationName, pattern)
   
   /** Extract values from specific positions in pattern query results.
     * 
@@ -116,32 +119,32 @@ object DomainExtraction:
     * 
     * Example:
     * {{{
-    * // KB has: capital("paris", "france"), capital("berlin", "germany")
+    * // Source has: capital("paris", "france"), capital("berlin", "germany")
     * // Pattern: [None, Some(Const("france"))]
     * // Positions: List(0) - extract first column
-    * extractFromPatternAtPositions(kb, "capital", pattern, List(0))
+    * extractFromPatternAtPositions(source, "capital", pattern, List(0))
     * // Returns: Set(Const("paris"))
     * 
     * // Can extract multiple positions:
     * // Pattern: [None, None] (all tuples)
     * // Positions: List(0, 1) - extract both columns
-    * extractFromPatternAtPositions(kb, "capital", pattern, List(0, 1))
+    * extractFromPatternAtPositions(source, "capital", pattern, List(0, 1))
     * // Returns: Set(Const("paris"), Const("berlin"), Const("france"), Const("germany"))
     * }}}
     * 
-    * @param kb Knowledge base to query
+    * @param source Knowledge source to query
     * @param relationName Name of the relation
     * @param pattern Query pattern
     * @param positions Positions to extract from matching tuples
     * @return Set of values at specified positions
     */
   def extractFromPatternAtPositions(
-    kb: KnowledgeBase,
+    source: KnowledgeSource,
     relationName: String,
     pattern: List[Option[RelationValue]],
     positions: List[Int]
   ): Set[RelationValue] =
-    val matchingTuples = extractWithPattern(kb, relationName, pattern)
+    val matchingTuples = extractWithPattern(source, relationName, pattern)
     matchingTuples.flatMap { tuple =>
       positions.map(pos => tuple.values(pos))
     }
@@ -151,41 +154,41 @@ object DomainExtraction:
     * Convenience method for the typical RangeExtractor use case:
     * query with pattern, extract values at one position.
     * 
-    * @param kb Knowledge base to query
+    * @param source Knowledge source to query
     * @param relationName Name of the relation
     * @param pattern Query pattern
     * @param position Single position to extract
     * @return Set of values at that position
     */
   def extractFromPatternAtPosition(
-    kb: KnowledgeBase,
+    source: KnowledgeSource,
     relationName: String,
     pattern: List[Option[RelationValue]],
     position: Int
   ): Set[RelationValue] =
-    extractFromPatternAtPositions(kb, relationName, pattern, List(position))
+    extractFromPatternAtPositions(source, relationName, pattern, List(position))
   
   /** Count how many distinct values exist at a position in a relation.
     * 
     * Utility for understanding domain sizes without materializing full sets.
     * Useful for query planning and optimization.
     * 
-    * @param kb Knowledge base
+    * @param source Knowledge source
     * @param relationName Relation to check
     * @param position Position to count
     * @return Number of distinct values
     */
   def domainSize(
-    kb: KnowledgeBase,
+    source: KnowledgeSource,
     relationName: String,
     position: Int
   ): Int =
-    extractFromRelation(kb, relationName, position).size
+    extractFromRelation(source, relationName, position).size
   
   /** Count size of active domain.
     * 
-    * @param kb Knowledge base
-    * @return Number of distinct values in entire KB
+    * @param source Knowledge source
+    * @return Number of distinct values in entire source
     */
-  def activeDomainSize(kb: KnowledgeBase): Int =
-    extractActiveDomain(kb).size
+  def activeDomainSize(source: KnowledgeSource): Int =
+    extractActiveDomain(source).size

@@ -2,9 +2,9 @@ package vague.semantics
 
 import logic.FOL
 import semantics.FOLSemantics
-import vague.datastore.{KnowledgeBase, RelationValue}
+import vague.datastore.{KnowledgeBase, KnowledgeSource, RelationValue}
 import vague.logic.{Quantifier, VagueQuery}
-import vague.bridge.KnowledgeBaseModel
+import vague.bridge.{KnowledgeBaseModel, KnowledgeSourceModel}
 import scala.util.Random
 
 /** Result of evaluating a vague quantifier query
@@ -49,45 +49,51 @@ case class EvaluationParams(
   */
 object VagueSemantics:
 
-  /** Evaluate a vague quantifier query
+  /** Evaluate a vague quantifier query (primary API using KnowledgeSource)
     * 
     * Evaluates: D ⊨ Q[op]^{k/n} x (R, φ(x,c))
     * 
+    * This is the main API that works with any KnowledgeSource implementation
+    * (in-memory, SQL, RDF, etc.).
+    * 
     * @param query The vague query to evaluate
-    * @param kb The knowledge base to evaluate against
+    * @param source The knowledge source to evaluate against
     * @param answerTuple The answer tuple c to substitute for answer variables in φ
     * @param params Evaluation parameters (sampling, etc.)
     * @return Result containing satisfaction and metadata
     * 
     * Example:
     * {{{
+    * val kb = KnowledgeBase.builder...build()
+    * val source = KnowledgeSource.fromKnowledgeBase(kb)
+    * 
     * val query = VagueQuery(
     *   quantifier = Quantifier.About(1, 2, 0.1),
     *   variable = Var("x"),
     *   rangePredicate = Pred("country", List(Var("x"))),
     *   scopeFormula = Pred("large", List(Var("x")))
     * )
-    * val kb = KnowledgeBase(...)
-    * val result = VagueSemantics.holds(query, kb, Map.empty)
+    * 
+    * val result = VagueSemantics.holds(query, source, Map.empty)
     * println(s"Query satisfied: ${result.satisfied}, proportion: ${result.actualProportion}")
     * }}}
     */
   def holds(
     query: VagueQuery,
-    kb: KnowledgeBase,
+    source: KnowledgeSource,
     answerTuple: Map[String, RelationValue],
     params: EvaluationParams = EvaluationParams()
   ): VagueResult =
     
     // Step 1: Extract range D_R using range predicate R
     val rangeElements = RangeExtractor.extractRange(
-      kb,
+      source,
       query,
       answerTuple
     )
     
-    // Convert KB to FOL Model for scope evaluation
-    val model = KnowledgeBaseModel.toModel(kb)
+    // Convert source to FOL Model for scope evaluation
+    val model = KnowledgeSourceModel.toModel(source)
     
     // Handle empty range
     if rangeElements.isEmpty then
@@ -130,6 +136,23 @@ object VagueSemantics:
       sampleSize = sample.size,
       satisfyingCount = satisfyingCount
     )
+  
+  /** Backward-compatible wrapper for KnowledgeBase
+    * 
+    * This method allows existing code using KnowledgeBase directly
+    * to continue working without changes. Internally, it wraps the
+    * KB in a KnowledgeSource and delegates to the main implementation.
+    * 
+    * @deprecated Use holds(query, source, ...) with KnowledgeSource instead
+    */
+  def holdsOnKB(
+    query: VagueQuery,
+    kb: KnowledgeBase,
+    answerTuple: Map[String, RelationValue],
+    params: EvaluationParams = EvaluationParams()
+  ): VagueResult =
+    val source = KnowledgeSource.fromKnowledgeBase(kb)
+    holds(query, source, answerTuple, params)
 
   /** Select sample from range based on evaluation parameters
     * 
@@ -192,24 +215,24 @@ object VagueSemantics:
       val target = k.toDouble / n.toDouble
       actualProportion <= (target + tolerance)
 
-  /** Convenience method for exact evaluation (no sampling)
+  /** Convenience method for exact evaluation (no sampling) using KnowledgeSource
     * 
     * @param query The vague query
-    * @param kb The knowledge base
+    * @param source The knowledge source
     * @param answerTuple Answer variable substitution
     * @return Result with exact proportion
     */
   def holdsExact(
     query: VagueQuery,
-    kb: KnowledgeBase,
+    source: KnowledgeSource,
     answerTuple: Map[String, RelationValue] = Map.empty
   ): VagueResult =
-    holds(query, kb, answerTuple, EvaluationParams(useSampling = false))
+    holds(query, source, answerTuple, EvaluationParams(useSampling = false))
 
-  /** Convenience method for sampling evaluation with specified sample size
+  /** Convenience method for sampling evaluation with specified sample size using KnowledgeSource
     * 
     * @param query The vague query
-    * @param kb The knowledge base
+    * @param source The knowledge source
     * @param sampleSize Number of elements to sample
     * @param answerTuple Answer variable substitution
     * @param seed Optional random seed
@@ -217,14 +240,36 @@ object VagueSemantics:
     */
   def holdsWithSampling(
     query: VagueQuery,
-    kb: KnowledgeBase,
+    source: KnowledgeSource,
     sampleSize: Int,
     answerTuple: Map[String, RelationValue] = Map.empty,
     seed: Option[Long] = None
   ): VagueResult =
     holds(
       query, 
-      kb, 
+      source, 
       answerTuple, 
       EvaluationParams(useSampling = true, sampleSize = Some(sampleSize), randomSeed = seed)
     )
+  
+  /** Backward-compatible exact evaluation for KnowledgeBase
+    * @deprecated Use holdsExact(query, source, ...) with KnowledgeSource instead
+    */
+  def holdsExactOnKB(
+    query: VagueQuery,
+    kb: KnowledgeBase,
+    answerTuple: Map[String, RelationValue] = Map.empty
+  ): VagueResult =
+    holdsExact(query, KnowledgeSource.fromKnowledgeBase(kb), answerTuple)
+
+  /** Backward-compatible sampling evaluation for KnowledgeBase
+    * @deprecated Use holdsWithSampling(query, source, ...) with KnowledgeSource instead
+    */
+  def holdsWithSamplingOnKB(
+    query: VagueQuery,
+    kb: KnowledgeBase,
+    sampleSize: Int,
+    answerTuple: Map[String, RelationValue] = Map.empty,
+    seed: Option[Long] = None
+  ): VagueResult =
+    holdsWithSampling(query, KnowledgeSource.fromKnowledgeBase(kb), sampleSize, answerTuple, seed)

@@ -4,7 +4,7 @@ import logic.{FOL, Formula, Term}
 import semantics.{Model, Valuation}
 import vague.logic.{VagueQuery, Quantifier}
 import vague.semantics.{RangeExtractor, ScopeEvaluator}
-import vague.datastore.{KnowledgeBase, Relation, RelationTuple, RelationValue, PositionType}
+import vague.datastore.{KnowledgeBase, KnowledgeSource, Relation, RelationTuple, RelationValue, PositionType}
 import vague.bridge.KnowledgeBaseModel
 
 /** Demonstration of Vague Quantifier Semantics
@@ -197,7 +197,8 @@ def exactEvaluationDemo(): Unit =
   println()
   
   // Step 1: Extract full range D_R
-  val rangeSet = RangeExtractor.extractRangeBoolean(kb, query)
+  val source = KnowledgeSource.fromKnowledgeBase(kb)
+  val rangeSet = RangeExtractor.extractRangeBoolean(source, query)
   
   println(s"Step 1: Extract range D_R (all countries)")
   println(s"  D_R = ${rangeSet.map(_.toString).mkString("{", ", ", "}")}")
@@ -311,7 +312,8 @@ def samplingVsExactDemo(): Unit =
   println("EXACT EVALUATION (use all 20 cities)")
   println("=" * 40)
   
-  val fullRange = RangeExtractor.extractRangeBoolean(kbFinal, query)
+  val sourceFinal = KnowledgeSource.fromKnowledgeBase(kbFinal)
+  val fullRange = RangeExtractor.extractRangeBoolean(sourceFinal, query)
   val exactProp = ScopeEvaluator.calculateProportion(
     fullRange, query.scope, query.variable, model
   )
@@ -394,7 +396,8 @@ def quantifierTypesDemo(): Unit =
   val range = FOL("student", List(Term.Var("x")))
   val scope = Formula.Atom(FOL("passed", List(Term.Var("x"))))
   
-  val fullRange = RangeExtractor.extractRangeBoolean(kb, 
+  val sourceStudent = KnowledgeSource.fromKnowledgeBase(kb)
+  val fullRange = RangeExtractor.extractRangeBoolean(sourceStudent, 
     VagueQuery(Quantifier.aboutHalf, "x", range, scope)
   )
   

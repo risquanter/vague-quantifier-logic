@@ -1,10 +1,14 @@
 package vague.semantics
 
 import logic.{FOL, Formula, Term}
-import vague.datastore.{KnowledgeBase, Relation, RelationValue, RelationTuple, PositionType}
+import vague.datastore.{KnowledgeBase, KnowledgeSource, Relation, RelationValue, RelationTuple, PositionType}
 import vague.logic.{Quantifier, VagueQuery}
 
 class VagueSemanticsSpec extends munit.FunSuite:
+
+  // Helper to convert KnowledgeBase to KnowledgeSource for backward compatibility
+  extension (kb: KnowledgeBase)
+    def asSource: KnowledgeSource = KnowledgeSource.fromKnowledgeBase(kb)
 
   // Helper to create unary tuple
   def unary(value: String): RelationTuple = 
@@ -42,7 +46,7 @@ class VagueSemanticsSpec extends munit.FunSuite:
       scope = Formula.Atom(FOL("large", List(Term.Var("x"))))
     )
     
-    val result = VagueSemantics.holdsExact(query, kb)
+    val result = VagueSemantics.holdsExact(query, kb.asSource)
     
     // 4 out of 8 countries are large = 0.5
     assertEquals(result.rangeSize, 8)
@@ -62,7 +66,7 @@ class VagueSemanticsSpec extends munit.FunSuite:
       scope = Formula.Atom(FOL("large", List(Term.Var("x"))))
     )
     
-    val result = VagueSemantics.holdsExact(query, kb)
+    val result = VagueSemantics.holdsExact(query, kb.asSource)
     
     assertEquals(result.actualProportion, 0.5)
     assertEquals(result.satisfied, true) // 0.5 >= 0.5 - 0.1 = 0.4
@@ -78,7 +82,7 @@ class VagueSemanticsSpec extends munit.FunSuite:
       scope = Formula.Atom(FOL("large", List(Term.Var("x"))))
     )
     
-    val result = VagueSemantics.holdsExact(query, kb)
+    val result = VagueSemantics.holdsExact(query, kb.asSource)
     
     assertEquals(result.actualProportion, 0.5)
     assertEquals(result.satisfied, true) // 0.5 <= 0.5 + 0.1 = 0.6
@@ -94,7 +98,7 @@ class VagueSemanticsSpec extends munit.FunSuite:
       scope = Formula.Atom(FOL("large", List(Term.Var("x"))))
     )
     
-    val result = VagueSemantics.holdsExact(query, kb)
+    val result = VagueSemantics.holdsExact(query, kb.asSource)
     
     // 0.5 is not within [0.65, 0.85]
     assertEquals(result.actualProportion, 0.5)
@@ -112,7 +116,7 @@ class VagueSemanticsSpec extends munit.FunSuite:
       scope = Formula.Atom(FOL("coastal", List(Term.Var("x"))))
     )
     
-    val result = VagueSemantics.holdsExact(query, kb)
+    val result = VagueSemantics.holdsExact(query, kb.asSource)
     
     // 3 out of 4 large countries are coastal = 0.75
     assertEquals(result.rangeSize, 4)
@@ -132,7 +136,7 @@ class VagueSemanticsSpec extends munit.FunSuite:
       scope = Formula.Atom(FOL("country", List(Term.Var("x"))))
     )
     
-    val result = VagueSemantics.holdsExact(query, kb)
+    val result = VagueSemantics.holdsExact(query, kb.asSource)
     
     assertEquals(result.actualProportion, 1.0)
     assertEquals(result.satisfyingCount, 8)
@@ -150,7 +154,7 @@ class VagueSemanticsSpec extends munit.FunSuite:
       scope = Formula.Atom(FOL("wealthy", List(Term.Var("x"))))
     )
     
-    val result = VagueSemantics.holdsExact(query, kb)
+    val result = VagueSemantics.holdsExact(query, kb.asSource)
     
     assertEquals(result.actualProportion, 0.0)
     assertEquals(result.satisfyingCount, 0)
@@ -167,7 +171,7 @@ class VagueSemanticsSpec extends munit.FunSuite:
       scope = Formula.Atom(FOL("large", List(Term.Var("x"))))
     )
     
-    val result = VagueSemantics.holdsExact(query, kb)
+    val result = VagueSemantics.holdsExact(query, kb.asSource)
     
     assertEquals(result.rangeSize, 0)
     assertEquals(result.sampleSize, 0)
@@ -189,7 +193,7 @@ class VagueSemanticsSpec extends munit.FunSuite:
       )
     )
     
-    val result = VagueSemantics.holdsExact(query, kb)
+    val result = VagueSemantics.holdsExact(query, kb.asSource)
     
     // 3 out of 8 countries are both large and coastal
     // France, Italy, Spain
@@ -211,7 +215,7 @@ class VagueSemanticsSpec extends munit.FunSuite:
       )
     )
     
-    val result = VagueSemantics.holdsExact(query, kb)
+    val result = VagueSemantics.holdsExact(query, kb.asSource)
     
     // Large: France, Germany, Italy, Spain (4)
     // Wealthy: Luxembourg, Switzerland (2)
@@ -231,7 +235,7 @@ class VagueSemanticsSpec extends munit.FunSuite:
       scope = Formula.Not(Formula.Atom(FOL("wealthy", List(Term.Var("x")))))
     )
     
-    val result = VagueSemantics.holdsExact(query, kb)
+    val result = VagueSemantics.holdsExact(query, kb.asSource)
     
     // 6 out of 8 are not wealthy (only Luxembourg, Switzerland are wealthy)
     assertEquals(result.satisfyingCount, 6)
@@ -249,7 +253,7 @@ class VagueSemanticsSpec extends munit.FunSuite:
     )
     
     val result = VagueSemantics.holdsWithSampling(
-      query, kb, 
+      query, kb.asSource, 
       sampleSize = 4,
       seed = Some(42L)
     )
@@ -269,7 +273,7 @@ class VagueSemanticsSpec extends munit.FunSuite:
     )
     
     val result = VagueSemantics.holdsWithSampling(
-      query, kb,
+      query, kb.asSource,
       sampleSize = 100, // Much larger than range
       seed = Some(42L)
     )
@@ -289,7 +293,7 @@ class VagueSemanticsSpec extends munit.FunSuite:
       scope = Formula.Atom(FOL("large", List(Term.Var("x"))))
     )
     
-    val result = VagueSemantics.holdsExact(query, kb)
+    val result = VagueSemantics.holdsExact(query, kb.asSource)
     
     // Should use entire range (no sampling)
     assertEquals(result.sampleSize, result.rangeSize)
@@ -317,7 +321,7 @@ class VagueSemanticsSpec extends munit.FunSuite:
       scope = Formula.Atom(FOL("large", List(Term.Var("x"))))
     )
     
-    val result = VagueSemantics.holdsExact(query, kb)
+    val result = VagueSemantics.holdsExact(query, kb.asSource)
     
     // 5 out of 10 = 0.5
     assertEquals(result.rangeSize, 10)

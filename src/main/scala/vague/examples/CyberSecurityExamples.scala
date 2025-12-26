@@ -57,7 +57,8 @@ object CyberSecurityExamples:
     println(s"  Boolean query: ${query.isBoolean}")
     
     // Evaluate with exact semantics
-    val result = VagueSemantics.holdsExact(query, domain)
+    val source = KnowledgeSource.fromKnowledgeBase(domain)
+    val result = VagueSemantics.holdsExact(query, source)
     
     println("\nEvaluation:")
     println(s"  Range size: ${result.rangeSize}")
@@ -113,7 +114,8 @@ object CyberSecurityExamples:
     println(s"  Unary query: ${query.isUnary}")
     
     // Evaluate
-    val result = VagueSemantics.holdsExact(query, domain)
+    val source = KnowledgeSource.fromKnowledgeBase(domain)
+    val result = VagueSemantics.holdsExact(query, source)
     
     println("\nEvaluation:")
     println(s"  Range size: ${result.rangeSize}")
@@ -187,7 +189,8 @@ object CyberSecurityExamples:
     println(s"  Answer vars: ${query.answerVars}")
     
     // Evaluate
-    val result = VagueSemantics.holdsExact(query, domain)
+    val source = KnowledgeSource.fromKnowledgeBase(domain)
+    val result = VagueSemantics.holdsExact(query, source)
     
     println("\nEvaluation:")
     println(s"  Critical assets: ${result.rangeSize}")
@@ -256,7 +259,8 @@ object CyberSecurityExamples:
     val query = VagueQueryParser.parse(queryStr)
     
     // Evaluate
-    val result = VagueSemantics.holdsExact(query, domain)
+    val source = KnowledgeSource.fromKnowledgeBase(domain)
+    val result = VagueSemantics.holdsExact(query, source)
     
     println("\nEvaluation:")
     println(s"  High-value assets: ${result.rangeSize}")

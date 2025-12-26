@@ -115,6 +115,14 @@ trait KnowledgeSource:
     * @return Sampled set from active domain
     */
   def sampleActiveDomain(sampleSize: Int, seed: Option[Long] = None): Set[RelationValue]
+  
+  /** Get all relation names defined in this source.
+    * 
+    * This is needed for FOL Model construction to create predicates.
+    * 
+    * @return Set of all relation names
+    */
+  def relationNames: Set[String]
 
 object KnowledgeSource:
   
@@ -197,6 +205,9 @@ class InMemoryKnowledgeSource(kb: KnowledgeBase) extends KnowledgeSource:
         .sortBy(_ => rng.nextDouble())
         .take(sampleSize)
         .toSet
+  
+  def relationNames: Set[String] =
+    kb.schema.keySet
 
 /** Extension methods for SQL backend implementation (future work).
   * 

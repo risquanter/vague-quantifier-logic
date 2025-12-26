@@ -3,12 +3,15 @@ package vague.semantics
 import munit.FunSuite
 import logic.{FOL, Formula, Term}
 import vague.logic.{VagueQuery, Quantifier}
-import vague.datastore.{KnowledgeBase, Relation, RelationTuple, RelationValue, PositionType}
+import vague.datastore.{KnowledgeBase, KnowledgeSource, Relation, RelationTuple, RelationValue, PositionType}
 
 class RangeExtractorSpec extends FunSuite:
   import RangeExtractor.*
   import RelationValue.{Const as RConst, Num}
   import Term.{Var, Const as TConst, Fn}
+  
+  // Helper: Convert KB to KnowledgeSource for testing
+  given Conversion[KnowledgeBase, KnowledgeSource] = KnowledgeSource.fromKnowledgeBase
   
   // ==================== Test Data Setup ====================
   
