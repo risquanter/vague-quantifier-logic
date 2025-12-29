@@ -183,25 +183,25 @@ src/test/scala/             # Comprehensive test suite (270+ vague tests)
 
 ### Core FOL (Completed)
 
-- ✅ Phase 1-4: Core types, utilities, lexer, combinators
-- ✅ Phase 5: Simple expression parser (learning exercise)
-- ✅ Phase 6: Generic formula parser
-- ✅ Phase 7: Term parser (6 operator levels)
-- ✅ Phase 8: FOL atom parser
-- ✅ Phase 9: Public API
-- ✅ Phase 10: Utility functions (free vars, substitution, renaming)
-- ✅ Phase 11: Pretty printer
-- ✅ Phase 12: Formal semantics (model theory)
+- ✅ Core types, utilities, lexer, parser combinators
+- ✅ Simple expression parser (learning exercise)
+- ✅ Generic formula parser
+- ✅ Term parser (6 operator levels)
+- ✅ FOL atom parser
+- ✅ Public API
+- ✅ Utility functions (free vars, substitution, renaming)
+- ✅ Pretty printer
+- ✅ Formal semantics (model theory)
 
 ### Vague Quantifiers (Completed)
 
-- ✅ Phase 1: Core ADTs (Quantifier, VagueQuery) - 69 tests
-- ✅ Phase 2: Range extraction from knowledge base - 21 tests
-- ✅ Phase 3: Scope evaluation with FOL semantics - 26 tests
-- ✅ Phase 4: Vague semantics orchestration - 15 tests
-- ✅ Phase 5: Parser for paper syntax - 41 tests
-- ✅ Phase 6: Cybersecurity examples - 4 working demos
-- ✅ Phase 7: Documentation
+- ✅ Core ADTs (Quantifier, VagueQuery) - 69 tests
+- ✅ Range extraction from knowledge base - 21 tests
+- ✅ Scope evaluation with FOL semantics - 26 tests
+- ✅ Vague semantics orchestration - 15 tests
+- ✅ Parser for paper syntax - 41 tests
+- ✅ Cybersecurity examples - 4 working demos
+- ✅ Documentation
 
 **Total: 270 vague quantifier tests passing + 4 working examples**
 
@@ -255,18 +255,14 @@ This project demonstrates:
 - **Vague quantifier semantics** from database theory
 - **Proportion-based query evaluation**
 - **Statistical sampling** for large datasets
-- **Knowledge base** design and querying
+- **Knowledge base** design and querying foundations
 
 ## References
 
-1. John Harrison (2009). "Handbook of Practical Logic and Automated Reasoning"
-   - Cambridge University Press
-   - ISBN: 978-0-521-89957-4
+1. **Harrison, J.** (2009). *Handbook of Practical Logic and Automated Reasoning*. Cambridge University Press. ISBN: 978-0-521-89957-4.
    - OCaml parser combinator implementation
-   - FOL syntax and semantics
+   - FOL syntax and semantics foundations
 
-2. Christian G. Fermüller, Matthias Hofer, and Magdalena Ortiz (2016). "Querying with Vague Quantifiers Using Probabilistic Semantics"
-   - TU Vienna, Austria
+2. **Fermüller, C. G., Hofer, M., & Ortiz, M.** (2016). Querying with Vague Quantifiers Using Probabilistic Semantics. *Proceedings of the 25th International Conference on Information and Knowledge Management (CIKM)*, TU Vienna, Austria.
    - Vague quantifier semantics: Q[op]^{k/n}
    - Sampling-based probabilistic evaluation
-   - Semi-fuzzy proportional quantifiers
