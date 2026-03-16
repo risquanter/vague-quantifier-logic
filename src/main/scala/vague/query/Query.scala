@@ -3,7 +3,7 @@ package vague.query
 import scala.reflect.ClassTag
 import vague.quantifier.VagueQuantifier
 import vague.datastore.{KnowledgeSource, RelationValue, RelationValueUtil}
-import vague.sampling.SamplingParams
+import vague.sampling.{SamplingParams, HDRConfig}
 import vague.semantics.DomainExtraction
 import RelationValueUtil.*
 
@@ -49,7 +49,8 @@ case class VagueQuery[A: ClassTag](
   quantifier: VagueQuantifier,
   domain: DomainSpec,
   predicate: A => Boolean,
-  params: SamplingParams = SamplingParams()
+  params: SamplingParams = SamplingParams(),
+  hdrConfig: HDRConfig = HDRConfig.default
 ):
   /** Evaluate this query against a knowledge source.
     * 
@@ -67,7 +68,7 @@ case class VagueQuery[A: ClassTag](
         val population: Set[A] = toDomainSetTyped[A](domainValues)
         
         // Evaluate quantifier with sampling
-        val result = quantifier.evaluateWithSampling(population, predicate, params)
+        val result = quantifier.evaluateWithSampling(population, predicate, params, hdrConfig)
         
         QueryResult(
           query = this.asInstanceOf[VagueQuery[Any]],
@@ -82,7 +83,7 @@ case class VagueQuery[A: ClassTag](
         
         val population: Set[A] = toDomainSetTyped[A](domainValues)
         
-        val result = quantifier.evaluateWithSampling(population, predicate, params)
+        val result = quantifier.evaluateWithSampling(population, predicate, params, hdrConfig)
         
         QueryResult(
           query = this.asInstanceOf[VagueQuery[Any]],
@@ -175,10 +176,11 @@ object Query:
       * 
       * @param pred Predicate function
       * @param params Sampling parameters
+      * @param config HDR PRNG configuration
       * @return Complete query
       */
-    def where(pred: A => Boolean, params: SamplingParams): VagueQuery[A] =
-      VagueQuery(q, domain, pred, params)
+    def where(pred: A => Boolean, params: SamplingParams, config: HDRConfig = HDRConfig.default): VagueQuery[A] =
+      VagueQuery(q, domain, pred, params, config)
 
 /** Extension methods for convenient querying. */
 extension (source: KnowledgeSource)

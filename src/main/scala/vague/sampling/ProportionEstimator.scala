@@ -118,14 +118,16 @@ object ProportionEstimator:
     * 
     * @param population Full population
     * @param predicate Condition to test
-    * @param params Sampling parameters
-    * @param sampler Sampling strategy (default: HDR for reproducibility)
+    * @param params Statistical precision parameters (ε, α)
+    * @param config HDR PRNG configuration (4-layer seed hierarchy)
+    * @param sampler Override sampling strategy (default: HDR)
     * @return Proportion estimate with confidence interval
     */
   def estimateWithSampling[A](
     population: Set[A],
     predicate: A => Boolean,
     params: SamplingParams = SamplingParams(),
+    config: HDRConfig = HDRConfig.default,
     sampler: Option[Sampler[A]] = None
   )(using ClassTag[A]): ProportionEstimate =
     
@@ -145,7 +147,7 @@ object ProportionEstimator:
     )
     
     // Perform sampling - default to HDR for reproducibility
-    val actualSampler = sampler.getOrElse(Sampler.hdr[A](params))
+    val actualSampler = sampler.getOrElse(HDRSampler[A](config))
     val sample = actualSampler.sample(population, sampleSize)
     
     // Estimate proportion from sample
@@ -182,6 +184,7 @@ object ProportionEstimator:
     population: Set[A],
     predicate: A => Boolean,
     params: SamplingParams = SamplingParams(),
+    config: HDRConfig = HDRConfig.default,
     maxIterations: Int = 5
   )(using ClassTag[A]): ProportionEstimate =
     
@@ -200,8 +203,8 @@ object ProportionEstimator:
       params
     )
     
-    val sampler = Sampler.hdr[A](params)
-    var estimate = estimateWithSampling(population, predicate, params, Some(sampler))
+    val sampler = HDRSampler[A](config)
+    var estimate = estimateWithSampling(population, predicate, params, config, Some(sampler))
     var iterations = 0
     
     // Refine if needed
@@ -273,7 +276,8 @@ object ProportionEstimator:
   def batchEstimate[A](
     population: Set[A],
     predicates: Map[String, A => Boolean],
-    params: SamplingParams = SamplingParams()
+    params: SamplingParams = SamplingParams(),
+    config: HDRConfig = HDRConfig.default
   )(using ClassTag[A]): Map[String, ProportionEstimate] =
     
     if population.isEmpty then
@@ -294,7 +298,7 @@ object ProportionEstimator:
     )
     
     // Take single sample using HDR
-    val sampler = Sampler.hdr[A](params)
+    val sampler = HDRSampler[A](config)
     val sample = sampler.sample(population, sampleSize)
     
     // Evaluate all predicates on same sample

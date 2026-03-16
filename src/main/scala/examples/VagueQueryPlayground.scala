@@ -2,7 +2,7 @@ package examples
 
 import vague.quantifier.VagueQuantifier
 import vague.query.{Query, Predicates, execute, QueryResult, VagueQuery}
-import vague.sampling.SamplingParams
+import vague.sampling.{SamplingParams, HDRConfig}
 import vague.datastore.{KnowledgeBase, KnowledgeSource, RiskDomain, RelationValue}
 import vague.bridge.{toModel, holds}
 import logic.Formula
@@ -278,9 +278,9 @@ def samplingScalabilityDemo(): Unit =
   println("Query WITH sampling (target: 1000 samples):")
   val paramsWithSampling = SamplingParams(
     epsilon = 0.03,  // 3% error margin
-    alpha = 0.05,    // 95% confidence
-    seed = Some(42)
+    alpha = 0.05     // 95% confidence
   )
+  val hdrConfig = HDRConfig(seed3 = 42)
   
   val t1 = System.currentTimeMillis()
   val q1 = Query

@@ -1,7 +1,6 @@
 package vague.sampling
 
 import scala.math.*
-import org.apache.commons.math3.distribution.NormalDistribution
 
 /** Calculator for determining sample sizes in vague quantifier evaluation.
   * 
@@ -164,8 +163,8 @@ object SampleSizeCalculator:
   
   /** Standard normal cumulative distribution function (CDF).
     * 
-    * Uses Apache Commons Math for precise calculation.
+    * Pure-Scala Abramowitz & Stegun rational approximation.
+    * Maximum absolute error < 7.5 × 10⁻⁸.
     */
   private def standardNormalCDF(x: Double): Double =
-    val standardNormal = new NormalDistribution(0.0, 1.0)
-    standardNormal.cumulativeProbability(x)
+    NormalApprox.cdf(x)

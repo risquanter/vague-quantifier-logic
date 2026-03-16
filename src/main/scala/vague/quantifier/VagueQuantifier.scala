@@ -1,6 +1,6 @@
 package vague.quantifier
 
-import vague.sampling.{ProportionEstimator, ProportionEstimate, SamplingParams}
+import vague.sampling.{ProportionEstimator, ProportionEstimate, SamplingParams, HDRConfig}
 import scala.reflect.ClassTag
 
 /** Vague quantifier for proportional reasoning over populations.
@@ -37,12 +37,14 @@ sealed trait VagueQuantifier:
   def evaluateWithSampling[A](
     population: Set[A],
     predicate: A => Boolean,
-    params: SamplingParams = SamplingParams()
+    params: SamplingParams = SamplingParams(),
+    config: HDRConfig = HDRConfig.default
   )(using ClassTag[A]): QuantifierResult =
     val estimate = ProportionEstimator.estimateWithSampling(
       population,
       predicate,
-      params
+      params,
+      config
     )
     
     QuantifierResult(

@@ -10,7 +10,7 @@ import munit.FunSuite
   * Tests:
   * - Sampling parameters and validation
   * - Sample size calculation with FPC
-  * - Uniform and stratified sampling
+  * - HDR sampling via Fisher-Yates
   * - Proportion estimation with confidence intervals
   */
 class SamplingSpec extends FunSuite:
@@ -21,7 +21,6 @@ class SamplingSpec extends FunSuite:
     val params = SamplingParams.default
     assertEquals(params.epsilon, 0.1)
     assertEquals(params.alpha, 0.05)
-    assertEquals(params.seed, None)
   }
   
   test("conservative sampling params") {
@@ -36,9 +35,12 @@ class SamplingSpec extends FunSuite:
     assertEquals(params.alpha, 0.10)
   }
   
-  test("testing params with seed") {
-    val params = SamplingParams.forTesting(42)
-    assertEquals(params.seed, Some(42L))
+  test("HDRConfig defaults") {
+    val config = HDRConfig.default
+    assertEquals(config.entityId, 0L)
+    assertEquals(config.varId, 0L)
+    assertEquals(config.seed3, 0L)
+    assertEquals(config.seed4, 0L)
   }
   
   test("params reject invalid epsilon") {
@@ -64,17 +66,14 @@ class SamplingSpec extends FunSuite:
   
   test("z-score for common confidence levels") {
     val params95 = SamplingParams(alpha = 0.05)
-    // Apache Commons Math returns precise value
     assert(math.abs(params95.zScore - 1.96) < 0.001, 
       s"95% z-score ${params95.zScore} should be close to 1.96")
     
     val params99 = SamplingParams(alpha = 0.01)
-    // Apache Commons Math returns precise value
     assert(math.abs(params99.zScore - 2.576) < 0.001, 
       s"99% z-score ${params99.zScore} should be close to 2.576")
     
     val params90 = SamplingParams(alpha = 0.10)
-    // Apache Commons Math returns precise value
     assert(math.abs(params90.zScore - 1.645) < 0.001, 
       s"90% z-score ${params90.zScore} should be close to 1.645")
   }
@@ -164,9 +163,9 @@ class SamplingSpec extends FunSuite:
   
   // ==================== Sampler Tests ====================
   
-  test("uniform sampler with reproducible seed") {
-    val params = SamplingParams.forTesting(42)
-    val sampler = Sampler.uniform[Int](params)
+  test("HDR sampler with reproducible seed") {
+    val config = HDRConfig(seed3 = 42)
+    val sampler = HDRSampler[Int](config)
     
     val population = (1 to 100).toSet
     val sample1 = sampler.sample(population, 10)
@@ -175,12 +174,12 @@ class SamplingSpec extends FunSuite:
     val sampler2 = sampler.reset()
     val sample2 = sampler2.sample(population, 10)
     
-    assertEquals(sample1, sample2, "Same seed should produce same sample")
+    assertEquals(sample1, sample2, "Same config should produce same sample")
   }
   
-  test("uniform sampling without replacement") {
-    val params = SamplingParams.forTesting(42)
-    val sampler = Sampler.uniform[Int](params)
+  test("sampling without replacement") {
+    val config = HDRConfig(seed3 = 42)
+    val sampler = HDRSampler[Int](config)
     
     val population = (1 to 100).toSet
     val sample = sampler.sample(population, 10)
@@ -190,8 +189,8 @@ class SamplingSpec extends FunSuite:
   }
   
   test("sampling more than population returns entire population") {
-    val params = SamplingParams.forTesting(42)
-    val sampler = Sampler.uniform[Int](params)
+    val config = HDRConfig(seed3 = 42)
+    val sampler = HDRSampler[Int](config)
     
     val population = (1 to 10).toSet
     val sample = sampler.sample(population, 100)
@@ -200,16 +199,16 @@ class SamplingSpec extends FunSuite:
   }
   
   test("sampling empty population") {
-    val params = SamplingParams.forTesting(42)
-    val sampler = Sampler.uniform[String](params)
+    val config = HDRConfig(seed3 = 42)
+    val sampler = HDRSampler[String](config)
     
     val sample = sampler.sample(Set.empty, 10)
     assert(sample.isEmpty, "Sample of empty population should be empty")
   }
   
   test("sampling zero elements") {
-    val params = SamplingParams.forTesting(42)
-    val sampler = Sampler.uniform[Int](params)
+    val config = HDRConfig(seed3 = 42)
+    val sampler = HDRSampler[Int](config)
     
     val population = (1 to 100).toSet
     val sample = sampler.sample(population, 0)
@@ -218,8 +217,8 @@ class SamplingSpec extends FunSuite:
   }
   
   test("sample with predicate") {
-    val params = SamplingParams.forTesting(42)
-    val sampler = Sampler.uniform[Int](params)
+    val config = HDRConfig(seed3 = 42)
+    val sampler = HDRSampler[Int](config)
     
     val population = (1 to 100).toSet
     val (sample, successes) = sampler.sampleWithPredicate(
@@ -234,7 +233,7 @@ class SamplingSpec extends FunSuite:
   }
   
   test("auto sample calculates size automatically") {
-    val params = SamplingParams.forTesting(42)
+    val params = SamplingParams.default
     val population = (1 to 1000).toSet
     
     val (sample, sampleSize) = Sampler.autoSample(population, params)
@@ -246,7 +245,7 @@ class SamplingSpec extends FunSuite:
   // ==================== ProportionEstimator Tests ====================
   
   test("estimate proportion from sample") {
-    val params = SamplingParams.forTesting(42)
+    val params = SamplingParams.default
     val sample = (1 to 100).toSet
     val predicate = (x: Int) => x <= 50  // 50% of elements
     
@@ -258,7 +257,7 @@ class SamplingSpec extends FunSuite:
   }
   
   test("estimate proportion with sampling") {
-    val params = SamplingParams.forTesting(42)
+    val params = SamplingParams.default
     val population = (1 to 1000).toSet
     val predicate = (x: Int) => x <= 500  // 50% of elements
     
@@ -275,7 +274,7 @@ class SamplingSpec extends FunSuite:
   }
   
   test("exact estimate uses full population") {
-    val params = SamplingParams.forTesting(42)
+    val params = SamplingParams.default
     val population = (1 to 100).toSet
     val predicate = (x: Int) => x <= 30  // 30% of elements
     
@@ -319,7 +318,7 @@ class SamplingSpec extends FunSuite:
   }
   
   test("proportion estimate contains target") {
-    val params = SamplingParams.forTesting(42)
+    val params = SamplingParams.default
     val sample = (1 to 100).toSet
     val predicate = (x: Int) => x <= 50
     
@@ -330,7 +329,7 @@ class SamplingSpec extends FunSuite:
   }
   
   test("proportion estimate overlaps range") {
-    val params = SamplingParams.forTesting(42)
+    val params = SamplingParams.default
     val sample = (1 to 100).toSet
     val predicate = (x: Int) => x <= 50
     
@@ -357,7 +356,7 @@ class SamplingSpec extends FunSuite:
   }
   
   test("batch estimate uses single sample") {
-    val params = SamplingParams.forTesting(42)
+    val params = SamplingParams.default
     val population = (1 to 1000).toSet
     
     val predicates = Map(
@@ -383,7 +382,7 @@ class SamplingSpec extends FunSuite:
   }
   
   test("significant difference detection") {
-    val params = SamplingParams.forTesting(42)
+    val params = SamplingParams.default
     
     val estimate1 = ProportionEstimate(
       proportion = 0.3,
@@ -423,7 +422,8 @@ class SamplingSpec extends FunSuite:
   // ==================== Integration Tests ====================
   
   test("end-to-end sampling pipeline") {
-    val params = SamplingParams.forTesting(123)
+    val params = SamplingParams.default
+    val config = HDRConfig(seed3 = 123)
     val population = (1 to 500).toSet
     val predicate = (x: Int) => x <= 250  // True proportion: 0.5
     
@@ -433,8 +433,8 @@ class SamplingSpec extends FunSuite:
       params
     )
     
-    // Sample
-    val sampler = Sampler.uniform[Int](params)
+    // Sample using HDR
+    val sampler = HDRSampler[Int](config)
     val sample = sampler.sample(population, sampleSize)
     
     // Estimate

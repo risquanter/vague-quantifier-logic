@@ -1,7 +1,7 @@
 package vague.examples
 
 import vague.quantifier.*
-import vague.sampling.SamplingParams
+import vague.sampling.{SamplingParams, HDRConfig}
 import vague.datastore.{KnowledgeBase, RiskDomain, RelationValue}
 
 /** Demonstration of Vague Quantifier Usage
@@ -133,17 +133,17 @@ object VagueQuantifierDemo:
     // Sampling parameters control precision vs. speed tradeoff
     // - epsilon (ε): Maximum error tolerance (default: 0.1 = ±10%)
     // - alpha (α): Significance level (default: 0.05 = 95% confidence)
-    // - seed: For reproducible results
+    // HDRConfig controls the PRNG seed hierarchy (ADR-003)
     val params = SamplingParams(
       epsilon = 0.05,   // ±5% error bound
-      alpha = 0.05,     // 95% confidence
-      seed = Some(42)   // Reproducible random sampling
+      alpha = 0.05      // 95% confidence
     )
+    val hdrConfig = HDRConfig(seed3 = 42)  // Reproducible random sampling
     
     println(s"  Sampling parameters:")
     println(s"    Error tolerance (ε): ${params.epsilon * 100}%")
     println(s"    Confidence level: ${(1 - params.alpha) * 100}%")
-    println(s"    Seed: ${params.seed}")
+    println(s"    HDR seed3: ${hdrConfig.seed3}")
     println()
     
     // HDR (Hubbard Decision Research) PRNG is used for sampling
@@ -151,7 +151,8 @@ object VagueQuantifierDemo:
     val result = VagueQuantifier.most.evaluateWithSampling(
       largePopulation,
       largePredicate,
-      params
+      params,
+      hdrConfig
     )
     
     println(s"  Q: Do 'most' records meet criteria? (≥70%)")
@@ -287,14 +288,15 @@ object VagueQuantifierDemo:
     // With tight sampling parameters, we can detect significance
     val tightParams = SamplingParams(
       epsilon = 0.01,  // ±1% error
-      alpha = 0.05,    // 95% confidence
-      seed = Some(42)
+      alpha = 0.05     // 95% confidence
     )
+    val tightHdr = HDRConfig(seed3 = 42)
     
     val borderlineResult = VagueQuantifier.most.evaluateWithSampling(
       population,
       borderlinePredicate,
-      tightParams
+      tightParams,
+      tightHdr
     )
     
     println(s"  Q: Are 'most' satisfied? (≥70%)")

@@ -1,7 +1,7 @@
 package vague.quantifier
 
 import munit.FunSuite
-import vague.sampling.SamplingParams
+import vague.sampling.{SamplingParams, HDRConfig}
 
 /** Test suite for Vague Quantifiers
   * 
@@ -116,10 +116,11 @@ class VagueQuantifierSpec extends FunSuite:
   test("evaluate with sampling on population") {
     val population = (1 to 100).toSet
     val predicate = (x: Int) => x <= 50  // Exactly 50%
-    val params = SamplingParams(seed = Some(42))
+    val params = SamplingParams()
+    val config = HDRConfig(seed3 = 42)
     
     val q = Approximately(0.5, 0.15)
-    val result = q.evaluateWithSampling(population, predicate, params)
+    val result = q.evaluateWithSampling(population, predicate, params, config)
     
     assert(result.satisfied, "should satisfy approximately 50%")
     assert(result.proportion >= 0.35 && result.proportion <= 0.65,
@@ -172,10 +173,11 @@ class VagueQuantifierSpec extends FunSuite:
   test("result significance for approximately with tight CI") {
     val population = (1 to 1000).toSet
     val predicate = (x: Int) => x <= 500  // Exactly 50%
-    val params = SamplingParams(epsilon = 0.01, alpha = 0.05, seed = Some(42))
+    val params = SamplingParams(epsilon = 0.01, alpha = 0.05)
+    val config = HDRConfig(seed3 = 42)
     
     val q = Approximately(0.5, 0.1)
-    val result = q.evaluateWithSampling(population, predicate, params)
+    val result = q.evaluateWithSampling(population, predicate, params, config)
     
     // With large sample, CI should be tight enough to be significant
     assert(result.satisfied)
@@ -263,7 +265,6 @@ class VagueQuantifierSpec extends FunSuite:
   
   test("chain multiple quantifier evaluations") {
     val population = (1 to 100).toSet
-    val params = SamplingParams(seed = Some(42))
     
     val predicates = Map(
       "low" -> ((x: Int) => x <= 20),    // 20%
