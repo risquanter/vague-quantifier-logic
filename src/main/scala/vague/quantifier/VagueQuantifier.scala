@@ -1,6 +1,8 @@
 package vague.quantifier
 
 import vague.sampling.{ProportionEstimator, ProportionEstimate, SamplingParams, HDRConfig}
+import vague.logic.{Quantifier => LogicQuantifier}
+import vague.result.VagueQueryResult
 import scala.reflect.ClassTag
 
 /** Vague quantifier for proportional reasoning over populations.
@@ -17,15 +19,33 @@ import scala.reflect.ClassTag
   * - Approximately (Q[~#]): proportion ≈ target (e.g., "about half")
   * - AtLeast (Q[≥]): proportion ≥ threshold (e.g., "most", "many")
   * - AtMost (Q[≤]): proportion ≤ threshold (e.g., "few", "hardly any")
+  * 
+  * This is the ergonomic Scala API (percentage-based). Internally,
+  * acceptance checking delegates to [[vague.logic.Quantifier.accepts]]
+  * which implements the paper's Definition 2 with ratio-based notation.
+  * Use [[toQuantifier]] to convert to the canonical ratio form.
   */
 sealed trait VagueQuantifier:
   
+  /** Convert to the canonical ratio-based [[vague.logic.Quantifier]].
+    * 
+    * The ratio form (k/n) is what the parser produces and what the paper
+    * uses. This conversion enables the typed DSL and the string-parsed
+    * path to share a single acceptance-checking implementation.
+    */
+  def toQuantifier: LogicQuantifier
+  
   /** Evaluate whether the proportion satisfies this quantifier.
+    * 
+    * Delegates to [[vague.logic.Quantifier.accepts]] using the
+    * quantifier's own tolerance as epsilon.
     * 
     * @param proportion Estimated proportion in [0, 1]
     * @return true if proportion falls within quantifier's acceptance range
     */
-  def evaluate(proportion: Double): Boolean
+  def evaluate(proportion: Double): Boolean =
+    val q = toQuantifier
+    LogicQuantifier.accepts(q, proportion, LogicQuantifier.tolerance(q))
   
   /** Evaluate quantifier on a population with sampling.
     * 
@@ -39,21 +59,11 @@ sealed trait VagueQuantifier:
     predicate: A => Boolean,
     params: SamplingParams = SamplingParams(),
     config: HDRConfig = HDRConfig.default
-  )(using ClassTag[A]): QuantifierResult =
+  )(using ClassTag[A]): VagueQueryResult =
     val estimate = ProportionEstimator.estimateWithSampling(
-      population,
-      predicate,
-      params,
-      config
+      population, predicate, params, config
     )
-    
-    QuantifierResult(
-      satisfied = evaluate(estimate.proportion),
-      proportion = estimate.proportion,
-      confidenceInterval = estimate.confidenceInterval,
-      quantifier = this,
-      estimate = estimate
-    )
+    VagueQueryResult.fromEstimate(this, estimate, population.size)
   
   /** Evaluate quantifier on exact proportion (no sampling).
     * 
@@ -64,20 +74,11 @@ sealed trait VagueQuantifier:
   def evaluateExact[A](
     population: Set[A],
     predicate: A => Boolean
-  ): QuantifierResult =
+  ): VagueQueryResult =
     val estimate = ProportionEstimator.exactEstimate(
-      population,
-      predicate,
-      SamplingParams()
+      population, predicate, SamplingParams()
     )
-    
-    QuantifierResult(
-      satisfied = evaluate(estimate.proportion),
-      proportion = estimate.proportion,
-      confidenceInterval = estimate.confidenceInterval,
-      quantifier = this,
-      estimate = estimate
-    )
+    VagueQueryResult.fromEstimate(this, estimate, population.size)
   
   /** Human-readable description of this quantifier. */
   def describe: String
@@ -98,8 +99,10 @@ case class Approximately(target: Double, tolerance: Double = 0.1) extends VagueQ
   val lowerBound: Double = math.max(0.0, target - tolerance)
   val upperBound: Double = math.min(1.0, target + tolerance)
   
-  def evaluate(proportion: Double): Boolean =
-    proportion >= lowerBound && proportion <= upperBound
+  def toQuantifier: LogicQuantifier =
+    // Convert percentage target to ratio k/n with denominator 1000 for precision
+    val k = math.round(target * 1000).toInt
+    LogicQuantifier.About(k, 1000, tolerance)
   
   def describe: String = 
     s"approximately ${(target * 100).toInt}% (±${(tolerance * 100).toInt}%)"
@@ -111,14 +114,17 @@ case class Approximately(target: Double, tolerance: Double = 0.1) extends VagueQ
   * 
   * @param threshold Minimum acceptable proportion in [0, 1]
   */
-case class AtLeast(threshold: Double) extends VagueQuantifier:
+case class AtLeast(threshold: Double, tolerance: Double = 0.0) extends VagueQuantifier:
   require(threshold >= 0.0 && threshold <= 1.0, s"Threshold must be in [0, 1], got $threshold")
+  require(tolerance >= 0.0 && tolerance <= 1.0, s"Tolerance must be in [0, 1], got $tolerance")
   
-  def evaluate(proportion: Double): Boolean =
-    proportion >= threshold
+  def toQuantifier: LogicQuantifier =
+    val k = math.round(threshold * 1000).toInt
+    LogicQuantifier.AtLeast(k, 1000, tolerance)
   
   def describe: String = 
-    s"at least ${(threshold * 100).toInt}%"
+    if tolerance > 0 then s"at least about ${(threshold * 100).toInt}%"
+    else s"at least ${(threshold * 100).toInt}%"
 
 /** At-most quantifier Q[≤].
   * 
@@ -127,66 +133,35 @@ case class AtLeast(threshold: Double) extends VagueQuantifier:
   * 
   * @param threshold Maximum acceptable proportion in [0, 1]
   */
-case class AtMost(threshold: Double) extends VagueQuantifier:
+case class AtMost(threshold: Double, tolerance: Double = 0.0) extends VagueQuantifier:
   require(threshold >= 0.0 && threshold <= 1.0, s"Threshold must be in [0, 1], got $threshold")
+  require(tolerance >= 0.0 && tolerance <= 1.0, s"Tolerance must be in [0, 1], got $tolerance")
   
-  def evaluate(proportion: Double): Boolean =
-    proportion <= threshold
+  def toQuantifier: LogicQuantifier =
+    val k = math.round(threshold * 1000).toInt
+    LogicQuantifier.AtMost(k, 1000, tolerance)
   
   def describe: String = 
-    s"at most ${(threshold * 100).toInt}%"
-
-/** Result of evaluating a vague quantifier. */
-case class QuantifierResult(
-  satisfied: Boolean,
-  proportion: Double,
-  confidenceInterval: (Double, Double),
-  quantifier: VagueQuantifier,
-  estimate: ProportionEstimate
-):
-  /** Check if result is statistically significant.
-    * 
-    * Result is significant if the entire confidence interval
-    * falls within (satisfied) or outside (not satisfied) the
-    * quantifier's acceptance range.
-    */
-  def isSignificant: Boolean = quantifier match
-    case Approximately(target, tolerance) =>
-      val (lower, upper) = confidenceInterval
-      val qLower = math.max(0.0, target - tolerance)
-      val qUpper = math.min(1.0, target + tolerance)
-      
-      if satisfied then
-        // Entire CI must be within acceptance range
-        lower >= qLower && upper <= qUpper
-      else
-        // Entire CI must be outside acceptance range
-        upper < qLower || lower > qUpper
-    
-    case AtLeast(threshold) =>
-      val (lower, upper) = confidenceInterval
-      if satisfied then
-        lower >= threshold  // Lower bound meets threshold
-      else
-        upper < threshold   // Upper bound below threshold
-    
-    case AtMost(threshold) =>
-      val (lower, upper) = confidenceInterval
-      if satisfied then
-        upper <= threshold  // Upper bound meets threshold
-      else
-        lower > threshold   // Lower bound exceeds threshold
-  
-  /** Human-readable summary of result. */
-  def summary: String =
-    val significanceNote = if isSignificant then "" else " (not statistically significant)"
-    s"${if satisfied then "✓" else "✗"} ${quantifier.describe}: " +
-    s"${(proportion * 100).toInt}% " +
-    s"[${(confidenceInterval._1 * 100).toInt}%-${(confidenceInterval._2 * 100).toInt}%]" +
-    significanceNote
+    if tolerance > 0 then s"at most about ${(threshold * 100).toInt}%"
+    else s"at most ${(threshold * 100).toInt}%"
 
 /** Common vague quantifiers with sensible defaults. */
 object VagueQuantifier:
+  
+  /** Convert from the canonical ratio-based [[vague.logic.Quantifier]]
+    * to the ergonomic percentage-based [[VagueQuantifier]].
+    * 
+    * This is the inverse of [[VagueQuantifier.toQuantifier]].
+    * Used by the bridge layer when string-parsed queries need to
+    * flow through the typed-DSL evaluation pipeline.
+    */
+  def fromQuantifier(q: LogicQuantifier): VagueQuantifier = q match
+    case LogicQuantifier.About(k, n, tol) =>
+      Approximately(k.toDouble / n.toDouble, tol)
+    case LogicQuantifier.AtLeast(k, n, tol) =>
+      AtLeast(k.toDouble / n.toDouble, tol)
+    case LogicQuantifier.AtMost(k, n, tol) =>
+      AtMost(k.toDouble / n.toDouble, tol)
   
   // Approximately quantifiers (Q[~#])
   val aboutHalf: Approximately = Approximately(0.5, 0.1)          // [0.4, 0.6]

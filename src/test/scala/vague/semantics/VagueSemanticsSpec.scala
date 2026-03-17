@@ -49,10 +49,10 @@ class VagueSemanticsSpec extends munit.FunSuite:
     val result = VagueSemantics.holdsExact(query, kb.asSource)
     
     // 4 out of 8 countries are large = 0.5
-    assertEquals(result.rangeSize, 8)
+    assertEquals(result.domainSize, 8)
     assertEquals(result.sampleSize, 8) // Exact evaluation uses all
     assertEquals(result.satisfyingCount, 4)
-    assertEquals(result.actualProportion, 0.5)
+    assertEquals(result.proportion, 0.5)
     assertEquals(result.satisfied, true) // 0.5 is within [0.4, 0.6]
 
   test("evaluate query: at least half are large"):
@@ -68,7 +68,7 @@ class VagueSemanticsSpec extends munit.FunSuite:
     
     val result = VagueSemantics.holdsExact(query, kb.asSource)
     
-    assertEquals(result.actualProportion, 0.5)
+    assertEquals(result.proportion, 0.5)
     assertEquals(result.satisfied, true) // 0.5 >= 0.5 - 0.1 = 0.4
 
   test("evaluate query: at most half are large"):
@@ -84,7 +84,7 @@ class VagueSemanticsSpec extends munit.FunSuite:
     
     val result = VagueSemantics.holdsExact(query, kb.asSource)
     
-    assertEquals(result.actualProportion, 0.5)
+    assertEquals(result.proportion, 0.5)
     assertEquals(result.satisfied, true) // 0.5 <= 0.5 + 0.1 = 0.6
 
   test("query not satisfied: about three-quarters are large"):
@@ -101,7 +101,7 @@ class VagueSemanticsSpec extends munit.FunSuite:
     val result = VagueSemantics.holdsExact(query, kb.asSource)
     
     // 0.5 is not within [0.65, 0.85]
-    assertEquals(result.actualProportion, 0.5)
+    assertEquals(result.proportion, 0.5)
     assertEquals(result.satisfied, false)
 
   test("query satisfied: about three-quarters are coastal"):
@@ -119,9 +119,9 @@ class VagueSemanticsSpec extends munit.FunSuite:
     val result = VagueSemantics.holdsExact(query, kb.asSource)
     
     // 3 out of 4 large countries are coastal = 0.75
-    assertEquals(result.rangeSize, 4)
+    assertEquals(result.domainSize, 4)
     assertEquals(result.satisfyingCount, 3)
-    assertEquals(result.actualProportion, 0.75)
+    assertEquals(result.proportion, 0.75)
     assertEquals(result.satisfied, true) // 0.75 is within [0.65, 0.85]
 
   test("all elements satisfy scope formula"):
@@ -138,7 +138,7 @@ class VagueSemanticsSpec extends munit.FunSuite:
     
     val result = VagueSemantics.holdsExact(query, kb.asSource)
     
-    assertEquals(result.actualProportion, 1.0)
+    assertEquals(result.proportion, 1.0)
     assertEquals(result.satisfyingCount, 8)
     assertEquals(result.satisfied, true)
 
@@ -156,7 +156,7 @@ class VagueSemanticsSpec extends munit.FunSuite:
     
     val result = VagueSemantics.holdsExact(query, kb.asSource)
     
-    assertEquals(result.actualProportion, 0.0)
+    assertEquals(result.proportion, 0.0)
     assertEquals(result.satisfyingCount, 0)
     assertEquals(result.satisfied, true) // 0.0 is within [-0.01, 0.01]
 
@@ -173,10 +173,10 @@ class VagueSemanticsSpec extends munit.FunSuite:
     
     val result = VagueSemantics.holdsExact(query, kb.asSource)
     
-    assertEquals(result.rangeSize, 0)
+    assertEquals(result.domainSize, 0)
     assertEquals(result.sampleSize, 0)
     assertEquals(result.satisfyingCount, 0)
-    assertEquals(result.actualProportion, 0.0)
+    assertEquals(result.proportion, 0.0)
     assertEquals(result.satisfied, false)
 
   test("conjunction in scope formula"):
@@ -198,7 +198,7 @@ class VagueSemanticsSpec extends munit.FunSuite:
     // 3 out of 8 countries are both large and coastal
     // France, Italy, Spain
     assertEquals(result.satisfyingCount, 3)
-    assertEquals(result.actualProportion, 3.0 / 8.0) // 0.375
+    assertEquals(result.proportion, 3.0 / 8.0) // 0.375
     assertEquals(result.satisfied, true) // 0.375 is within [0.3, 0.7]
 
   test("disjunction in scope formula"):
@@ -221,7 +221,7 @@ class VagueSemanticsSpec extends munit.FunSuite:
     // Wealthy: Luxembourg, Switzerland (2)
     // Union: 6 out of 8
     assertEquals(result.satisfyingCount, 6)
-    assertEquals(result.actualProportion, 0.75)
+    assertEquals(result.proportion, 0.75)
     assertEquals(result.satisfied, true) // 0.75 >= 0.4
 
   test("negation in scope formula"):
@@ -239,10 +239,10 @@ class VagueSemanticsSpec extends munit.FunSuite:
     
     // 6 out of 8 are not wealthy (only Luxembourg, Switzerland are wealthy)
     assertEquals(result.satisfyingCount, 6)
-    assertEquals(result.actualProportion, 0.75)
+    assertEquals(result.proportion, 0.75)
     assertEquals(result.satisfied, true) // 0.75 is within [0.65, 0.85]
 
-  test("sampling evaluation with fixed seed"):
+  test("sampling evaluation produces reproducible result via HDR PRNG"):
     val kb = createCountryKB()
     
     val query = VagueQuery(
@@ -252,17 +252,20 @@ class VagueSemanticsSpec extends munit.FunSuite:
       scope = Formula.Atom(FOL("large", List(Term.Var("x"))))
     )
     
+    import vague.sampling.{SamplingParams, HDRConfig}
     val result = VagueSemantics.holdsWithSampling(
-      query, kb.asSource, 
-      sampleSize = 4,
-      seed = Some(42L)
+      query, kb.asSource,
+      samplingParams = SamplingParams(),
+      hdrConfig = HDRConfig(entityId = 1, varId = 1, seed3 = 0, seed4 = 0)
     )
     
-    assertEquals(result.rangeSize, 8)
-    assertEquals(result.sampleSize, 4) // Sampled only 4
-    assert(result.sampleSize < result.rangeSize)
+    // Small population (8) — SampleSizeCalculator uses all elements
+    assertEquals(result.domainSize, 8)
+    assertEquals(result.sampleSize, 8)
+    assertEquals(result.proportion, 0.5)
+    assertEquals(result.satisfied, true)
 
-  test("sampling with sample size >= range size uses exact evaluation"):
+  test("sampling with small population uses entire range"):
     val kb = createCountryKB()
     
     val query = VagueQuery(
@@ -272,16 +275,17 @@ class VagueSemanticsSpec extends munit.FunSuite:
       scope = Formula.Atom(FOL("large", List(Term.Var("x"))))
     )
     
+    import vague.sampling.{SamplingParams, HDRConfig}
     val result = VagueSemantics.holdsWithSampling(
       query, kb.asSource,
-      sampleSize = 100, // Much larger than range
-      seed = Some(42L)
+      samplingParams = SamplingParams(),
+      hdrConfig = HDRConfig.default
     )
     
-    // Should use entire range when sample size >= range size
-    assertEquals(result.rangeSize, 8)
-    assertEquals(result.sampleSize, 8) // Uses all
-    assertEquals(result.actualProportion, 0.5)
+    // Population of 8 is small enough that SampleSizeCalculator uses all
+    assertEquals(result.domainSize, 8)
+    assertEquals(result.sampleSize, 8)
+    assertEquals(result.proportion, 0.5)
 
   test("convenience method: holdsExact"):
     val kb = createCountryKB()
@@ -296,7 +300,7 @@ class VagueSemanticsSpec extends munit.FunSuite:
     val result = VagueSemantics.holdsExact(query, kb.asSource)
     
     // Should use entire range (no sampling)
-    assertEquals(result.sampleSize, result.rangeSize)
+    assertEquals(result.sampleSize, result.domainSize)
 
   test("paper example (simplified): large European countries"):
     // Simplified version of query q₁ from paper Section 5.2
@@ -324,7 +328,7 @@ class VagueSemanticsSpec extends munit.FunSuite:
     val result = VagueSemantics.holdsExact(query, kb.asSource)
     
     // 5 out of 10 = 0.5
-    assertEquals(result.rangeSize, 10)
+    assertEquals(result.domainSize, 10)
     assertEquals(result.satisfyingCount, 5)
-    assertEquals(result.actualProportion, 0.5)
+    assertEquals(result.proportion, 0.5)
     assertEquals(result.satisfied, true)

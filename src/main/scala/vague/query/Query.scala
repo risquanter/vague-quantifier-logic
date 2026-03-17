@@ -5,6 +5,7 @@ import vague.quantifier.VagueQuantifier
 import vague.datastore.{KnowledgeSource, RelationValue, RelationValueUtil}
 import vague.sampling.{SamplingParams, HDRConfig}
 import vague.semantics.DomainExtraction
+import vague.result.VagueQueryResult
 import RelationValueUtil.*
 
 /** Query DSL for vague quantifier queries over knowledge bases.
@@ -57,40 +58,17 @@ case class VagueQuery[A: ClassTag](
     * @param source Knowledge source to query
     * @return Query result with satisfaction and proportion
     */
-  def evaluate(source: KnowledgeSource): QueryResult =
+  def evaluate(source: KnowledgeSource): VagueQueryResult =
     domain match
       case DomainSpec.Relation(relationName, position) =>
-        // Extract domain from relation - always use full domain for now
-        // (sampling happens inside evaluateWithSampling)
         val domainValues = source.getDomain(relationName, position)
-        
-        // Convert RelationValues to the expected type A (typically String)
         val population: Set[A] = toDomainSetTyped[A](domainValues)
-        
-        // Evaluate quantifier with sampling
-        val result = quantifier.evaluateWithSampling(population, predicate, params, hdrConfig)
-        
-        QueryResult(
-          query = this.asInstanceOf[VagueQuery[Any]],
-          result = result,
-          sampleSize = result.estimate.sampleSize,
-          domainSize = population.size
-        )
+        quantifier.evaluateWithSampling(population, predicate, params, hdrConfig)
       
       case DomainSpec.ActiveDomain =>
-        // Use full active domain (all constants in KB)
         val domainValues = source.activeDomain
-        
         val population: Set[A] = toDomainSetTyped[A](domainValues)
-        
-        val result = quantifier.evaluateWithSampling(population, predicate, params, hdrConfig)
-        
-        QueryResult(
-          query = this.asInstanceOf[VagueQuery[Any]],
-          result = result,
-          sampleSize = result.estimate.sampleSize,
-          domainSize = population.size
-        )
+        quantifier.evaluateWithSampling(population, predicate, params, hdrConfig)
 
 /** Specification of the domain to query over. */
 enum DomainSpec:
@@ -106,29 +84,6 @@ enum DomainSpec:
     * is not restricted to a specific relation.
     */
   case ActiveDomain
-
-/** Result of evaluating a vague query. */
-case class QueryResult(
-  query: VagueQuery[Any],
-  result: vague.quantifier.QuantifierResult,
-  sampleSize: Int,
-  domainSize: Int
-):
-  /** Whether the query is satisfied. */
-  def satisfied: Boolean = result.satisfied
-  
-  /** Estimated proportion. */
-  def proportion: Double = result.proportion
-  
-  /** Confidence interval. */
-  def confidenceInterval: (Double, Double) = result.confidenceInterval
-  
-  /** Human-readable summary. */
-  def summary: String =
-    s"${result.summary} (sampled $sampleSize of $domainSize elements)"
-  
-  /** Is the result statistically significant? */
-  def isSignificant: Boolean = result.isSignificant
 
 /** Fluent query builder. */
 object Query:
@@ -190,7 +145,7 @@ extension (source: KnowledgeSource)
     * @param query Query to execute
     * @return Query result
     */
-  def execute[A](query: VagueQuery[A]): QueryResult =
+  def execute[A](query: VagueQuery[A]): VagueQueryResult =
     query.evaluate(source)
 
 /** Predicate builders for common patterns. */

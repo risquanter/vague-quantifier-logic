@@ -387,6 +387,7 @@ class SamplingSpec extends FunSuite:
     val estimate1 = ProportionEstimate(
       proportion = 0.3,
       sampleSize = 100,
+      successes = 30,
       confidenceInterval = (0.21, 0.39),
       marginOfError = 0.09,
       params = params
@@ -395,6 +396,7 @@ class SamplingSpec extends FunSuite:
     val estimate2 = ProportionEstimate(
       proportion = 0.7,
       sampleSize = 100,
+      successes = 70,
       confidenceInterval = (0.61, 0.79),
       marginOfError = 0.09,
       params = params
@@ -403,6 +405,7 @@ class SamplingSpec extends FunSuite:
     val estimate3 = ProportionEstimate(
       proportion = 0.35,
       sampleSize = 100,
+      successes = 35,
       confidenceInterval = (0.26, 0.44),
       marginOfError = 0.09,
       params = params

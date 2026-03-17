@@ -136,6 +136,23 @@ object Quantifier:
     case AtLeast(_, _, tol) => tol
     case AtMost(_, _, tol) => tol
   
+  /** Acceptance range [lower, upper] for a quantifier.
+    *
+    * Returns the proportion interval within which `accepts` returns true.
+    * Clamped to [0, 1].
+    *
+    * - About(k,n,ε):   [k/n - ε, k/n + ε]
+    * - AtLeast(k,n,ε):  [k/n - ε, 1.0]
+    * - AtMost(k,n,ε):   [0.0, k/n + ε]
+    */
+  def acceptanceRange(q: Quantifier): (Double, Double) =
+    val target = targetProportion(q)
+    val tol = tolerance(q)
+    q match
+      case _: About   => (math.max(0.0, target - tol), math.min(1.0, target + tol))
+      case _: AtLeast => (math.max(0.0, target - tol), 1.0)
+      case _: AtMost  => (0.0, math.min(1.0, target + tol))
+  
   /** Pretty print quantifier in paper notation
     * 
     * OCaml pattern: printer function

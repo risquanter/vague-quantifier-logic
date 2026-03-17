@@ -13,6 +13,7 @@ import scala.reflect.ClassTag
 case class ProportionEstimate(
   proportion: Double,
   sampleSize: Int,
+  successes: Int,
   confidenceInterval: (Double, Double),
   marginOfError: Double,
   params: SamplingParams
@@ -21,6 +22,8 @@ case class ProportionEstimate(
     s"Proportion must be in [0,1], got $proportion")
   require(sampleSize >= 0, 
     s"Sample size must be non-negative, got $sampleSize")
+  require(successes >= 0 && successes <= sampleSize,
+    s"Successes must be in [0, sampleSize], got $successes (sampleSize=$sampleSize)")
   // Allow small floating point tolerance for CI bounds
   require(confidenceInterval._1 - 0.0001 <= proportion && proportion <= confidenceInterval._2 + 0.0001,
     s"Proportion $proportion not in confidence interval ${confidenceInterval}")
@@ -61,6 +64,18 @@ case class ProportionEstimate(
     f"$proportion%.3f ± $marginOfError%.3f " +
     f"(95%% CI: [$lower%.3f, $upper%.3f], n=$sampleSize)"
 
+object ProportionEstimate:
+  /** Empty estimate for zero-element populations/samples. */
+  def empty(params: SamplingParams = SamplingParams()): ProportionEstimate =
+    ProportionEstimate(
+      proportion = 0.0,
+      sampleSize = 0,
+      successes = 0,
+      confidenceInterval = (0.0, 1.0),
+      marginOfError = 0.5,
+      params = params
+    )
+
 /** Estimator for proportions using statistical sampling.
   * 
   * Estimates the proportion of elements satisfying a predicate
@@ -85,32 +100,26 @@ object ProportionEstimator:
     val sampleSize = sample.size
     
     if sampleSize == 0 then
-      // Empty sample - undefined proportion, return 0 with zero confidence
-      return ProportionEstimate(
-        proportion = 0.0,
-        sampleSize = 0,
-        confidenceInterval = (0.0, 1.0),
-        marginOfError = 0.5,
+      ProportionEstimate.empty(params)
+    else
+      val successes = sample.count(predicate)
+      val proportion = successes.toDouble / sampleSize.toDouble
+      
+      val ci = SampleSizeCalculator.confidenceInterval(
+        proportion, 
+        sampleSize, 
+        params
+      )
+      val moe = (ci._2 - ci._1) / 2.0
+      
+      ProportionEstimate(
+        proportion = proportion,
+        sampleSize = sampleSize,
+        successes = successes,
+        confidenceInterval = ci,
+        marginOfError = moe,
         params = params
       )
-    
-    val successes = sample.count(predicate)
-    val proportion = successes.toDouble / sampleSize.toDouble
-    
-    val ci = SampleSizeCalculator.confidenceInterval(
-      proportion, 
-      sampleSize, 
-      params
-    )
-    val moe = (ci._2 - ci._1) / 2.0
-    
-    ProportionEstimate(
-      proportion = proportion,
-      sampleSize = sampleSize,
-      confidenceInterval = ci,
-      marginOfError = moe,
-      params = params
-    )
   
   /** Estimate proportion with automatic sampling.
     * 
@@ -132,26 +141,20 @@ object ProportionEstimator:
   )(using ClassTag[A]): ProportionEstimate =
     
     if population.isEmpty then
-      return ProportionEstimate(
-        proportion = 0.0,
-        sampleSize = 0,
-        confidenceInterval = (0.0, 1.0),
-        marginOfError = 0.5,
-        params = params
+      ProportionEstimate.empty(params)
+    else
+      // Calculate required sample size
+      val sampleSize = SampleSizeCalculator.calculateSampleSize(
+        population.size, 
+        params
       )
-    
-    // Calculate required sample size
-    val sampleSize = SampleSizeCalculator.calculateSampleSize(
-      population.size, 
-      params
-    )
-    
-    // Perform sampling - default to HDR for reproducibility
-    val actualSampler = sampler.getOrElse(HDRSampler[A](config))
-    val sample = actualSampler.sample(population, sampleSize)
-    
-    // Estimate proportion from sample
-    estimate(sample, predicate, params)
+      
+      // Perform sampling - default to HDR for reproducibility
+      val actualSampler = sampler.getOrElse(HDRSampler[A](config))
+      val sample = actualSampler.sample(population, sampleSize)
+      
+      // Estimate proportion from sample
+      estimate(sample, predicate, params)
   
   /** Estimate proportion using exhaustive enumeration (no sampling).
     * 
@@ -189,40 +192,34 @@ object ProportionEstimator:
   )(using ClassTag[A]): ProportionEstimate =
     
     if population.isEmpty then
-      return ProportionEstimate(
-        proportion = 0.0,
-        sampleSize = 0,
-        confidenceInterval = (0.0, 1.0),
-        marginOfError = 0.5,
-        params = params
-      )
-    
-    // Start with calculated sample size
-    var currentSampleSize = SampleSizeCalculator.calculateSampleSize(
-      population.size, 
-      params
-    )
-    
-    val sampler = HDRSampler[A](config)
-    var estimate = estimateWithSampling(population, predicate, params, config, Some(sampler))
-    var iterations = 0
-    
-    // Refine if needed
-    while !estimate.meetsErrorBound(params.epsilon) && 
-          currentSampleSize < population.size && 
-          iterations < maxIterations do
-      
-      // Increase sample size by 50%
-      currentSampleSize = math.min(
-        (currentSampleSize * 1.5).toInt,
-        population.size
+      ProportionEstimate.empty(params)
+    else
+      // Start with calculated sample size
+      var currentSampleSize = SampleSizeCalculator.calculateSampleSize(
+        population.size, 
+        params
       )
       
-      val sample = sampler.sample(population, currentSampleSize)
-      estimate = ProportionEstimator.estimate(sample, predicate, params)
-      iterations += 1
-    
-    estimate
+      val sampler = HDRSampler[A](config)
+      var estimate = estimateWithSampling(population, predicate, params, config, Some(sampler))
+      var iterations = 0
+      
+      // Refine if needed
+      while !estimate.meetsErrorBound(params.epsilon) && 
+            currentSampleSize < population.size && 
+            iterations < maxIterations do
+        
+        // Increase sample size by 50%
+        currentSampleSize = math.min(
+          (currentSampleSize * 1.5).toInt,
+          population.size
+        )
+        
+        val sample = sampler.sample(population, currentSampleSize)
+        estimate = ProportionEstimator.estimate(sample, predicate, params)
+        iterations += 1
+      
+      estimate
   
   /** Compare two proportion estimates for statistical significance.
     * 
@@ -244,25 +241,25 @@ object ProportionEstimator:
     val n1 = estimate1.sampleSize.toDouble
     val n2 = estimate2.sampleSize.toDouble
     
-    if n1 == 0 || n2 == 0 then return false
-    
-    // Pooled proportion
-    val pooled = (n1 * p1 + n2 * p2) / (n1 + n2)
-    
-    // Standard error
-    val se = math.sqrt(pooled * (1.0 - pooled) * (1.0 / n1 + 1.0 / n2))
-    
-    if se == 0.0 then return p1 != p2
-    
-    // Z-statistic
-    val z = math.abs(p1 - p2) / se
-    
-    // Critical value for two-tailed test
-    val zCritical = if math.abs(alpha - 0.05) < 0.0001 then 1.96 
-                    else if math.abs(alpha - 0.01) < 0.0001 then 2.576
-                    else 1.96  // Default to 95% confidence
-    
-    z > zCritical
+    if n1 == 0 || n2 == 0 then false
+    else
+      // Pooled proportion
+      val pooled = (n1 * p1 + n2 * p2) / (n1 + n2)
+      
+      // Standard error
+      val se = math.sqrt(pooled * (1.0 - pooled) * (1.0 / n1 + 1.0 / n2))
+      
+      if se == 0.0 then p1 != p2
+      else
+        // Z-statistic
+        val z = math.abs(p1 - p2) / se
+        
+        // Critical value for two-tailed test
+        val zCritical = if math.abs(alpha - 0.05) < 0.0001 then 1.96 
+                        else if math.abs(alpha - 0.01) < 0.0001 then 2.576
+                        else 1.96  // Default to 95% confidence
+        
+        z > zCritical
   
   /** Batch estimation for multiple predicates.
     * 
@@ -281,27 +278,21 @@ object ProportionEstimator:
   )(using ClassTag[A]): Map[String, ProportionEstimate] =
     
     if population.isEmpty then
-      return predicates.map { case (name, _) =>
-        name -> ProportionEstimate(
-          proportion = 0.0,
-          sampleSize = 0,
-          confidenceInterval = (0.0, 1.0),
-          marginOfError = 0.5,
-          params = params
-        )
+      predicates.map { case (name, _) =>
+        name -> ProportionEstimate.empty(params)
       }
-    
-    // Calculate sample size once
-    val sampleSize = SampleSizeCalculator.calculateSampleSize(
-      population.size, 
-      params
-    )
-    
-    // Take single sample using HDR
-    val sampler = HDRSampler[A](config)
-    val sample = sampler.sample(population, sampleSize)
-    
-    // Evaluate all predicates on same sample
-    predicates.map { case (name, predicate) =>
-      name -> estimate(sample, predicate, params)
-    }
+    else
+      // Calculate sample size once
+      val sampleSize = SampleSizeCalculator.calculateSampleSize(
+        population.size, 
+        params
+      )
+      
+      // Take single sample using HDR
+      val sampler = HDRSampler[A](config)
+      val sample = sampler.sample(population, sampleSize)
+      
+      // Evaluate all predicates on same sample
+      predicates.map { case (name, predicate) =>
+        name -> estimate(sample, predicate, params)
+      }

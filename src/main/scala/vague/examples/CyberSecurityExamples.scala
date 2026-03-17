@@ -61,19 +61,19 @@ object CyberSecurityExamples:
     val result = VagueSemantics.holdsExact(query, source)
     
     println("\nEvaluation:")
-    println(s"  Range size: ${result.rangeSize}")
+    println(s"  Range size: ${result.domainSize}")
     println(s"  Satisfying: ${result.satisfyingCount}")
-    println(s"  Proportion: ${result.actualProportion}")
+    println(s"  Proportion: ${result.proportion}")
     println(s"  Target: ${Quantifier.targetProportion(query.quantifier)}")
     println(s"  Tolerance: ±${query.quantifier match { case q: Quantifier.AtLeast => q.tolerance; case _ => 0.0 }}")
     println(s"  Satisfied: ${result.satisfied}")
     
     println("\nInterpretation:")
     if result.satisfied then
-      println(s"  ✓ YES: ${(result.actualProportion * 100).round}% of assets (${result.satisfyingCount}/${result.rangeSize}) have critical risks")
+      println(s"  ✓ YES: ${(result.proportion * 100).round}% of assets (${result.satisfyingCount}/${result.domainSize}) have critical risks")
       println(s"     This meets the ≥75% threshold (with 10% tolerance)")
     else
-      println(s"  ✗ NO: Only ${(result.actualProportion * 100).round}% of assets have critical risks")
+      println(s"  ✗ NO: Only ${(result.proportion * 100).round}% of assets have critical risks")
       println(s"     This falls below the ≥75% threshold")
     
     println("\n" + "-"*70)
@@ -118,18 +118,18 @@ object CyberSecurityExamples:
     val result = VagueSemantics.holdsExact(query, source)
     
     println("\nEvaluation:")
-    println(s"  Range size: ${result.rangeSize}")
+    println(s"  Range size: ${result.domainSize}")
     println(s"  Satisfying: ${result.satisfyingCount}")
-    println(s"  Proportion: ${result.actualProportion}")
+    println(s"  Proportion: ${result.proportion}")
     println(s"  Target: ${Quantifier.targetProportion(query.quantifier)} (about half)")
     println(s"  Satisfied: ${result.satisfied}")
     
     println("\nInterpretation:")
     if result.satisfied then
-      println(s"  ✓ YES: ${(result.actualProportion * 100).round}% of risks (${result.satisfyingCount}/${result.rangeSize}) have mitigations")
+      println(s"  ✓ YES: ${(result.proportion * 100).round}% of risks (${result.satisfyingCount}/${result.domainSize}) have mitigations")
       println(s"     This is approximately half (target 50% ± 10%)")
     else
-      println(s"  ✗ NO: ${(result.actualProportion * 100).round}% is not close enough to half")
+      println(s"  ✗ NO: ${(result.proportion * 100).round}% is not close enough to half")
     
     // For unary queries, we can extract the answer set
     if query.isUnary then
@@ -193,19 +193,19 @@ object CyberSecurityExamples:
     val result = VagueSemantics.holdsExact(query, source)
     
     println("\nEvaluation:")
-    println(s"  Critical assets: ${result.rangeSize}")
+    println(s"  Critical assets: ${result.domainSize}")
     println(s"  With unmitigated risks: ${result.satisfyingCount}")
-    println(s"  Proportion: ${result.actualProportion}")
+    println(s"  Proportion: ${result.proportion}")
     println(s"  Target: ≤${Quantifier.targetProportion(query.quantifier)} (at most 1/3)")
     println(s"  Satisfied: ${result.satisfied}")
     
     println("\nInterpretation:")
     if result.satisfied then
-      println(s"  ✓ YES: ${(result.actualProportion * 100).round}% of critical assets (${result.satisfyingCount}/${result.rangeSize})")
+      println(s"  ✓ YES: ${(result.proportion * 100).round}% of critical assets (${result.satisfyingCount}/${result.domainSize})")
       println(s"     have unmitigated risks - this is at most 33%")
       println(s"     Security posture is acceptable.")
     else
-      println(s"  ✗ NO: ${(result.actualProportion * 100).round}% of critical assets have unmitigated risks")
+      println(s"  ✗ NO: ${(result.proportion * 100).round}% of critical assets have unmitigated risks")
       println(s"     This exceeds the 33% threshold - SECURITY ISSUE!")
     
     // Show which critical assets have unmitigated risks
@@ -263,18 +263,18 @@ object CyberSecurityExamples:
     val result = VagueSemantics.holdsExact(query, source)
     
     println("\nEvaluation:")
-    println(s"  High-value assets: ${result.rangeSize}")
+    println(s"  High-value assets: ${result.domainSize}")
     println(s"  With patched mitigations: ${result.satisfyingCount}")
-    println(s"  Proportion: ${result.actualProportion}")
+    println(s"  Proportion: ${result.proportion}")
     println(s"  Target: ≥${Quantifier.targetProportion(query.quantifier)} (at least 90%)")
     println(s"  Satisfied: ${result.satisfied}")
     
     println("\nInterpretation:")
     if result.satisfied then
-      println(s"  ✓ YES: ${(result.actualProportion * 100).round}% of high-value assets are protected")
+      println(s"  ✓ YES: ${(result.proportion * 100).round}% of high-value assets are protected")
       println(s"     High-value assets have strong patch coverage.")
     else
-      println(s"  ✗ NO: Only ${(result.actualProportion * 100).round}% have patched mitigations")
+      println(s"  ✗ NO: Only ${(result.proportion * 100).round}% have patched mitigations")
       println(s"     Need to improve patch deployment for critical assets!")
     
     println("\n" + "-"*70)

@@ -1,9 +1,10 @@
 package examples
 
 import vague.quantifier.VagueQuantifier
-import vague.query.{Query, Predicates, execute, QueryResult, VagueQuery}
+import vague.query.{Query, Predicates, execute, VagueQuery}
 import vague.sampling.{SamplingParams, HDRConfig}
 import vague.datastore.{KnowledgeBase, KnowledgeSource, RiskDomain, RelationValue}
+import vague.result.VagueQueryResult
 import vague.bridge.{toModel, holds}
 import logic.Formula
 import parser.FOLParser
@@ -309,13 +310,7 @@ def samplingScalabilityDemo(): Unit =
   // Evaluate with full domain (no sampling)
   val allEntities = largeKB.getDomain("entity", 0)
     .collect { case RelationValue.Const(name) => name }
-  val exactResult = VagueQuantifier.most.evaluateExact(allEntities, satisfiesPredicate)
-  val result2 = QueryResult(
-    query = exactQ.asInstanceOf[VagueQuery[Any]],
-    result = exactResult,
-    sampleSize = allEntities.size,
-    domainSize = allEntities.size
-  )
+  val result2 = VagueQuantifier.most.evaluateExact(allEntities, satisfiesPredicate)
   val elapsed2 = System.currentTimeMillis() - t2
   
   println(s"  ${result2.summary}")
