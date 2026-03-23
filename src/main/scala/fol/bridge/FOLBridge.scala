@@ -4,6 +4,7 @@ import logic.{FOL, Formula}
 import semantics.EvaluationContext
 import semantics.holdsWithRelationValue
 import fol.datastore.{KnowledgeSource, RelationValue, RelationValueUtil}
+import semantics.ModelAugmenter
 import RelationValueUtil.*
 
 /** FOL → typed predicate bridge.
@@ -44,10 +45,11 @@ object FOLBridge:
     formula: Formula[FOL],
     variable: String,
     source: KnowledgeSource,
-    answerTuple: Map[String, RelationValue] = Map.empty
+    answerTuple: Map[String, RelationValue] = Map.empty,
+    modelAugmenter: ModelAugmenter[Any] = ModelAugmenter.identity
   ): RelationValue => Boolean =
     // Construct model once — this is the expensive part
-    val model = KnowledgeSourceModel.toModel(source)
+    val model = modelAugmenter(KnowledgeSourceModel.toModel(source))
     
     // Convert answer tuple to domain values for substitution
     val substitution: Map[String, Any] = answerTuple.map { (k, v) =>
@@ -74,7 +76,8 @@ object FOLBridge:
     formula: Formula[FOL],
     variable: String,
     source: KnowledgeSource,
-    answerTuple: Map[String, RelationValue] = Map.empty
+    answerTuple: Map[String, RelationValue] = Map.empty,
+    modelAugmenter: ModelAugmenter[Any] = ModelAugmenter.identity
   ): String => Boolean =
-    val rvPredicate = scopeToPredicate(formula, variable, source, answerTuple)
+    val rvPredicate = scopeToPredicate(formula, variable, source, answerTuple, modelAugmenter)
     (s: String) => rvPredicate(RelationValue.Const(s))

@@ -75,13 +75,21 @@ Q[operator]^{k/n}[tolerance] variable (range, scope)(answer_vars)
 
 ### Operators
 
-| Category | Symbols |
-|---|---|
-| Quantifier | `~`, `~#`, `>=`, `≥`, `<=`, `≤` |
-| Logical | `/\` (and), `\/` (or), `~` (not), `==>` (implies), `<=>` (iff) |
-| Quantifiers | `forall x . P(x)`, `exists x . P(x)` |
-| Comparison | `=`, `<`, `<=`, `>`, `>=` |
-| Arithmetic | `+`, `-`, `*`, `^` (in terms) |
+| Category | Symbols | Availability |
+|---|---|---|
+| Quantifier | `~`, `~#`, `>=`, `≥`, `<=`, `≤` | Always |
+| Logical | `/\` (and), `\/` (or), `~` (not), `==>` (implies), `<=>` (iff) | Always |
+| Quantifiers | `forall x . P(x)`, `exists x . P(x)` | Always |
+| Comparison | `=`, `<`, `<=`, `>`, `>=` | Requires `NumericAugmenter` |
+| Arithmetic | `+`, `-`, `*`, `^` (in terms) | Requires model augmenter with arithmetic functions |
+
+**Availability note:** The parser accepts all operators. KB-backed models
+(built by `KnowledgeSourceModel.toModel`) provide only relation-membership
+predicates and identity constants. Comparison predicates, arithmetic
+operations, numeric literal resolution, and consumer-specific functions
+require a `ModelAugmenter` passed to `VagueSemantics.holds/evaluate`.
+`NumericAugmenter` provides the built-in comparisons and numeric
+literals. See [ADR-005](ADR-005.md).
 
 ### Examples
 

@@ -247,6 +247,62 @@ class CompositeKnowledgeSource(sources: List[KnowledgeSource]) extends Knowledge
 3. **Pattern matching bugs** — test both `Wildcard` and `Specific` patterns
 4. **Type mismatches** — respect `PositionType` (Constant vs Numeric)
 5. **Resource leaks** — close connections/streams in custom backends
+6. **Expecting numeric operations from KB models** — `KnowledgeSourceModel.toModel()`
+   produces only relation-membership predicates and identity constants.
+   Comparisons (`>`, `<`), arithmetic (`+`, `*`), numeric literal resolution,
+   and custom functions require a `ModelAugmenter`. Use `NumericAugmenter`
+   for comparisons and literals; supply a consumer augmenter for domain-specific
+   functions. See [ADR-005](ADR-005.md)
+
+---
+
+## Model Augmentation for Custom Functions
+
+A `KnowledgeSource` provides **relational facts** (membership queries).
+When scope formulas require **computed values** — numeric comparisons,
+arithmetic, simulation-backed functions — use a `ModelAugmenter` to
+enrich the model built from the source.
+
+```scala
+import semantics.ModelAugmenter
+import fol.bridge.NumericAugmenter
+
+// Domain-specific augmenter (e.g., quantile functions from simulations)
+val myAugmenter: ModelAugmenter[Any] =
+  ModelAugmenter.fromFunctions(Map(
+    "score" -> { case List(x) => computeScore(x.toString) }
+  ))
+
+// Compose with built-in numeric comparisons + literal resolution
+val augmenter = NumericAugmenter.augmenter andThen myAugmenter
+
+// Pass through VagueSemantics
+val result = VagueSemantics.holds(
+  query, source,
+  modelAugmenter = augmenter
+)
+```
+
+Augmenters compose as a **monoid** — `identity` changes nothing,
+`compose(a, b)` applies `a` then `b`, and composition is associative.
+See [ADR-005](ADR-005.md) for the full design.
+
+### What `KnowledgeSourceModel.toModel()` Provides
+
+| Category | Content | Example |
+|---|---|---|
+| Domain | All values appearing in KB facts | `{"alice", "bob", 42}` |
+| Functions | 0-ary identity for each domain constant | `"alice" → (_ => "alice")` |
+| Predicates | Membership check per relation | `"person" → args => source.contains(...)` |
+
+### What Requires an Augmenter
+
+| Need | Augmenter | Source |
+|---|---|---|
+| `>`, `<`, `>=`, `<=`, `=` | `NumericAugmenter` | fol-engine built-in |
+| Numeric literals (`5000000`) | `NumericAugmenter` | fol-engine built-in |
+| `+`, `-`, `*`, `/` | Consumer augmenter | Not built-in |
+| `p95(x)`, `lec(x, t)`, etc. | Consumer augmenter | Domain-specific |
 
 ---
 
@@ -254,5 +310,8 @@ class CompositeKnowledgeSource(sources: List[KnowledgeSource]) extends Knowledge
 
 - `InMemoryKnowledgeSource` in `fol/datastore/KnowledgeSource.scala` — reference implementation
 - `KnowledgeSourceModel` in `fol/bridge/` — how sources become FOL `Model[Any]`
+- `NumericAugmenter` in `fol/bridge/` — built-in comparisons and numeric literals
+- `ModelAugmenter` in `semantics/` — composition combinators
 - [Architecture.md](Architecture.md) — system overview and layer diagram
 - [ADR-004](ADR-004.md) — tagless initial architecture and bridge pattern
+- [ADR-005](ADR-005.md) — model augmentation via functional composition

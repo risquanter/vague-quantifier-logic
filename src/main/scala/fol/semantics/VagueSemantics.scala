@@ -8,6 +8,7 @@ import fol.query.ResolvedQuery
 import fol.result.{VagueQueryResult, EvaluationOutput}
 import fol.sampling.{SamplingParams, HDRConfig}
 import fol.error.{QueryError, QueryException}
+import semantics.ModelAugmenter
 import scala.util.control.NonFatal
 
 /** Vague quantifier semantics evaluation — thin facade.
@@ -42,13 +43,14 @@ object VagueSemantics:
     source: KnowledgeSource,
     answerTuple: Map[String, RelationValue],
     samplingParams: SamplingParams,
-    hdrConfig: HDRConfig
+    hdrConfig: HDRConfig,
+    modelAugmenter: ModelAugmenter[Any] = ModelAugmenter.identity
   ): ResolvedQuery =
     val rangeElements = RangeExtractor.extractRange(source, query, answerTuple) match
       case Right(elems) => elems
       case Left(error) => throw error.toThrowable
     val predicate = FOLBridge.scopeToPredicate(
-      query.scope, query.variable, source, answerTuple
+      query.scope, query.variable, source, answerTuple, modelAugmenter
     )
     val vq = VagueQuantifier.fromQuantifier(query.quantifier)
     ResolvedQuery(vq, rangeElements, predicate, samplingParams, hdrConfig)
@@ -72,10 +74,11 @@ object VagueSemantics:
     source: KnowledgeSource,
     answerTuple: Map[String, RelationValue] = Map.empty,
     samplingParams: SamplingParams = SamplingParams.exact,
-    hdrConfig: HDRConfig = HDRConfig.default
+    hdrConfig: HDRConfig = HDRConfig.default,
+    modelAugmenter: ModelAugmenter[Any] = ModelAugmenter.identity
   ): Either[QueryError, VagueQueryResult] =
     try
-      Right(toResolved(query, source, answerTuple, samplingParams, hdrConfig).evaluate())
+      Right(toResolved(query, source, answerTuple, samplingParams, hdrConfig, modelAugmenter).evaluate())
     catch
       case e: QueryException => Left(e.error)
       case NonFatal(e) =>
@@ -103,10 +106,11 @@ object VagueSemantics:
     source: KnowledgeSource,
     answerTuple: Map[String, RelationValue] = Map.empty,
     samplingParams: SamplingParams = SamplingParams.exact,
-    hdrConfig: HDRConfig = HDRConfig.default
+    hdrConfig: HDRConfig = HDRConfig.default,
+    modelAugmenter: ModelAugmenter[Any] = ModelAugmenter.identity
   ): Either[QueryError, EvaluationOutput] =
     try
-      Right(toResolved(query, source, answerTuple, samplingParams, hdrConfig).evaluateWithOutput())
+      Right(toResolved(query, source, answerTuple, samplingParams, hdrConfig, modelAugmenter).evaluateWithOutput())
     catch
       case e: QueryException => Left(e.error)
       case NonFatal(e) =>

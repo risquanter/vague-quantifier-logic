@@ -12,7 +12,7 @@ src/main/scala/
 ├── logic/           Formula, Term, FOL, Model, Valuation
 ├── parser/          Combinators, FormulaParser, FOLAtomParser, TermParser
 ├── lexer/           Lexer (String → List[String])
-├── semantics/       FOLSemantics, EvaluationContext
+├── semantics/       FOLSemantics, EvaluationContext, ModelAugmenter
 ├── printer/         FOLPrinter, PrinterUtil
 ├── util/            StringUtil
 │
@@ -24,7 +24,8 @@ src/main/scala/
     ├── sampling/    HDRSampler, ProportionEstimator, SampleSizeCalculator, NormalApprox, SamplingParams
     ├── quantifier/  VagueQuantifier
     ├── result/      VagueQueryResult, EvaluationOutput
-    ├── bridge/      FOLBridge, KnowledgeBaseModel, KnowledgeSourceModel
+    ├── bridge/      FOLBridge, KnowledgeBaseModel, KnowledgeSourceModel,
+    │                NumericAugmenter
     ├── datastore/   KnowledgeBase, KnowledgeSource, RelationValue, RelationValueUtil
     ├── error/       QueryError, QueryException
     └── examples/    CyberSecurityDomain, CyberSecurityExamples, VagueQuantifierDemo
@@ -103,10 +104,36 @@ See [ADR-001](ADR-001.md) for the full trace diagram.
 into `Model[Any]`. `RelationValueUtil` handles `RelationValue ↔ Any`
 conversion. See [ADR-004](ADR-004.md).
 
+The resulting model contains only relation-membership predicates and
+identity constants. Numeric comparisons (`>`, `<`, `>=`, `<=`),
+arithmetic, numeric literal resolution, and consumer-specific functions
+require a `ModelAugmenter` — see below.
+
+**Model Augmentation:**
+`ModelAugmenter[D]` wraps `Model[D] => Model[D]` as a case class —
+an endomorphism monoid under composition. Augmenters compose via
+`andThen`, with `identity` as the unit. `NumericAugmenter` provides
+built-in comparisons and numeric literal resolution. Consumers chain
+domain-specific augmenters (e.g., simulation-backed functions) using
+`andThen` or `ModelAugmenter.combine`. The case class wrapper allows
+consumers to provide type class instances (e.g., ZIO Prelude `Identity`)
+without fol-engine depending on any type class library.
+See [ADR-005](ADR-005.md).
+
+```
+KnowledgeSourceModel.toModel(source)   →   KB-backed Model[Any]
+  │                                           (relations + constants only)
+  └── modelAugmenter ──────────────────→   Augmented Model[Any]
+        │                                    (+ comparisons, numerics,
+        ├── NumericAugmenter                   custom functions)
+        └── consumer augmenter
+```
+
 **FOL Scope → Predicate Closure:**
-`FOLBridge.scopeToPredicate(scope, variable, source)` compiles an FOL
-formula into `RelationValue => Boolean` by closing over the model and
-substitution. The closure calls `FOLSemantics.holds()` per element.
+`FOLBridge.scopeToPredicate(scope, variable, source, augmenter)` compiles
+an FOL formula into `RelationValue => Boolean` by applying the augmenter
+to the KB-backed model, then closing over the result. The closure calls
+`FOLSemantics.holds()` per element.
 
 **Range Extraction:**
 `RangeExtractor.extractRange(source, query, substitution)` queries the
@@ -133,6 +160,7 @@ See [ADR-002](ADR-002.md).
 | [ADR-002](ADR-002.md) | Parser-Combinator Style — CPS, single Either boundary |
 | [ADR-003](ADR-003.md) | HDR Deterministic Sampling — Fisher-Yates, reproducibility |
 | [ADR-004](ADR-004.md) | Tagless Initial Architecture — ADTs + operations, layering |
+| [ADR-005](ADR-005.md) | Model Augmentation — endomorphism monoid, numeric infra, extensibility |
 
 ---
 

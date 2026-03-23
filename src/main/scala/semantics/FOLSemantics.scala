@@ -46,7 +46,8 @@ case class Domain[D](elements: Set[D]):
 case class Interpretation[D](
   domain: Domain[D],
   funcInterp: Map[String, List[D] => D],
-  predInterp: Map[String, List[D] => Boolean]
+  predInterp: Map[String, List[D] => Boolean],
+  funcFallback: String => Option[List[D] => D] = (_: String) => None
 ):
   /** Check if a function symbol is interpreted */
   def hasFunction(name: String): Boolean = funcInterp.contains(name)
@@ -54,17 +55,71 @@ case class Interpretation[D](
   /** Check if a predicate symbol is interpreted */
   def hasPredicate(name: String): Boolean = predInterp.contains(name)
   
-  /** Get function interpretation */
+  /** Get function interpretation.
+    *
+    * Lookup order: funcInterp map → funcFallback → error.
+    * This ensures map entries take priority, with the fallback
+    * consulted only on miss (Option.orElse chain).
+    */
   def getFunction(name: String): List[D] => D =
-    funcInterp.get(name) match
-      case Some(f) => f
-      case None => _ => throw new Exception(s"Uninterpreted function: $name")
+    funcInterp.get(name)
+      .orElse(funcFallback(name))
+      .getOrElse(_ => throw new Exception(s"Uninterpreted function: $name"))
   
   /** Get predicate interpretation */
   def getPredicate(name: String): List[D] => Boolean =
     predInterp.get(name) match
       case Some(p) => p
       case None => _ => throw new Exception(s"Uninterpreted predicate: $name")
+
+  // ==================== Composition Primitives ====================
+
+  /** Merge extra functions into this interpretation (right-biased on collision).
+    *
+    * Map.++ is associative with empty as identity — monoid over merge.
+    * Preserves the existing funcFallback.
+    */
+  def withFunctions(extra: Map[String, List[D] => D]): Interpretation[D] =
+    copy(funcInterp = funcInterp ++ extra)
+
+  /** Merge extra predicates into this interpretation (right-biased on collision). */
+  def withPredicates(extra: Map[String, List[D] => Boolean]): Interpretation[D] =
+    copy(predInterp = predInterp ++ extra)
+
+  /** Extend the domain with additional elements. */
+  def withDomain(extra: Set[D]): Interpretation[D] =
+    copy(domain = Domain(domain.elements ++ extra))
+
+  /** Combine two interpretations: union domains, merge maps (right-biased).
+    *
+    * Monoid laws hold by construction:
+    *   identity — combine with empty maps/set
+    *   associativity — Map.++ and Set.++ are associative
+    *
+    * The right operand's funcFallback wins (last-writer-wins).
+    */
+  def combine(other: Interpretation[D]): Interpretation[D] =
+    Interpretation(
+      Domain(domain.elements ++ other.domain.elements),
+      funcInterp ++ other.funcInterp,
+      predInterp ++ other.predInterp,
+      name => funcFallback(name).orElse(other.funcFallback(name))
+    )
+
+  /** Install a fallback for function lookup (Option.orElse chain).
+    *
+    * Map entries take priority; the fallback is consulted only on miss.
+    * Multiple fallbacks compose via Option.orElse — associative with
+    * `_ => None` as identity.
+    *
+    * Survives `copy` because the fallback is stored as a field, not
+    * as a subclass override.
+    */
+  def withFunctionFallback(
+    fallback: String => Option[List[D] => D]
+  ): Interpretation[D] =
+    val current = funcFallback
+    copy(funcFallback = name => current(name).orElse(fallback(name)))
 
 /** Valuation: assigns domain values to variables
   * 
@@ -374,22 +429,18 @@ object FOLSemantics:
     // Store reference to local funcInterp to avoid ambiguity in anonymous class
     val localFuncInterp = funcInterp.toMap
     
-    // Custom interpretation that handles numeric constants dynamically
-    val dynamicInterp = new Interpretation[Int](
+    // Use withFunctionFallback for dynamic numeric constant resolution
+    val numericFallback: String => Option[List[Int] => Int] = name =>
+      if name.forall(_.isDigit) || (name.startsWith("-") && name.tail.nonEmpty && name.tail.forall(_.isDigit)) then
+        Some(_ => name.toInt)
+      else
+        None
+    
+    val dynamicInterp = Interpretation[Int](
       domain,
       localFuncInterp,
       predInterp
-    ) {
-      override def getFunction(name: String): List[Int] => Int =
-        localFuncInterp.get(name) match
-          case Some(f) => f
-          case None =>
-            // Try to parse as numeric constant
-            if name.forall(_.isDigit) || (name.startsWith("-") && name.tail.forall(_.isDigit)) then
-              _ => name.toInt
-            else
-              _ => throw new Exception(s"Uninterpreted function: $name")
-    }
+    ).withFunctionFallback(numericFallback)
     
     Model(dynamicInterp)
   
