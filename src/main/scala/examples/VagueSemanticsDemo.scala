@@ -2,10 +2,10 @@ package examples
 
 import logic.{FOL, Formula, Term}
 import semantics.{Model, Valuation}
-import vague.logic.{VagueQuery, Quantifier}
-import vague.semantics.{RangeExtractor, ScopeEvaluator}
-import vague.datastore.{KnowledgeBase, KnowledgeSource, Relation, RelationTuple, RelationValue, PositionType}
-import vague.bridge.KnowledgeBaseModel
+import fol.logic.{ParsedQuery, Quantifier}
+import fol.semantics.{RangeExtractor, ScopeEvaluator}
+import fol.datastore.{KnowledgeBase, KnowledgeSource, Relation, RelationTuple, RelationValue, PositionType}
+import fol.bridge.KnowledgeBaseModel
 
 /** Demonstration of Vague Quantifier Semantics
   * 
@@ -185,7 +185,7 @@ def exactEvaluationDemo(): Unit =
   val model = KnowledgeBaseModel.toModel(kb)
   
   // Create a vague query: "About 1/2 of countries are large"
-  val query = VagueQuery(
+  val query = ParsedQuery(
     quantifier = Quantifier.aboutHalf,
     variable = "x",
     range = FOL("country", List(Term.Var("x"))),
@@ -198,7 +198,9 @@ def exactEvaluationDemo(): Unit =
   
   // Step 1: Extract full range D_R
   val source = KnowledgeSource.fromKnowledgeBase(kb)
-  val rangeSet = RangeExtractor.extractRangeBoolean(source, query)
+  val rangeSet = RangeExtractor.extractRangeBoolean(source, query) match
+    case Right(r) => r
+    case Left(e) => println(s"Range extraction error: ${e.formatted}"); return
   
   println(s"Step 1: Extract range D_R (all countries)")
   println(s"  D_R = ${rangeSet.map(_.toString).mkString("{", ", ", "}")}")
@@ -296,7 +298,7 @@ def samplingVsExactDemo(): Unit =
   println(s"  Small cities: ${cities.drop(15).mkString(", ")}")
   println()
   
-  val query = VagueQuery(
+  val query = ParsedQuery(
     quantifier = Quantifier.aboutThreeQuarters,
     variable = "x",
     range = FOL("city", List(Term.Var("x"))),
@@ -313,7 +315,9 @@ def samplingVsExactDemo(): Unit =
   println("=" * 40)
   
   val sourceFinal = KnowledgeSource.fromKnowledgeBase(kbFinal)
-  val fullRange = RangeExtractor.extractRangeBoolean(sourceFinal, query)
+  val fullRange = RangeExtractor.extractRangeBoolean(sourceFinal, query) match
+    case Right(r) => r
+    case Left(e) => println(s"Range extraction error: ${e.formatted}"); return
   val exactProp = ScopeEvaluator.calculateProportion(
     fullRange, query.scope, query.variable, model
   )
@@ -331,6 +335,7 @@ def samplingVsExactDemo(): Unit =
   println("=" * 40)
   println()
   
+  // TODO: Replace with HDRSampler for consistency (scala.util.Random — demo code only)
   val random = new scala.util.Random(42)  // Fixed seed for reproducibility
   
   // Try different sample sizes
@@ -398,8 +403,10 @@ def quantifierTypesDemo(): Unit =
   
   val sourceStudent = KnowledgeSource.fromKnowledgeBase(kb)
   val fullRange = RangeExtractor.extractRangeBoolean(sourceStudent, 
-    VagueQuery(Quantifier.aboutHalf, "x", range, scope)
-  )
+    ParsedQuery(Quantifier.aboutHalf, "x", range, scope)
+  ) match
+    case Right(r) => r
+    case Left(e) => println(s"Range extraction error: ${e.formatted}"); return
   
   val actualProp = ScopeEvaluator.calculateProportion(
     fullRange, scope, "x", model

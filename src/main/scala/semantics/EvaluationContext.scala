@@ -1,7 +1,7 @@
 package semantics
 
 import logic.{FOL, Formula, Term}
-import vague.datastore.{RelationValue, RelationValueUtil}
+import fol.datastore.{RelationValue, RelationValueUtil}
 
 /** Context for evaluating FOL formulas in a model.
   * 

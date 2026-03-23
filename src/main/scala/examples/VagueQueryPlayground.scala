@@ -1,11 +1,11 @@
 package examples
 
-import vague.quantifier.VagueQuantifier
-import vague.query.{Query, Predicates, execute, VagueQuery}
-import vague.sampling.{SamplingParams, HDRConfig}
-import vague.datastore.{KnowledgeBase, KnowledgeSource, RiskDomain, RelationValue}
-import vague.result.VagueQueryResult
-import vague.bridge.{toModel, holds}
+import fol.quantifier.VagueQuantifier
+import fol.query.{Query, Predicates, execute, UnresolvedQuery}
+import fol.sampling.{SamplingParams, HDRConfig}
+import fol.datastore.{KnowledgeBase, KnowledgeSource, RiskDomain, RelationValue}
+import fol.result.VagueQueryResult
+import fol.bridge.{toModel, holds}
 import logic.Formula
 import parser.FOLParser
 import semantics.{Valuation, FOLSemantics}
@@ -71,9 +71,11 @@ def basicQueryDemo(): Unit =
   val q1 = Query
     .quantifier(VagueQuantifier.most)  // ≥70%
     .over("component")                 // domain: all components
-    .where(isLowRisk)                  // predicate: not critical
+    .whereConst(isLowRisk)             // predicate: not critical
   
-  val result1 = source.execute(q1)
+  val result1 = source.execute(q1) match
+    case Right(r) => r
+    case Left(e) => println(s"Error: ${e.formatted}"); return
   println(s"  ${result1.summary}")
   println(s"  Satisfied: ${result1.satisfied}")
   println()
@@ -87,9 +89,11 @@ def basicQueryDemo(): Unit =
   val q2 = Query
     .quantifier(VagueQuantifier.few)  // ≤30%
     .over("risk")                      // domain: all risks
-    .where(isHighSeverity)            // predicate: high severity
+    .whereConst(isHighSeverity)       // predicate: high severity
   
-  val result2 = source.execute(q2)
+  val result2 = source.execute(q2) match
+    case Right(r) => r
+    case Left(e) => println(s"Error: ${e.formatted}"); return
   println(s"  ${result2.summary}")
   println(s"  Satisfied: ${result2.satisfied}")
   println()
@@ -106,9 +110,11 @@ def basicQueryDemo(): Unit =
   val q3 = Query
     .quantifier(VagueQuantifier.aboutHalf)  // 50% ±10%
     .over("component")
-    .where(hasMitigation)
+    .whereConst(hasMitigation)
   
-  val result3 = source.execute(q3)
+  val result3 = source.execute(q3) match
+    case Right(r) => r
+    case Left(e) => println(s"Error: ${e.formatted}"); return
   println(s"  ${result3.summary}")
   println(s"  Satisfied: ${result3.satisfied}")
   println()
@@ -132,9 +138,11 @@ def predicateQueryDemo(): Unit =
   val q1 = Query
     .quantifier(VagueQuantifier.many)  // ≥50%
     .over("component")
-    .where(componentHasRisk)
+    .whereConst(componentHasRisk)
   
-  val result1 = source.execute(q1)
+  val result1 = source.execute(q1) match
+    case Right(r) => r
+    case Left(e) => println(s"Error: ${e.formatted}"); return
   println(s"  ${result1.summary}")
   println()
   
@@ -155,9 +163,11 @@ def predicateQueryDemo(): Unit =
   val q2 = Query
     .quantifier(VagueQuantifier.several)  // ≥30%
     .over("mitigation")
-    .where(hasRisks)
+    .whereConst(hasRisks)
   
-  val result2 = source.execute(q2)
+  val result2 = source.execute(q2) match
+    case Right(r) => r
+    case Left(e) => println(s"Error: ${e.formatted}"); return
   println(s"  ${result2.summary}")
   println()
 
@@ -242,9 +252,11 @@ def folIntegrationDemo(): Unit =
   val q = Query
     .quantifier(VagueQuantifier.most)
     .over("component")
-    .where(hasRiskAndMitigation)
+    .whereConst(hasRiskAndMitigation)
   
-  val result = source.execute(q)
+  val result = source.execute(q) match
+    case Right(r) => r
+    case Left(e) => println(s"Error: ${e.formatted}"); return
   println(s"  Do MOST components have both risks and mitigations?")
   println(s"  ${result.summary}")
   println()
@@ -287,9 +299,11 @@ def samplingScalabilityDemo(): Unit =
   val q1 = Query
     .quantifier(VagueQuantifier.most)  // ≥70%
     .over("entity")
-    .where(satisfiesPredicate, paramsWithSampling)
+    .whereConst(satisfiesPredicate, paramsWithSampling)
   
-  val result1 = source.execute(q1)
+  val result1 = source.execute(q1) match
+    case Right(r) => r
+    case Left(e) => println(s"Error: ${e.formatted}"); return
   val elapsed1 = System.currentTimeMillis() - t1
   
   println(s"  ${result1.summary}")
@@ -303,14 +317,14 @@ def samplingScalabilityDemo(): Unit =
   val exactQ = Query
     .quantifier(VagueQuantifier.most)
     .over("entity")
-    .where(satisfiesPredicate)
+    .whereConst(satisfiesPredicate)
   
   val t2 = System.currentTimeMillis()
   
-  // Evaluate with full domain (no sampling)
-  val allEntities = largeKB.getDomain("entity", 0)
-    .collect { case RelationValue.Const(name) => name }
-  val result2 = VagueQuantifier.most.evaluateExact(allEntities, satisfiesPredicate)
+  // Evaluate with full domain (no sampling) via the Query DSL
+  val result2 = source.execute(exactQ) match
+    case Right(r) => r
+    case Left(e) => println(s"Error: ${e.formatted}"); return
   val elapsed2 = System.currentTimeMillis() - t2
   
   println(s"  ${result2.summary}")

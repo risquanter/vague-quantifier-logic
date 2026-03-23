@@ -3,7 +3,7 @@ package semantics
 import munit.FunSuite
 import logic.{FOL, Formula, Term}
 import semantics.{Domain, Interpretation, Model, Valuation, EvaluationContext, FOLSemantics}
-import vague.datastore.RelationValue
+import fol.datastore.RelationValue
 
 /** Test suite for EvaluationContext
   * 
