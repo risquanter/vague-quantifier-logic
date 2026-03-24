@@ -66,7 +66,12 @@ case class Interpretation[D](
       .orElse(funcFallback(name))
       .getOrElse(_ => throw new Exception(s"Uninterpreted function: $name"))
   
-  /** Get predicate interpretation */
+  /** Get predicate interpretation.
+    *
+    * Unlike `getFunction`, there is no predicate fallback — predicates
+    * are always statically known from KB relations or explicit augmentation.
+    * Numeric literal resolution applies only to function symbols.
+    */
   def getPredicate(name: String): List[D] => Boolean =
     predInterp.get(name) match
       case Some(p) => p
@@ -96,7 +101,8 @@ case class Interpretation[D](
     *   identity — combine with empty maps/set
     *   associativity — Map.++ and Set.++ are associative
     *
-    * The right operand's funcFallback wins (last-writer-wins).
+    * Fallback chain is left-biased: `this.funcFallback` is consulted
+    * first, then `other.funcFallback` (via `Option.orElse`).
     */
   def combine(other: Interpretation[D]): Interpretation[D] =
     Interpretation(
@@ -335,7 +341,7 @@ object FOLSemantics:
 
   // ==================== Convenience Constructors ====================
   
-  /** Create a simple integer arithmetic model
+  /** Create a simple integer arithmetic model.
     * 
     * Domain: Integers
     * Functions: +, -, *, / (arithmetic operations)
@@ -345,6 +351,10 @@ object FOLSemantics:
     * 
     * Note: Numeric constants are handled dynamically - any numeric string
     * can be used in formulas, but quantification only ranges over the domain.
+    *
+    * The operators here overlap with `NumericAugmenter` but operate on
+    * typed `Int` (not `Any`), preserving type safety for pure-FOL tests.
+    * `NumericAugmenter` is the KB-pipeline counterpart for `Model[Any]`.
     */
   def integerModel(range: Range = -10 to 10): Model[Int] =
     val domain = Domain(range.toSet)

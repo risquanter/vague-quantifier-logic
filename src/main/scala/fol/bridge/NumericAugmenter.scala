@@ -25,7 +25,7 @@ object NumericAugmenter:
     *   - Arithmetic functions: `+`, `-`, `*`, `/`
     *   - Numeric literal resolution via fallback (any digit string → Double)
     */
-  def augmenter: ModelAugmenter[Any] = ModelAugmenter { model =>
+  val augmenter: ModelAugmenter[Any] = ModelAugmenter { model =>
     val preds = Map[String, List[Any] => Boolean](
       ">"  -> { case List(a, b) => toDouble(a) > toDouble(b)
                case args => throw new Exception(s"> expects 2 arguments, got ${args.length}") },
