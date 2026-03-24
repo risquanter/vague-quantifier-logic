@@ -3,7 +3,7 @@ package fol.semantics
 import munit.FunSuite
 import logic.{FOL, Formula, Term}
 import semantics.{Model, Valuation}
-import fol.datastore.{KnowledgeBase, Relation, RelationTuple, RelationValue, PositionType}
+import fol.datastore.{KnowledgeBase, Relation, RelationTuple, RelationValue}
 import fol.bridge.KnowledgeBaseModel
 
 class ScopeEvaluatorSpec extends FunSuite:
@@ -14,13 +14,13 @@ class ScopeEvaluatorSpec extends FunSuite:
   // ==================== Test Data Setup ====================
   
   // Geography KB with countries and properties
-  def geographyKB: KnowledgeBase =
-    val kb = KnowledgeBase(Map.empty, Map.empty)
-      .addRelation(Relation("country", 1, PositionType.allConstants(1)))
-      .addRelation(Relation("city", 1, PositionType.allConstants(1)))
-      .addRelation(Relation("capital", 2, PositionType.allConstants(2)))
-      .addRelation(Relation("large", 1, PositionType.allConstants(1)))
-      .addRelation(Relation("has_pop", 2, List(PositionType.Constant, PositionType.Numeric)))
+  def geographyKB: KnowledgeBase[RelationValue] =
+    val kb = KnowledgeBase[RelationValue](Map.empty, Map.empty)
+      .addRelation(Relation("country", 1))
+      .addRelation(Relation("city", 1))
+      .addRelation(Relation("capital", 2))
+      .addRelation(Relation("large", 1))
+      .addRelation(Relation("has_pop", 2))
     
     kb.addFacts("country", Set(
       RelationTuple(List(RConst("France"))),
@@ -55,11 +55,11 @@ class ScopeEvaluatorSpec extends FunSuite:
     ))
   
   // Component/risk KB for numeric tests
-  def componentKB: KnowledgeBase =
-    val kb = KnowledgeBase(Map.empty, Map.empty)
-      .addRelation(Relation("component", 1, PositionType.allConstants(1)))
-      .addRelation(Relation("critical", 1, PositionType.allConstants(1)))
-      .addRelation(Relation("has_severity", 2, List(PositionType.Constant, PositionType.Numeric)))
+  def componentKB: KnowledgeBase[RelationValue] =
+    val kb = KnowledgeBase[RelationValue](Map.empty, Map.empty)
+      .addRelation(Relation("component", 1))
+      .addRelation(Relation("critical", 1))
+      .addRelation(Relation("has_severity", 2))
     
     kb.addFacts("component", Set(
       RelationTuple(List(RConst("C1"))),
@@ -200,7 +200,7 @@ class ScopeEvaluatorSpec extends FunSuite:
   test("evaluate complex formula from paper: ∃y (capital(x,y) ∧ large(y))") {
     val kb = geographyKB
     // Add relation: large countries
-    val kb2 = kb.addRelation(Relation("country_large", 1, PositionType.allConstants(1)))
+    val kb2 = kb.addRelation(Relation("country_large", 1))
       .addFacts("country_large", Set(
         RelationTuple(List(RConst("France"))),
         RelationTuple(List(RConst("Germany")))

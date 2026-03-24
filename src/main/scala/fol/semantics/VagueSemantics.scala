@@ -40,7 +40,7 @@ object VagueSemantics:
     */
   private def toResolved(
     query: ParsedQuery,
-    source: KnowledgeSource,
+    source: KnowledgeSource[RelationValue],
     answerTuple: Map[String, RelationValue],
     samplingParams: SamplingParams,
     hdrConfig: HDRConfig,
@@ -71,7 +71,7 @@ object VagueSemantics:
     */
   def holds(
     query: ParsedQuery,
-    source: KnowledgeSource,
+    source: KnowledgeSource[RelationValue],
     answerTuple: Map[String, RelationValue] = Map.empty,
     samplingParams: SamplingParams = SamplingParams.exact,
     hdrConfig: HDRConfig = HDRConfig.default,
@@ -103,7 +103,7 @@ object VagueSemantics:
     */
   def evaluate(
     query: ParsedQuery,
-    source: KnowledgeSource,
+    source: KnowledgeSource[RelationValue],
     answerTuple: Map[String, RelationValue] = Map.empty,
     samplingParams: SamplingParams = SamplingParams.exact,
     hdrConfig: HDRConfig = HDRConfig.default,

@@ -163,8 +163,8 @@ object RiskDomain:
   // ==================== Knowledge Base Construction ====================
   
   /** Build the complete risk management knowledge base */
-  def createKnowledgeBase: KnowledgeBase =
-    val builder = KnowledgeBase.builder
+  def createKnowledgeBase: KnowledgeBase[RelationValue] =
+    val builder = KnowledgeBase.builder[RelationValue]
     
     // Add schema
     builder
@@ -178,33 +178,33 @@ object RiskDomain:
       .withRelation(highSeverityRiskRelation)
     
     // Add component facts
-    components.foreach(c => builder.withFact("component", c))
+    components.foreach(c => builder.withConstFact("component", c))
     
     // Add risk facts
-    risks.foreach(r => builder.withFact("risk", r))
+    risks.foreach(r => builder.withConstFact("risk", r))
     
     // Add mitigation facts
-    mitigations.foreach(m => builder.withFact("mitigation", m))
+    mitigations.foreach(m => builder.withConstFact("mitigation", m))
     
     // Add critical component facts
-    criticalComponents.foreach(c => builder.withFact("critical_component", c))
+    criticalComponents.foreach(c => builder.withConstFact("critical_component", c))
     
     // Add high severity risk facts
-    highSeverityRisks.foreach(r => builder.withFact("high_severity", r))
+    highSeverityRisks.foreach(r => builder.withConstFact("high_severity", r))
     
     // Add component-risk relationships
     componentRisks.foreach { case (comp, riskSet) =>
-      riskSet.foreach(risk => builder.withFact("has_risk", comp, risk))
+      riskSet.foreach(risk => builder.withConstFact("has_risk", comp, risk))
     }
     
     // Add component-mitigation relationships
     componentMitigations.foreach { case (comp, mitSet) =>
-      mitSet.foreach(mit => builder.withFact("has_mitigation", comp, mit))
+      mitSet.foreach(mit => builder.withConstFact("has_mitigation", comp, mit))
     }
     
     // Add mitigation-risk relationships
     mitigationRisks.foreach { case (mit, riskSet) =>
-      riskSet.foreach(risk => builder.withFact("mitigates", mit, risk))
+      riskSet.foreach(risk => builder.withConstFact("mitigates", mit, risk))
     }
     
     builder.build()

@@ -268,13 +268,13 @@ def samplingScalabilityDemo(): Unit =
   
   // Create large knowledge base
   println("Creating large synthetic knowledge base...")
-  val builder = KnowledgeBase.builder
+  val builder = KnowledgeBase.builder[RelationValue]
     .withUnaryRelation("entity")
   
   // Add 10,000 entities
   val largeN = 10000
   for i <- 1 to largeN do
-    builder.withFact("entity", s"e$i")
+    builder.withConstFact("entity", s"e$i")
   
   val largeKB = builder.build()
   val source = KnowledgeSource.fromKnowledgeBase(largeKB)

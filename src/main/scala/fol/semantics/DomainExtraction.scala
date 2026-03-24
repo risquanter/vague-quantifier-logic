@@ -49,7 +49,7 @@ object DomainExtraction:
     * @return Set of values at that position
     */
   def extractFromRelation(
-    source: KnowledgeSource,
+    source: KnowledgeSource[RelationValue],
     relationName: String,
     position: Int
   ): Set[RelationValue] =
@@ -74,7 +74,7 @@ object DomainExtraction:
     * @param source Knowledge source
     * @return Set of all values in source
     */
-  def extractActiveDomain(source: KnowledgeSource): Set[RelationValue] =
+  def extractActiveDomain(source: KnowledgeSource[RelationValue]): Set[RelationValue] =
     source.activeDomain
   
   /** Extract domain using pattern matching (for FOL range predicates).
@@ -105,10 +105,10 @@ object DomainExtraction:
     * @return Set of matching tuples (full tuples, not just wildcard positions)
     */
   def extractWithPattern(
-    source: KnowledgeSource,
+    source: KnowledgeSource[RelationValue],
     relationName: String,
     pattern: List[Option[RelationValue]]
-  ): Set[RelationTuple] =
+  ): Set[RelationTuple[RelationValue]] =
     source.query(relationName, pattern)
   
   /** Extract values from specific positions in pattern query results.
@@ -139,7 +139,7 @@ object DomainExtraction:
     * @return Set of values at specified positions
     */
   def extractFromPatternAtPositions(
-    source: KnowledgeSource,
+    source: KnowledgeSource[RelationValue],
     relationName: String,
     pattern: List[Option[RelationValue]],
     positions: List[Int]
@@ -161,7 +161,7 @@ object DomainExtraction:
     * @return Set of values at that position
     */
   def extractFromPatternAtPosition(
-    source: KnowledgeSource,
+    source: KnowledgeSource[RelationValue],
     relationName: String,
     pattern: List[Option[RelationValue]],
     position: Int
@@ -179,7 +179,7 @@ object DomainExtraction:
     * @return Number of distinct values
     */
   def domainSize(
-    source: KnowledgeSource,
+    source: KnowledgeSource[RelationValue],
     relationName: String,
     position: Int
   ): Int =
@@ -190,5 +190,5 @@ object DomainExtraction:
     * @param source Knowledge source
     * @return Number of distinct values in entire source
     */
-  def activeDomainSize(source: KnowledgeSource): Int =
+  def activeDomainSize(source: KnowledgeSource[RelationValue]): Int =
     extractActiveDomain(source).size

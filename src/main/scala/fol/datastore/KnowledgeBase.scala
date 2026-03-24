@@ -1,85 +1,88 @@
 package fol.datastore
 
 /** Knowledge Base
-  * 
+  *
   * A lightweight, in-memory datastore for relational facts.
   * Inspired by relational databases and RDF triple stores,
   * but simplified for FOL querying experiments.
-  * 
+  *
   * Based on concepts from Section 5.1 of Fermüller et al.,
   * "Querying with Vague Quantifiers Using Probabilistic Semantics"
+  *
+  * @tparam D the domain element type (e.g. `RelationValue`, `String`)
   */
 
 /** Knowledge base containing relations and facts
-  * 
+  *
   * A knowledge base consists of:
   * - A schema (set of relation definitions)
   * - A set of ground facts (relation instances)
-  * 
+  *
   * @param schema Map from relation names to their schemas
   * @param facts Map from relation names to sets of tuples
+  * @tparam D the domain element type
   */
-case class KnowledgeBase(
+case class KnowledgeBase[D](
   schema: Map[String, Relation],
-  facts: Map[String, Set[RelationTuple]]
+  facts: Map[String, Set[RelationTuple[D]]]
 ):
   /** Get relation by name */
   def getRelation(name: String): Option[Relation] =
     schema.get(name)
-  
+
   /** Check if relation exists in schema */
   def hasRelation(name: String): Boolean =
     schema.contains(name)
-  
+
   /** Get all facts for a relation */
-  def getFacts(relationName: String): Set[RelationTuple] =
+  def getFacts(relationName: String): Set[RelationTuple[D]] =
     facts.getOrElse(relationName, Set.empty)
-  
+
   /** Check if a fact exists */
-  def contains(relationName: String, tuple: RelationTuple): Boolean =
+  def contains(relationName: String, tuple: RelationTuple[D]): Boolean =
     getFacts(relationName).contains(tuple)
-  
+
   /** Add a relation to the schema */
-  def addRelation(relation: Relation): KnowledgeBase =
+  def addRelation(relation: Relation): KnowledgeBase[D] =
     if schema.contains(relation.name) then
       throw new IllegalArgumentException(s"Relation ${relation.name} already exists")
     else
       copy(schema = schema + (relation.name -> relation))
-  
-  /** Add a fact (validates against schema) */
-  def addFact(relationName: String, tuple: RelationTuple): KnowledgeBase =
+
+  /** Add a fact (validates arity against schema) */
+  def addFact(relationName: String, tuple: RelationTuple[D]): KnowledgeBase[D] =
     schema.get(relationName) match
       case None =>
         throw new IllegalArgumentException(s"Unknown relation: $relationName")
       case Some(relation) =>
-        if !relation.validates(tuple) then
+        if tuple.arity != relation.arity then
           throw new IllegalArgumentException(
-            s"Tuple $tuple does not conform to relation ${relation}"
+            s"Tuple $tuple has arity ${tuple.arity}, expected ${relation.arity} for relation ${relation}"
           )
         val currentFacts = facts.getOrElse(relationName, Set.empty)
         copy(facts = facts + (relationName -> (currentFacts + tuple)))
-  
+
   /** Add multiple facts at once */
-  def addFacts(relationName: String, tuples: Set[RelationTuple]): KnowledgeBase =
+  def addFacts(relationName: String, tuples: Set[RelationTuple[D]]): KnowledgeBase[D] =
     tuples.foldLeft(this)((kb, tuple) => kb.addFact(relationName, tuple))
-  
+
   /** Query facts matching a pattern
-    * 
-    * Pattern uses Option[RelationValue]:
+    *
+    * Pattern uses Option[D]:
     * - Some(value): must match exactly
     * - None: wildcard (matches anything)
-    * 
+    *
     * Example: query("has_risk", List(Some(Const("C1")), None))
     *   matches all risks for component C1
     */
-  def query(relationName: String, pattern: List[Option[RelationValue]]): Set[RelationTuple] =
+  def query(relationName: String, pattern: List[Option[D]]): Set[RelationTuple[D]] =
     getFacts(relationName).filter(_.matches(pattern))
-  
+
   /** Get all unique values at a specific position of a relation
-    * 
+    *
     * Useful for getting all domain elements (e.g., all component IDs)
     */
-  def getDomain(relationName: String, position: Int = 0): Set[RelationValue] =
+  def getDomain(relationName: String, position: Int = 0): Set[D] =
     val rel = schema.get(relationName).getOrElse(
       throw new IllegalArgumentException(s"Unknown relation: $relationName")
     )
@@ -88,19 +91,19 @@ case class KnowledgeBase(
         s"Position $position out of bounds for relation $relationName (arity ${rel.arity})"
       )
     getFacts(relationName).map(_.values(position))
-  
-  /** Get active domain: all constants and numbers used in the KB */
-  def activeDomain: Set[RelationValue] =
+
+  /** Get active domain: all values used in the KB */
+  def activeDomain: Set[D] =
     facts.values.flatten.flatMap(_.values).toSet
-  
+
   /** Count facts in a relation */
   def count(relationName: String): Int =
     getFacts(relationName).size
-  
+
   /** Total number of facts across all relations */
   def totalFacts: Int =
     facts.values.map(_.size).sum
-  
+
   /** Pretty print KB statistics */
   def stats: String =
     val sb = new StringBuilder
@@ -115,46 +118,63 @@ case class KnowledgeBase(
     sb.toString
 
 object KnowledgeBase:
+  /** Convenience alias for backward compatibility during migration. */
+  type Classic = KnowledgeBase[RelationValue]
+
   /** Create an empty knowledge base */
-  def empty: KnowledgeBase =
+  def empty[D]: KnowledgeBase[D] =
     KnowledgeBase(Map.empty, Map.empty)
-  
-  /** Builder for constructing knowledge bases fluently */
-  class Builder:
-    private var kb = KnowledgeBase.empty
-    
+
+  /** Builder for constructing knowledge bases fluently
+    *
+    * @tparam D the domain element type
+    */
+  class Builder[D]:
+    private var kb = KnowledgeBase.empty[D]
+
     /** Add a relation to the schema */
-    def withRelation(relation: Relation): Builder =
+    def withRelation(relation: Relation): Builder[D] =
       kb = kb.addRelation(relation)
       this
-    
+
     /** Add a unary relation */
-    def withUnaryRelation(name: String): Builder =
+    def withUnaryRelation(name: String): Builder[D] =
       withRelation(Relation.unary(name))
-    
+
     /** Add a binary relation */
-    def withBinaryRelation(name: String): Builder =
+    def withBinaryRelation(name: String): Builder[D] =
       withRelation(Relation.binary(name))
-    
-    /** Add a fact using constant names */
-    def withFact(relationName: String, values: String*): Builder =
-      val tuple = RelationTuple.fromConstants(values*)
+
+    /** Add a fact using domain values */
+    def withFact(relationName: String, values: D*): Builder[D] =
+      val tuple = RelationTuple(values.toList)
       kb = kb.addFact(relationName, tuple)
       this
-    
-    /** Add a fact using RelationValues */
-    def withFactValues(relationName: String, values: RelationValue*): Builder =
-      val tuple = RelationTuple.of(values*)
+
+    /** Add a fact using a pre-built tuple */
+    def withFactTuple(relationName: String, tuple: RelationTuple[D]): Builder[D] =
       kb = kb.addFact(relationName, tuple)
       this
-    
+
     /** Add multiple facts from tuples */
-    def withFacts(relationName: String, tuples: Set[RelationTuple]): Builder =
+    def withFacts(relationName: String, tuples: Set[RelationTuple[D]]): Builder[D] =
       kb = kb.addFacts(relationName, tuples)
       this
-    
+
     /** Build the final knowledge base */
-    def build(): KnowledgeBase = kb
-  
+    def build(): KnowledgeBase[D] = kb
+
   /** Start building a knowledge base */
-  def builder: Builder = new Builder
+  def builder[D]: Builder[D] = new Builder[D]
+
+  // ==================== RelationValue Convenience ====================
+
+  /** Builder convenience: add fact from constant strings.
+    *
+    * Only available when D = RelationValue.  Wraps each string
+    * in `RelationValue.Const`.
+    */
+  extension (b: Builder[RelationValue])
+    def withConstFact(relationName: String, values: String*): Builder[RelationValue] =
+      val tuple = RelationTuple.fromConstants(values*)
+      b.withFactTuple(relationName, tuple)

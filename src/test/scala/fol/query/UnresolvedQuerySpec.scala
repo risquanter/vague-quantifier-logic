@@ -1,7 +1,7 @@
 package fol.query
 
 import munit.FunSuite
-import fol.datastore.{KnowledgeBase, KnowledgeSource, Relation, RelationValue, RelationTuple, PositionType}
+import fol.datastore.{KnowledgeBase, KnowledgeSource, Relation, RelationValue, RelationTuple}
 import fol.quantifier.VagueQuantifier
 import fol.sampling.{SamplingParams, HDRConfig}
 import fol.result.{VagueQueryResult, EvaluationOutput}
@@ -12,7 +12,7 @@ class UnresolvedQuerySpec extends FunSuite:
   // ---------- Test fixtures ----------
 
   def const(s: String): RelationValue = RelationValue.Const(s)
-  def unary(s: String): RelationTuple = RelationTuple(List(const(s)))
+  def unary(s: String): RelationTuple[RelationValue] = RelationTuple(List(const(s)))
 
   val countries: Set[String] = Set(
     "France", "Germany", "Italy", "Spain",
@@ -21,14 +21,14 @@ class UnresolvedQuerySpec extends FunSuite:
 
   val largeCountries: Set[String] = Set("France", "Germany", "Italy", "Spain")
 
-  def createKB(): KnowledgeBase =
-    KnowledgeBase(Map.empty, Map.empty)
-      .addRelation(Relation("country", 1, PositionType.allConstants(1)))
-      .addRelation(Relation("large", 1, PositionType.allConstants(1)))
+  def createKB(): KnowledgeBase[RelationValue] =
+    KnowledgeBase[RelationValue](Map.empty, Map.empty)
+      .addRelation(Relation("country", 1))
+      .addRelation(Relation("large", 1))
       .addFacts("country", countries.map(unary))
       .addFacts("large", largeCountries.map(unary))
 
-  def source: KnowledgeSource = KnowledgeSource.fromKnowledgeBase(createKB())
+  def source: KnowledgeSource[RelationValue] = KnowledgeSource.fromKnowledgeBase(createKB())
 
   /** Query: "most countries are large" — 4/8 = 0.5, does NOT satisfy "most" (0.7) */
   def mostCountriesLarge: UnresolvedQuery =

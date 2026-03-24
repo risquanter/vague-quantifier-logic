@@ -32,8 +32,8 @@ import fol.datastore.RelationValue.*
 object CyberSecurityDomain:
   
   /** Complete cybersecurity knowledge base */
-  def kb: KnowledgeBase =
-    val builder = KnowledgeBase.builder
+  def kb: KnowledgeBase[RelationValue] =
+    val builder = KnowledgeBase.builder[RelationValue]
     
     // ==================== Schema Definitions ====================
     
@@ -92,9 +92,9 @@ object CyberSecurityDomain:
     
     val allAssets = (criticalAssets ++ standardAssets ++ highValueAssets).distinct
     
-    allAssets.foreach(asset => builder.withFact("asset", asset))
-    criticalAssets.foreach(asset => builder.withFact("critical_asset", asset))
-    highValueAssets.foreach(asset => builder.withFact("high_value", asset))
+    allAssets.foreach(asset => builder.withConstFact("asset", asset))
+    criticalAssets.foreach(asset => builder.withConstFact("critical_asset", asset))
+    highValueAssets.foreach(asset => builder.withConstFact("high_value", asset))
     
     // ==================== Risks (20 total) ====================
     
@@ -128,8 +128,8 @@ object CyberSecurityDomain:
     
     val allRisks = criticalRisks ++ standardRisks
     
-    allRisks.foreach(risk => builder.withFact("risk", risk))
-    criticalRisks.foreach(risk => builder.withFact("critical_risk", risk))
+    allRisks.foreach(risk => builder.withConstFact("risk", risk))
+    criticalRisks.foreach(risk => builder.withConstFact("critical_risk", risk))
     
     // Exploitable risks (subset of all risks - 15 total)
     val exploitableRisks = List(
@@ -150,7 +150,7 @@ object CyberSecurityDomain:
       "verbose_error_messages"
     )
     
-    exploitableRisks.foreach(risk => builder.withFact("exploitable", risk))
+    exploitableRisks.foreach(risk => builder.withConstFact("exploitable", risk))
     
     // ==================== Mitigations (16 total) ====================
     
@@ -173,7 +173,7 @@ object CyberSecurityDomain:
       "vulnerability_scanning"        // proactive detection
     )
     
-    mitigations.foreach(mit => builder.withFact("mitigation", mit))
+    mitigations.foreach(mit => builder.withConstFact("mitigation", mit))
     
     // Patched mitigations (deployed fixes - 10 out of 16)
     val patchedMitigations = List(
@@ -189,7 +189,7 @@ object CyberSecurityDomain:
       "vulnerability_scanning"
     )
     
-    patchedMitigations.foreach(mit => builder.withFact("patched", mit))
+    patchedMitigations.foreach(mit => builder.withConstFact("patched", mit))
     
     // ==================== has_risk(asset, risk) ====================
     // Most assets have multiple risks, creating realistic risk distribution
@@ -242,8 +242,8 @@ object CyberSecurityDomain:
       ("email_server", "weak_ssl_cipher"),
       ("vpn_gateway", "outdated_library")
     ).foreach { case (asset, risk) =>
-      builder.withFact("has_risk", asset, risk)
-      builder.withFact("affects", risk, asset)
+      builder.withConstFact("has_risk", asset, risk)
+      builder.withConstFact("affects", risk, asset)
     }
     
     // ==================== has_mitigation(risk, mitigation) ====================
@@ -276,7 +276,7 @@ object CyberSecurityDomain:
       // Unmitigated standard: session_fixation, clickjacking, 
       //   cors_misconfiguration, verbose_error_messages (4 standard unmitigated)
     ).foreach { case (risk, mitigation) =>
-      builder.withFact("has_mitigation", risk, mitigation)
+      builder.withConstFact("has_mitigation", risk, mitigation)
     }
     
     builder.build()

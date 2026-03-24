@@ -59,7 +59,7 @@ object KnowledgeSourceModel:
     * @param source Knowledge source to translate
     * @return FOL model with source semantics
     */
-  def toModel(source: KnowledgeSource): Model[Any] =
+  def toModel(source: KnowledgeSource[RelationValue]): Model[Any] =
     // 1. Domain: all values used in the source
     val activeDomain = source.activeDomain
     
@@ -92,7 +92,7 @@ object KnowledgeSourceModel:
     * @param source Knowledge source to extract predicates from
     * @return Map of predicate names to predicate functions
     */
-  private def createPredicatesFromSource(source: KnowledgeSource): Map[String, List[Any] => Boolean] =
+  private def createPredicatesFromSource(source: KnowledgeSource[RelationValue]): Map[String, List[Any] => Boolean] =
     source.relationNames.flatMap { relationName =>
       source.getRelation(relationName).map { relation =>
         relationName -> createPredicateFunction(source, relationName, relation.arity)
@@ -107,7 +107,7 @@ object KnowledgeSourceModel:
     * @return Predicate function for FOL interpretation
     */
   private def createPredicateFunction(
-    source: KnowledgeSource,
+    source: KnowledgeSource[RelationValue],
     relationName: String,
     arity: Int
   ): List[Any] => Boolean =
@@ -137,7 +137,7 @@ object KnowledgeSourceModel:
     * @return FOL model with source semantics
     */
   def toModelWithPredicates(
-    source: KnowledgeSource,
+    source: KnowledgeSource[RelationValue],
     predicateNames: Map[String, Int]
   ): Model[Any] =
     val activeDomain = source.activeDomain
@@ -164,7 +164,7 @@ object KnowledgeSourceModel:
     * @param source Knowledge source to translate
     * @return FOL model with discovered predicates
     */
-  def toModelWithDiscovery(source: KnowledgeSource): Model[Any] =
+  def toModelWithDiscovery(source: KnowledgeSource[RelationValue]): Model[Any] =
     // Try to discover predicates from source
     // This is a best-effort approach for sources that don't expose schema
     val activeDomain = source.activeDomain

@@ -44,7 +44,7 @@ object FOLBridge:
   def scopeToPredicate(
     formula: Formula[FOL],
     variable: String,
-    source: KnowledgeSource,
+    source: KnowledgeSource[RelationValue],
     answerTuple: Map[String, RelationValue] = Map.empty,
     modelAugmenter: ModelAugmenter[Any] = ModelAugmenter.identity
   ): RelationValue => Boolean =
@@ -75,7 +75,7 @@ object FOLBridge:
   def scopeToStringPredicate(
     formula: Formula[FOL],
     variable: String,
-    source: KnowledgeSource,
+    source: KnowledgeSource[RelationValue],
     answerTuple: Map[String, RelationValue] = Map.empty,
     modelAugmenter: ModelAugmenter[Any] = ModelAugmenter.identity
   ): String => Boolean =

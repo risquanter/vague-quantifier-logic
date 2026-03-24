@@ -1,7 +1,7 @@
 package fol.semantics
 
 import logic.{FOL, Formula, Term}
-import fol.datastore.{KnowledgeBase, KnowledgeSource, Relation, RelationValue, RelationTuple, PositionType}
+import fol.datastore.{KnowledgeBase, KnowledgeSource, Relation, RelationValue, RelationTuple}
 import fol.logic.{Quantifier, ParsedQuery}
 import fol.result.{EvaluationOutput, VagueQueryResult}
 import fol.error.QueryError
@@ -10,24 +10,24 @@ import fol.sampling.SamplingParams
 class VagueSemanticsSpec extends munit.FunSuite:
 
   // Helper to convert KnowledgeBase to KnowledgeSource for backward compatibility
-  extension (kb: KnowledgeBase)
-    def asSource: KnowledgeSource = KnowledgeSource.fromKnowledgeBase(kb)
+  extension (kb: KnowledgeBase[RelationValue])
+    def asSource: KnowledgeSource[RelationValue] = KnowledgeSource.fromKnowledgeBase(kb)
 
   // Helper: Extract Right or fail the test
   def ok[A](result: Either[QueryError, A]): A =
     result.fold(e => fail(s"Expected Right, got Left(${e.message})"), identity)
 
   // Helper to create unary tuple
-  def unary(value: String): RelationTuple = 
+  def unary(value: String): RelationTuple[RelationValue] = 
     RelationTuple(List(RelationValue.Const(value)))
 
   // Test knowledge base with countries
-  def createCountryKB(): KnowledgeBase =
-    KnowledgeBase(Map.empty, Map.empty)
-      .addRelation(Relation("country", 1, PositionType.allConstants(1)))
-      .addRelation(Relation("large", 1, PositionType.allConstants(1)))
-      .addRelation(Relation("coastal", 1, PositionType.allConstants(1)))
-      .addRelation(Relation("wealthy", 1, PositionType.allConstants(1)))
+  def createCountryKB(): KnowledgeBase[RelationValue] =
+    KnowledgeBase[RelationValue](Map.empty, Map.empty)
+      .addRelation(Relation("country", 1))
+      .addRelation(Relation("large", 1))
+      .addRelation(Relation("coastal", 1))
+      .addRelation(Relation("wealthy", 1))
       .addFacts("country", Set(
         unary("France"), unary("Germany"), unary("Italy"), unary("Spain"),
         unary("Luxembourg"), unary("Switzerland"), unary("Belgium"), unary("Austria")
@@ -313,9 +313,9 @@ class VagueSemanticsSpec extends munit.FunSuite:
     // Simplified version of query q₁ from paper Section 5.2
     // Q[~#]^{1/2} x (european_country(x), large(x))
     
-    val kb = KnowledgeBase(Map.empty, Map.empty)
-      .addRelation(Relation("european_country", 1, PositionType.allConstants(1)))
-      .addRelation(Relation("large", 1, PositionType.allConstants(1)))
+    val kb = KnowledgeBase[RelationValue](Map.empty, Map.empty)
+      .addRelation(Relation("european_country", 1))
+      .addRelation(Relation("large", 1))
       .addFacts("european_country", Set(
         unary("France"), unary("Germany"), unary("Spain"), unary("Italy"), 
         unary("Poland"), unary("Romania"), unary("Luxembourg"), unary("Belgium"), 

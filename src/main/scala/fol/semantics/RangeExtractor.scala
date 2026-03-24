@@ -50,7 +50,7 @@ object RangeExtractor:
     * @return Either[QueryError, Set[RelationValue]]
     */
   def extractRange(
-    source: KnowledgeSource,
+    source: KnowledgeSource[RelationValue],
     query: ParsedQuery,
     substitution: Map[String, RelationValue] = Map.empty
   ): Either[QueryError, Set[RelationValue]] =
@@ -70,7 +70,7 @@ object RangeExtractor:
     *
     * Convenience wrapper for Boolean queries.
     */
-  def extractRangeBoolean(source: KnowledgeSource, query: ParsedQuery): Either[QueryError, Set[RelationValue]] =
+  def extractRangeBoolean(source: KnowledgeSource[RelationValue], query: ParsedQuery): Either[QueryError, Set[RelationValue]] =
     if !query.isBoolean then
       Left(QueryError.ValidationError(
         "Query must be Boolean (no answer variables)",
@@ -85,7 +85,7 @@ object RangeExtractor:
     * Convenience wrapper for unary queries.
     */
   def extractRangeUnary(
-    source: KnowledgeSource,
+    source: KnowledgeSource[RelationValue],
     query: ParsedQuery,
     answerValue: RelationValue
   ): Either[QueryError, Set[RelationValue]] =
@@ -113,7 +113,7 @@ object RangeExtractor:
     *   )
     */
   def extractAllRanges(
-    source: KnowledgeSource,
+    source: KnowledgeSource[RelationValue],
     query: ParsedQuery
   ): Either[QueryError, Map[Map[String, RelationValue], Set[RelationValue]]] =
     try
@@ -139,7 +139,7 @@ object RangeExtractor:
 
   /** Core extraction — throws on error, like FOLAtomParser. */
   private def extractRangeUnsafe(
-    source: KnowledgeSource,
+    source: KnowledgeSource[RelationValue],
     query: ParsedQuery,
     substitution: Map[String, RelationValue]
   ): Set[RelationValue] =
@@ -230,7 +230,7 @@ object RangeExtractor:
 
   /** Generate all possible substitutions for answer variables. */
   private def generateSubstitutions(
-    source: KnowledgeSource,
+    source: KnowledgeSource[RelationValue],
     query: ParsedQuery
   ): Set[Map[String, RelationValue]] =
     val domain = source.activeDomain.toList

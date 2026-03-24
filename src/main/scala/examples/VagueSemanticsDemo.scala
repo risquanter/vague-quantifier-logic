@@ -4,7 +4,7 @@ import logic.{FOL, Formula, Term}
 import semantics.{Model, Valuation}
 import fol.logic.{ParsedQuery, Quantifier}
 import fol.semantics.{RangeExtractor, ScopeEvaluator}
-import fol.datastore.{KnowledgeBase, KnowledgeSource, Relation, RelationTuple, RelationValue, PositionType}
+import fol.datastore.{KnowledgeBase, KnowledgeSource, Relation, RelationTuple, RelationValue}
 import fol.bridge.KnowledgeBaseModel
 
 /** Demonstration of Vague Quantifier Semantics
@@ -54,10 +54,10 @@ def proportionCalculationDemo(): Unit =
   println()
   
   // Create a simple knowledge base about European countries
-  val kb = KnowledgeBase(Map.empty, Map.empty)
-    .addRelation(Relation("country", 1, PositionType.allConstants(1)))
-    .addRelation(Relation("large", 1, PositionType.allConstants(1)))
-    .addRelation(Relation("has_coast", 1, PositionType.allConstants(1)))
+  val kb = KnowledgeBase[RelationValue](Map.empty, Map.empty)
+    .addRelation(Relation("country", 1))
+    .addRelation(Relation("large", 1))
+    .addRelation(Relation("has_coast", 1))
     .addFacts("country", Set(
       RelationTuple(List(RelationValue.Const("France"))),
       RelationTuple(List(RelationValue.Const("Germany"))),
@@ -162,9 +162,9 @@ def exactEvaluationDemo(): Unit =
   println("-" * 80)
   println()
   
-  val kb = KnowledgeBase(Map.empty, Map.empty)
-    .addRelation(Relation("country", 1, PositionType.allConstants(1)))
-    .addRelation(Relation("large", 1, PositionType.allConstants(1)))
+  val kb = KnowledgeBase[RelationValue](Map.empty, Map.empty)
+    .addRelation(Relation("country", 1))
+    .addRelation(Relation("large", 1))
     .addFacts("country", Set(
       RelationTuple(List(RelationValue.Const("France"))),
       RelationTuple(List(RelationValue.Const("Germany"))),
@@ -276,9 +276,9 @@ def samplingVsExactDemo(): Unit =
   println()
   
   // Create larger KB to make sampling effects visible
-  val kb = KnowledgeBase(Map.empty, Map.empty)
-    .addRelation(Relation("city", 1, PositionType.allConstants(1)))
-    .addRelation(Relation("large", 1, PositionType.allConstants(1)))
+  val kb = KnowledgeBase[RelationValue](Map.empty, Map.empty)
+    .addRelation(Relation("city", 1))
+    .addRelation(Relation("large", 1))
   
   // Add 20 cities, 15 are large
   val cities = (1 to 20).map(i => s"City$i")
@@ -383,9 +383,9 @@ def quantifierTypesDemo(): Unit =
   println("-" * 80)
   println()
   
-  val kb = KnowledgeBase(Map.empty, Map.empty)
-    .addRelation(Relation("student", 1, PositionType.allConstants(1)))
-    .addRelation(Relation("passed", 1, PositionType.allConstants(1)))
+  val kb = KnowledgeBase[RelationValue](Map.empty, Map.empty)
+    .addRelation(Relation("student", 1))
+    .addRelation(Relation("passed", 1))
     .addFacts("student", (1 to 10).map(i =>
       RelationTuple(List(RelationValue.Const(s"Student$i")))
     ).toSet)
@@ -460,11 +460,11 @@ def complexFormulaDemo(): Unit =
   println("-" * 80)
   println()
   
-  val kb = KnowledgeBase(Map.empty, Map.empty)
-    .addRelation(Relation("country", 1, PositionType.allConstants(1)))
-    .addRelation(Relation("large", 1, PositionType.allConstants(1)))
-    .addRelation(Relation("wealthy", 1, PositionType.allConstants(1)))
-    .addRelation(Relation("coastal", 1, PositionType.allConstants(1)))
+  val kb = KnowledgeBase[RelationValue](Map.empty, Map.empty)
+    .addRelation(Relation("country", 1))
+    .addRelation(Relation("large", 1))
+    .addRelation(Relation("wealthy", 1))
+    .addRelation(Relation("coastal", 1))
     .addFacts("country", Set(
       RelationTuple(List(RelationValue.Const("France"))),
       RelationTuple(List(RelationValue.Const("Germany"))),

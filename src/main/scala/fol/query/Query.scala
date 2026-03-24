@@ -61,7 +61,7 @@ case class UnresolvedQuery(
     * @param source Knowledge source to query
     * @return Either error or resolved query ready for evaluation
     */
-  def resolve(source: KnowledgeSource): Either[QueryError, ResolvedQuery] =
+  def resolve(source: KnowledgeSource[RelationValue]): Either[QueryError, ResolvedQuery] =
     try
       val elements: Set[RelationValue] = domain match
         case DomainSpec.Relation(relationName, position) =>
@@ -100,7 +100,7 @@ case class UnresolvedQuery(
     * @param source Knowledge source to query
     * @return Either error or VagueQueryResult
     */
-  def evaluate(source: KnowledgeSource): Either[QueryError, VagueQueryResult] =
+  def evaluate(source: KnowledgeSource[RelationValue]): Either[QueryError, VagueQueryResult] =
     resolve(source).map(_.evaluate())
 
   /** Convenience: resolve and evaluate with element sets in one step.
@@ -111,7 +111,7 @@ case class UnresolvedQuery(
     * @param source Knowledge source to query
     * @return Either error or EvaluationOutput with result + element sets
     */
-  def evaluateWithOutput(source: KnowledgeSource): Either[QueryError, EvaluationOutput] =
+  def evaluateWithOutput(source: KnowledgeSource[RelationValue]): Either[QueryError, EvaluationOutput] =
     resolve(source).map(_.evaluateWithOutput())
 
 /** Specification of the domain to query over. */
@@ -206,7 +206,7 @@ object Query:
       UnresolvedQuery(q, domain, rvPred, params, config)
 
 /** Extension methods for convenient querying. */
-extension (source: KnowledgeSource)
+extension (source: KnowledgeSource[RelationValue])
   
   /** Execute a vague query against this knowledge source.
     * 
@@ -237,7 +237,7 @@ object Predicates:
     * @return Predicate function
     */
   def hasRelation(
-    source: KnowledgeSource,
+    source: KnowledgeSource[RelationValue],
     relationName: String,
     argMapper: RelationValue => List[RelationValue]
   ): RelationValue => Boolean =
@@ -255,7 +255,7 @@ object Predicates:
     * @return Predicate function
     */
   def inRelation(
-    source: KnowledgeSource,
+    source: KnowledgeSource[RelationValue],
     relationName: String
   ): RelationValue => Boolean =
     (entity: RelationValue) =>
@@ -272,7 +272,7 @@ object Predicates:
     * @return Predicate function
     */
   def relatedTo(
-    source: KnowledgeSource,
+    source: KnowledgeSource[RelationValue],
     relationName: String,
     secondArg: String
   ): RelationValue => Boolean =

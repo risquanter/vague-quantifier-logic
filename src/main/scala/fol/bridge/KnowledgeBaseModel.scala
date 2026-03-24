@@ -57,7 +57,7 @@ object KnowledgeBaseModel:
     * @param kb Knowledge base to translate
     * @return FOL model with KB semantics
     */
-  def toModel(kb: KnowledgeBase): Model[Any] =
+  def toModel(kb: KnowledgeBase[RelationValue]): Model[Any] =
     // 1. Domain: all values used in the KB
     val activeDomain = kb.activeDomain
     
@@ -89,7 +89,7 @@ object KnowledgeBaseModel:
     * @return Predicate function for FOL interpretation
     */
   private def createPredicateFunction(
-    kb: KnowledgeBase,
+    kb: KnowledgeBase[RelationValue],
     relationName: String,
     arity: Int
   ): List[Any] => Boolean =
@@ -110,7 +110,7 @@ object KnowledgeBaseModel:
         }
 
 /** Extension methods for KnowledgeBase. */
-extension (kb: KnowledgeBase)
+extension (kb: KnowledgeBase[RelationValue])
   
   /** Convert this knowledge base to an FOL model.
     * 

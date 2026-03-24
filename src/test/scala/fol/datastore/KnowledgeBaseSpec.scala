@@ -33,22 +33,18 @@ class KnowledgeBaseSpec extends FunSuite:
     assert(rel.isBinary)
   }
   
-  test("relation validates correct tuple") {
+  test("relation arity-only validation accepts matching arity") {
     val rel = Relation.unary("person")
     val tuple = RelationTuple.fromConstants("alice")
-    assert(rel.validates(tuple))
+    assertEquals(tuple.arity, rel.arity)
   }
   
-  test("relation rejects wrong arity") {
-    val rel = Relation.unary("person")
-    val tuple = RelationTuple.fromConstants("alice", "bob")
-    assert(!rel.validates(tuple))
-  }
-  
-  test("relation rejects wrong type") {
-    val rel = Relation.unary("person")
-    val tuple = RelationTuple.fromNums(42)
-    assert(!rel.validates(tuple))
+  test("relation rejects wrong arity via addFact") {
+    intercept[IllegalArgumentException] {
+      KnowledgeBase.empty[RelationValue]
+        .addRelation(Relation.unary("person"))
+        .addFact("person", RelationTuple.fromConstants("alice", "bob"))
+    }
   }
   
   // ==================== Tuple Tests ====================
@@ -79,13 +75,13 @@ class KnowledgeBaseSpec extends FunSuite:
   // ==================== Knowledge Base Tests ====================
   
   test("create empty knowledge base") {
-    val kb = KnowledgeBase.empty
+    val kb = KnowledgeBase.empty[RelationValue]
     assertEquals(kb.totalFacts, 0)
     assertEquals(kb.schema.size, 0)
   }
   
   test("add relation to knowledge base") {
-    val kb = KnowledgeBase.empty
+    val kb = KnowledgeBase.empty[RelationValue]
       .addRelation(Relation.unary("person"))
     
     assert(kb.hasRelation("person"))
@@ -94,14 +90,14 @@ class KnowledgeBaseSpec extends FunSuite:
   
   test("cannot add duplicate relation") {
     intercept[IllegalArgumentException] {
-      KnowledgeBase.empty
+      KnowledgeBase.empty[RelationValue]
         .addRelation(Relation.unary("person"))
         .addRelation(Relation.unary("person"))
     }
   }
   
   test("add fact to knowledge base") {
-    val kb = KnowledgeBase.empty
+    val kb = KnowledgeBase.empty[RelationValue]
       .addRelation(Relation.unary("person"))
       .addFact("person", RelationTuple.fromConstants("alice"))
     
@@ -111,21 +107,21 @@ class KnowledgeBaseSpec extends FunSuite:
   
   test("cannot add fact without schema") {
     intercept[IllegalArgumentException] {
-      KnowledgeBase.empty
+      KnowledgeBase.empty[RelationValue]
         .addFact("person", RelationTuple.fromConstants("alice"))
     }
   }
   
-  test("cannot add invalid fact") {
+  test("cannot add fact with wrong arity") {
     intercept[IllegalArgumentException] {
-      KnowledgeBase.empty
+      KnowledgeBase.empty[RelationValue]
         .addRelation(Relation.unary("person"))
-        .addFact("person", RelationTuple.fromNums(42))  // Wrong type
+        .addFact("person", RelationTuple.fromConstants("alice", "bob"))
     }
   }
   
   test("query facts with pattern") {
-    val kb = KnowledgeBase.empty
+    val kb = KnowledgeBase.empty[RelationValue]
       .addRelation(Relation.binary("knows"))
       .addFact("knows", RelationTuple.fromConstants("alice", "bob"))
       .addFact("knows", RelationTuple.fromConstants("alice", "charlie"))
@@ -141,7 +137,7 @@ class KnowledgeBaseSpec extends FunSuite:
   }
   
   test("get domain from relation") {
-    val kb = KnowledgeBase.empty
+    val kb = KnowledgeBase.empty[RelationValue]
       .addRelation(Relation.unary("person"))
       .addFact("person", RelationTuple.fromConstants("alice"))
       .addFact("person", RelationTuple.fromConstants("bob"))
@@ -155,7 +151,7 @@ class KnowledgeBaseSpec extends FunSuite:
   }
   
   test("get domain from binary relation") {
-    val kb = KnowledgeBase.empty
+    val kb = KnowledgeBase.empty[RelationValue]
       .addRelation(Relation.binary("knows"))
       .addFact("knows", RelationTuple.fromConstants("alice", "bob"))
       .addFact("knows", RelationTuple.fromConstants("alice", "charlie"))
@@ -168,7 +164,7 @@ class KnowledgeBaseSpec extends FunSuite:
   }
   
   test("active domain includes all values") {
-    val kb = KnowledgeBase.empty
+    val kb = KnowledgeBase.empty[RelationValue]
       .addRelation(Relation.unary("person"))
       .addRelation(Relation.binary("knows"))
       .addFact("person", RelationTuple.fromConstants("alice"))
@@ -181,16 +177,34 @@ class KnowledgeBaseSpec extends FunSuite:
   // ==================== Builder Tests ====================
   
   test("build knowledge base with builder") {
-    val kb = KnowledgeBase.builder
+    val kb = KnowledgeBase.builder[RelationValue]
       .withUnaryRelation("person")
       .withBinaryRelation("knows")
-      .withFact("person", "alice")
-      .withFact("person", "bob")
-      .withFact("knows", "alice", "bob")
+      .withConstFact("person", "alice")
+      .withConstFact("person", "bob")
+      .withConstFact("knows", "alice", "bob")
       .build()
     
     assertEquals(kb.schema.size, 2)
     assertEquals(kb.totalFacts, 3)
+  }
+  
+  // ==================== RelationValue Validation Tests ====================
+  
+  test("RelationValueValidation validates correct tuple") {
+    val rel = Relation.unary("person")
+    val tuple = RelationTuple.fromConstants("alice")
+    assert(RelationValueValidation.validates(
+      rel, tuple, List(PositionType.Constant)
+    ))
+  }
+  
+  test("RelationValueValidation rejects wrong type") {
+    val rel = Relation.unary("person")
+    val tuple = RelationTuple.fromNums(42)
+    assert(!RelationValueValidation.validates(
+      rel, tuple, List(PositionType.Constant)
+    ))
   }
   
   // ==================== Risk Domain Tests ====================

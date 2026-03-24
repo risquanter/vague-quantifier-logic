@@ -2,7 +2,7 @@ package fol.semantics
 
 import munit.FunSuite
 import logic.{FOL, Formula, Term}
-import fol.datastore.{KnowledgeBase, KnowledgeSource, Relation, RelationValue, RelationTuple, PositionType}
+import fol.datastore.{KnowledgeBase, KnowledgeSource, Relation, RelationValue, RelationTuple}
 import fol.logic.{Quantifier, ParsedQuery}
 import fol.bridge.{FOLBridge, NumericAugmenter}
 import fol.error.QueryError
@@ -17,20 +17,20 @@ class ModelAugmentationIntegrationSpec extends FunSuite:
 
   // ==================== Helpers ====================
 
-  extension (kb: KnowledgeBase)
-    def asSource: KnowledgeSource = KnowledgeSource.fromKnowledgeBase(kb)
+  extension (kb: KnowledgeBase[RelationValue])
+    def asSource: KnowledgeSource[RelationValue] = KnowledgeSource.fromKnowledgeBase(kb)
 
   def ok[A](result: Either[QueryError, A]): A =
     result.fold(e => fail(s"Expected Right, got Left(${e.message})"), identity)
 
-  def unary(value: String): RelationTuple =
+  def unary(value: String): RelationTuple[RelationValue] =
     RelationTuple(List(RelationValue.Const(value)))
 
   /** KB with items and a "score" concept that needs a function augmenter. */
-  def createItemKB(): KnowledgeBase =
-    KnowledgeBase(Map.empty, Map.empty)
-      .addRelation(Relation("item", 1, PositionType.allConstants(1)))
-      .addRelation(Relation("category", 1, PositionType.allConstants(1)))
+  def createItemKB(): KnowledgeBase[RelationValue] =
+    KnowledgeBase[RelationValue](Map.empty, Map.empty)
+      .addRelation(Relation("item", 1))
+      .addRelation(Relation("category", 1))
       .addFacts("item", Set(
         unary("A"), unary("B"), unary("C"), unary("D")
       ))

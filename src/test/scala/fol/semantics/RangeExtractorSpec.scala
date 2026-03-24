@@ -4,7 +4,7 @@ import munit.FunSuite
 import fol.error.{QueryError, QueryException}
 import logic.{FOL, Formula, Term}
 import fol.logic.{ParsedQuery, Quantifier}
-import fol.datastore.{KnowledgeBase, KnowledgeSource, Relation, RelationTuple, RelationValue, PositionType}
+import fol.datastore.{KnowledgeBase, KnowledgeSource, Relation, RelationTuple, RelationValue}
 
 class RangeExtractorSpec extends FunSuite:
   import RangeExtractor.*
@@ -12,7 +12,7 @@ class RangeExtractorSpec extends FunSuite:
   import Term.{Var, Const as TConst, Fn}
   
   // Helper: Convert KB to KnowledgeSource for testing
-  given Conversion[KnowledgeBase, KnowledgeSource] = KnowledgeSource.fromKnowledgeBase
+  given Conversion[KnowledgeBase[RelationValue], KnowledgeSource[RelationValue]] = KnowledgeSource.fromKnowledgeBase
   
   // Helper: Extract Right or fail the test
   def ok[A](result: Either[QueryError, A]): A =
@@ -21,12 +21,12 @@ class RangeExtractorSpec extends FunSuite:
   // ==================== Test Data Setup ====================
   
   // Simple geography KB
-  def geographyKB: KnowledgeBase =
-    val kb = KnowledgeBase(Map.empty, Map.empty)
-      .addRelation(Relation("country", 1, PositionType.allConstants(1)))
-      .addRelation(Relation("city", 1, PositionType.allConstants(1)))
-      .addRelation(Relation("capital", 2, PositionType.allConstants(2)))
-      .addRelation(Relation("large_country", 1, PositionType.allConstants(1)))
+  def geographyKB: KnowledgeBase[RelationValue] =
+    val kb = KnowledgeBase[RelationValue](Map.empty, Map.empty)
+      .addRelation(Relation("country", 1))
+      .addRelation(Relation("city", 1))
+      .addRelation(Relation("capital", 2))
+      .addRelation(Relation("large_country", 1))
     
     kb.addFacts("country", Set(
       RelationTuple(List(RConst("France"))),
@@ -52,10 +52,10 @@ class RangeExtractorSpec extends FunSuite:
     ))
   
   // KB with numeric values
-  def numericKB: KnowledgeBase =
-    val kb = KnowledgeBase(Map.empty, Map.empty)
-      .addRelation(Relation("component", 1, PositionType.allConstants(1)))
-      .addRelation(Relation("has_severity", 2, List(PositionType.Constant, PositionType.Numeric)))
+  def numericKB: KnowledgeBase[RelationValue] =
+    val kb = KnowledgeBase[RelationValue](Map.empty, Map.empty)
+      .addRelation(Relation("component", 1))
+      .addRelation(Relation("has_severity", 2))
     
     kb.addFacts("component", Set(
       RelationTuple(List(RConst("C1"))),
@@ -99,8 +99,8 @@ class RangeExtractorSpec extends FunSuite:
   }
   
   test("extract range from empty relation") {
-    val kb = KnowledgeBase(Map.empty, Map.empty)
-      .addRelation(Relation("empty_rel", 1, PositionType.allConstants(1)))
+    val kb = KnowledgeBase[RelationValue](Map.empty, Map.empty)
+      .addRelation(Relation("empty_rel", 1))
     
     val query = ParsedQuery(
       Quantifier.aboutHalf,
@@ -194,8 +194,8 @@ class RangeExtractorSpec extends FunSuite:
       country -> ok(extractRange(kb, query, Map("y" -> country)))
     }.toMap
     
-    assertEquals(ranges(RConst("France")), Set(RConst("Paris")))
-    assertEquals(ranges(RConst("Italy")), Set(RConst("Rome")))
+    assertEquals(ranges(RConst("France")), Set[RelationValue](RConst("Paris")))
+    assertEquals(ranges(RConst("Italy")), Set[RelationValue](RConst("Rome")))
   }
   
   test("extract range with no substitution needed (Boolean)") {
