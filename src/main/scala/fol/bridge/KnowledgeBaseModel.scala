@@ -2,8 +2,7 @@ package fol.bridge
 
 import logic.{Term, Formula, FOL}
 import semantics.{Domain, Interpretation, Model, Valuation}
-import fol.datastore.{KnowledgeBase, RelationValue, RelationTuple, RelationValueUtil}
-import RelationValueUtil.*
+import fol.datastore.{DomainElement, KnowledgeBase, RelationValue, RelationTuple}
 
 /** Bridge between KnowledgeBase and FOL Model Theory.
   * 
@@ -37,44 +36,28 @@ object KnowledgeBaseModel:
     * - Constants (e.g., "alice", "C1") as 0-ary functions returning themselves
     * - Predicates (e.g., "person", "knows") as lookups in KB relations
     * 
-    * Example usage:
-    * ```scala
-    * val kb = KnowledgeBase.builder
-    *   .withUnaryRelation("person")
-    *   .withBinaryRelation("knows")
-    *   .withFact("person", "alice")
-    *   .withFact("person", "bob")
-    *   .withFact("knows", "alice", "bob")
-    *   .build()
+    * Domain elements are named via `DomainElement[D].show`, which supplies
+    * the constant name used by the FOL evaluation layer
+    * (e.g. `Const("alice").show == "alice"`).
     * 
-    * val model = KnowledgeBaseModel.toModel(kb)
-    * 
-    * // Now evaluate FOL formulas:
-    * val formula = FOLParser.parse("person(alice) /\\ knows(alice, bob)")
-    * FOLSemantics.holds(formula, model, Valuation(Map.empty))  // true
-    * ```
-    * 
+    * @tparam D Domain element type (must have a `DomainElement` instance)
     * @param kb Knowledge base to translate
     * @return FOL model with KB semantics
     */
-  def toModel(kb: KnowledgeBase[RelationValue]): Model[Any] =
+  def toModel[D: DomainElement](kb: KnowledgeBase[D]): Model[D] =
     // 1. Domain: all values used in the KB
-    val activeDomain = kb.activeDomain
-    
-    // Convert RelationValues to their underlying values (String or Int)
-    val domainElements: Set[Any] = toDomainSet(activeDomain)
-    
+    val domainElements: Set[D] = kb.activeDomain
     val domain = Domain(domainElements)
     
     // 2. Functions: Constants as 0-ary functions
-    // Each constant c is interpreted as a 0-ary function: () => c
-    val functions = domainElements.map { value =>
-      val name = value.toString
-      name -> ((_: List[Any]) => value)
+    // Each domain element d is interpreted as a 0-ary function: () => d
+    // The function name is d.show (e.g. "alice" for Const("alice"))
+    val functions: Map[String, List[D] => D] = domainElements.map { d =>
+      d.show -> ((_: List[D]) => d)
     }.toMap
     
     // 3. Predicates: Wrap KB relation lookups
-    val predicates = kb.schema.map { case (relationName, relation) =>
+    val predicates: Map[String, List[D] => Boolean] = kb.schema.map { case (relationName, relation) =>
       relationName -> createPredicateFunction(kb, relationName, relation.arity)
     }.toMap
     
@@ -88,29 +71,19 @@ object KnowledgeBaseModel:
     * @param arity Number of arguments
     * @return Predicate function for FOL interpretation
     */
-  private def createPredicateFunction(
-    kb: KnowledgeBase[RelationValue],
+  private def createPredicateFunction[D](
+    kb: KnowledgeBase[D],
     relationName: String,
     arity: Int
-  ): List[Any] => Boolean =
-    (args: List[Any]) =>
-      // Check arity
+  ): List[D] => Boolean =
+    (args: List[D]) =>
       if args.length != arity then
         false
       else
-        try {
-          // Convert Scala values back to RelationValues
-          val values = args.map(fromDomainValue)
-        
-          // Look up in KB
-          val tuple = RelationTuple(values)
-          kb.contains(relationName, tuple)
-        } catch {
-          case _: IllegalArgumentException => false
-        }
+        kb.contains(relationName, RelationTuple(args))
 
 /** Extension methods for KnowledgeBase. */
-extension (kb: KnowledgeBase[RelationValue])
+extension [D: DomainElement](kb: KnowledgeBase[D])
   
   /** Convert this knowledge base to an FOL model.
     * 
@@ -118,7 +91,7 @@ extension (kb: KnowledgeBase[RelationValue])
     * 
     * @return FOL model with KB semantics
     */
-  def toModel: Model[Any] =
+  def toModel: Model[D] =
     KnowledgeBaseModel.toModel(kb)
   
   /** Evaluate an FOL formula against this knowledge base.
@@ -131,7 +104,7 @@ extension (kb: KnowledgeBase[RelationValue])
     * @param valuation Variable assignments (default: empty)
     * @return true if formula holds in the KB
     */
-  def holds(formula: Formula[logic.FOL], valuation: Valuation[Any] = Valuation(Map.empty)): Boolean =
+  def holds(formula: Formula[logic.FOL], valuation: Valuation[D] = Valuation(Map.empty)): Boolean =
     import semantics.FOLSemantics
     val model = toModel
     FOLSemantics.holds(formula, model, valuation)

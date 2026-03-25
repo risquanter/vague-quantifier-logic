@@ -20,7 +20,31 @@ enum RelationValue:
     case Const(name)  => name
     case Num(value)   => value.toString
 
-object RelationValue
+object RelationValue:
+
+  /** Compare two RelationValues.
+    *
+    * - `Num` values compared by integer value
+    * - `Const` values compared lexicographically
+    * - Mixed `Num`/`Const` throws (matching the existing `toDouble` behaviour)
+    */
+  private def compareValues(x: RelationValue, y: RelationValue): Int = (x, y) match
+    case (RelationValue.Num(a), RelationValue.Num(b))     => a compare b
+    case (RelationValue.Const(a), RelationValue.Const(b)) => a compare b
+    case _ =>
+      throw IllegalArgumentException(
+        s"Cannot compare different RelationValue variants: $x, $y"
+      )
+
+  /** Ordering instance for RelationValue.
+    *
+    * Total on all variants:
+    *   - `Num` values compared by integer value
+    *   - `Const` values compared lexicographically
+    *   - Mixed `Num`/`Const` throws (heterogeneous comparison is undefined)
+    */
+  given Ordering[RelationValue] with
+    def compare(x: RelationValue, y: RelationValue): Int = compareValues(x, y)
 
 /** A tuple of values forming a fact.
   *

@@ -112,7 +112,7 @@ class ScopeEvaluatorSpec extends FunSuite:
     val formula = Atom(FOL("capital", List(Var("x"), Var("y"))))
     
     // With substitution y -> France
-    val substitution = Map("y" -> "France")
+    val substitution = Map("y" -> RConst("France"))
     val result = evaluateForElement(formula, RConst("Paris"), "x", model, substitution)
     assert(result, "Paris is capital of France")
     
@@ -477,7 +477,7 @@ class ScopeEvaluatorSpec extends FunSuite:
     val formula = Atom(FOL("capital", List(Var("x"), Var("y"))))
     
     // For France
-    val substitution = Map("y" -> "France")
+    val substitution = Map("y" -> RConst("France"))
     val sample = Set(RConst("Paris"), RConst("Berlin"), RConst("Rome"))
     
     val prop = calculateProportion(sample, formula, "x", model, substitution)

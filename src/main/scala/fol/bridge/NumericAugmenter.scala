@@ -1,9 +1,17 @@
 package fol.bridge
 
+import fol.datastore.RelationValue
+import fol.datastore.RelationValue.{Num, Const}
 import semantics.{Model, ModelAugmenter}
 
 /** Built-in augmenter providing comparison predicates, arithmetic
-  * functions, and numeric literal resolution for `Model[Any]`.
+  * functions, and numeric literal resolution for `Model[RelationValue]`.
+  *
+  * This is the backward-compatible composition of the three generic
+  * augmenters:
+  *   - [[ComparisonAugmenter]]  — `>`, `<`, `>=`, `<=`, `=`
+  *   - [[ArithmeticAugmenter]]  — `+`, `-`, `*`, `/`
+  *   - [[LiteralResolver]]      — numeric literal fallback
   *
   * KB-backed models contain only relation-membership predicates and
   * identity constants.  This augmenter fills the gap so that formulas
@@ -16,76 +24,54 @@ import semantics.{Model, ModelAugmenter}
   *   VagueSemantics.evaluate(query, source, modelAugmenter = augmenter)
   * }}}
   *
+  * '''Note:''' Arithmetic is integer-based (`RelationValue.Num(Int)`).
+  * Division truncates toward zero.  Consumers needing precise decimal
+  * arithmetic should use `ArithmeticAugmenter[Double]` with a richer
+  * domain type.
+  *
   * @see [[docs/ADR-005.md]] §Decision 4
   */
 object NumericAugmenter:
 
-  /** ModelAugmenter that adds:
-    *   - Comparison predicates: `>`, `<`, `>=`, `<=`, `=`
-    *   - Arithmetic functions: `+`, `-`, `*`, `/`
-    *   - Numeric literal resolution via fallback (any digit string → Double)
+  /** Domain-specific arithmetic for `RelationValue.Num(Int)`.
+    *
+    * Adds `+`, `-`, `*`, `/` as model functions by direct pattern
+    * matching on `Num`.  No `Fractional` type class instance is
+    * created — `RelationValue` is a sum type where arithmetic is
+    * only meaningful on the `Num` variant, which does not satisfy
+    * the totality requirement of `Fractional`.
+    *
+    * Consumers with a lawful `Fractional` domain (e.g. `Double`)
+    * should use [[ArithmeticAugmenter]] directly instead.
     */
-  val augmenter: ModelAugmenter[Any] = ModelAugmenter { model =>
-    val preds = Map[String, List[Any] => Boolean](
-      ">"  -> { case List(a, b) => toDouble(a) > toDouble(b)
-               case args => throw new Exception(s"> expects 2 arguments, got ${args.length}") },
-      "<"  -> { case List(a, b) => toDouble(a) < toDouble(b)
-               case args => throw new Exception(s"< expects 2 arguments, got ${args.length}") },
-      ">=" -> { case List(a, b) => toDouble(a) >= toDouble(b)
-               case args => throw new Exception(s">= expects 2 arguments, got ${args.length}") },
-      "<=" -> { case List(a, b) => toDouble(a) <= toDouble(b)
-               case args => throw new Exception(s"<= expects 2 arguments, got ${args.length}") },
-      "="  -> { case List(a, b) => toDouble(a) == toDouble(b)
-               case args => throw new Exception(s"= expects 2 arguments, got ${args.length}") },
-    )
-
-    val fns = Map[String, List[Any] => Any](
-      "+" -> { case List(a, b) => toDouble(a) + toDouble(b)
-               case args => throw new Exception(s"+ expects 2 arguments, got ${args.length}") },
+  private val relValueArithmetic: ModelAugmenter[RelationValue] = ModelAugmenter { model =>
+    val fns = Map[String, List[RelationValue] => RelationValue](
+      "+" -> { case List(Num(a), Num(b)) => Num(a + b)
+               case args => throw Exception(s"+ expects 2 Num arguments, got $args") },
       "-" -> {
-        case List(a)    => -toDouble(a)
-        case List(a, b) => toDouble(a) - toDouble(b)
-        case args => throw new Exception(s"- expects 1 or 2 arguments, got ${args.length}")
+        case List(Num(a))         => Num(-a)
+        case List(Num(a), Num(b)) => Num(a - b)
+        case args => throw Exception(s"- expects 1 or 2 Num arguments, got $args")
       },
-      "*" -> { case List(a, b) => toDouble(a) * toDouble(b)
-               case args => throw new Exception(s"* expects 2 arguments, got ${args.length}") },
-      "/" -> { case List(a, b) =>
-        val denom = toDouble(b)
-        if denom == 0.0 then throw new Exception("Division by zero")
-        else toDouble(a) / denom
-               case args => throw new Exception(s"/ expects 2 arguments, got ${args.length}") },
+      "*" -> { case List(Num(a), Num(b)) => Num(a * b)
+               case args => throw Exception(s"* expects 2 Num arguments, got $args") },
+      "/" -> { case List(Num(a), Num(b)) =>
+        if b == 0 then throw ArithmeticException("Division by zero")
+        else Num(a / b)
+               case args => throw Exception(s"/ expects 2 Num arguments, got $args") },
     )
-
-    val withPreds = model.interpretation.withPredicates(preds)
-    val withFns   = withPreds.withFunctions(fns)
-    Model(withFns.withFunctionFallback(numericLiteral))
+    Model(model.interpretation.withFunctions(fns))
   }
 
-  /** Try to parse a symbol name as a numeric literal.
+  /** ModelAugmenter that adds comparisons, arithmetic, and literal resolution
+    * for `RelationValue`-based models.
     *
-    * Returns `Some` for any string parseable as `Double`
-    * (integers, decimals, negatives).  Returns `None` for
-    * non-numeric strings — the fallback chain continues.
+    * Composed from:
+    *   - `ComparisonAugmenter` — uses the lawful global `Ordering[RelationValue]`
+    *   - `relValueArithmetic`  — domain-specific `Num` pattern matching (no type class)
+    *   - `LiteralResolver`     — uses the lawful `DomainCodec[RelationValue]`
     */
-  private[bridge] def numericLiteral(name: String): Option[List[Any] => Any] =
-    name.toDoubleOption.map(d => (_: List[Any]) => d)
-
-  /** Convert an `Any` value to `Double` for numeric operations.
-    *
-    * Handles the types that appear in KB-backed models and
-    * numeric augmenter outputs: `Double`, `Int`, `Long`,
-    * `BigDecimal`, and `String` (numeric).
-    */
-  private[bridge] def toDouble(v: Any): Double = v match
-    case d: Double      => d
-    case i: Int         => i.toDouble
-    case l: Long        => l.toDouble
-    case bd: BigDecimal => bd.toDouble
-    case s: String      =>
-      s.toDoubleOption.getOrElse(
-        throw new Exception(s"Cannot convert to Double: '$s'")
-      )
-    case other =>
-      throw new Exception(
-        s"Cannot convert to Double: $other (${other.getClass.getName})"
-      )
+  val augmenter: ModelAugmenter[RelationValue] =
+    ComparisonAugmenter.augmenter[RelationValue]
+      .andThen(relValueArithmetic)
+      .andThen(LiteralResolver.augmenter[RelationValue])

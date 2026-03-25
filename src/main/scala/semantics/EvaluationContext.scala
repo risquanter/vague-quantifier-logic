@@ -1,7 +1,6 @@
 package semantics
 
 import logic.{FOL, Formula, Term}
-import fol.datastore.{RelationValue, RelationValueUtil}
 
 /** Context for evaluating FOL formulas in a model.
   * 
@@ -80,47 +79,26 @@ case class EvaluationContext[D](
   def isBound(variable: String): Boolean =
     valuation.contains(variable)
 
-/** Extension methods for working with RelationValues in evaluation contexts.
-  * 
-  * Bridges the gap between KB data (RelationValue) and FOL semantics (Any).
-  */
-extension (ctx: EvaluationContext[Any])
-  
-  /** Evaluate formula with RelationValue binding.
-    * 
-    * Convenience method that converts RelationValue to domain value
-    * before evaluating. Used extensively by ScopeEvaluator.
-    * 
-    * @param formula Formula to evaluate
+/** Generic extension methods for any EvaluationContext[D]. */
+extension [D](ctx: EvaluationContext[D])
+
+  /** Evaluate formula with a single domain-element binding.
+    *
+    * Convenience method that combines `withBinding` and `holds` in one call.
+    * Used by FOLBridge and ScopeEvaluator to bind the quantified variable
+    * for each element.
+    *
+    * @param formula  Formula to evaluate
     * @param variable Variable to bind
-    * @param value RelationValue to bind to variable
+    * @param value    Domain value to bind to variable
     * @return true if formula holds with this binding
     */
-  def holdsWithRelationValue(
+  def holdsWithBinding(
     formula: Formula[FOL],
     variable: String,
-    value: RelationValue
+    value: D
   ): Boolean =
-    val domainValue = RelationValueUtil.toDomainValue(value)
-    ctx.withBinding(variable, domainValue).holds(formula)
-  
-  /** Evaluate formula with multiple RelationValue bindings.
-    * 
-    * @param formula Formula to evaluate
-    * @param bindings Map from variable names to RelationValues
-    * @return true if formula holds with these bindings
-    */
-  def holdsWithRelationValues(
-    formula: Formula[FOL],
-    bindings: Map[String, RelationValue]
-  ): Boolean =
-    val domainBindings = bindings.map { case (v, rv) =>
-      v -> RelationValueUtil.toDomainValue(rv)
-    }
-    val extendedValuation = domainBindings.foldLeft(ctx.valuation) {
-      case (val_, (variable, value)) => val_.updated(variable, value)
-    }
-    EvaluationContext(ctx.model, extendedValuation).holds(formula)
+    ctx.withBinding(variable, value).holds(formula)
 
 /** Companion object with factory methods. */
 object EvaluationContext:

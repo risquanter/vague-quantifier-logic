@@ -25,14 +25,14 @@ case class ModelAugmenter[D](run: Model[D] => Model[D]):
     *
     * `(a andThen b)(m)  ≡  b(a(m))`
     */
-  def andThen(that: ModelAugmenter[D]): ModelAugmenter[D] =
+  infix def andThen(that: ModelAugmenter[D]): ModelAugmenter[D] =
     ModelAugmenter(m => that.run(this.run(m)))
 
   /** Compose right-to-left: apply `that` first, then `this`.
     *
     * `(a compose b)(m)  ≡  a(b(m))`
     */
-  def compose(that: ModelAugmenter[D]): ModelAugmenter[D] =
+  infix def compose(that: ModelAugmenter[D]): ModelAugmenter[D] =
     ModelAugmenter(m => this.run(that.run(m)))
 
 object ModelAugmenter:

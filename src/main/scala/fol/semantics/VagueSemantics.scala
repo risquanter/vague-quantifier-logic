@@ -44,7 +44,7 @@ object VagueSemantics:
     answerTuple: Map[String, RelationValue],
     samplingParams: SamplingParams,
     hdrConfig: HDRConfig,
-    modelAugmenter: ModelAugmenter[Any] = ModelAugmenter.identity
+    modelAugmenter: ModelAugmenter[RelationValue] = ModelAugmenter.identity
   ): ResolvedQuery =
     val rangeElements = RangeExtractor.extractRange(source, query, answerTuple) match
       case Right(elems) => elems
@@ -75,7 +75,7 @@ object VagueSemantics:
     answerTuple: Map[String, RelationValue] = Map.empty,
     samplingParams: SamplingParams = SamplingParams.exact,
     hdrConfig: HDRConfig = HDRConfig.default,
-    modelAugmenter: ModelAugmenter[Any] = ModelAugmenter.identity
+    modelAugmenter: ModelAugmenter[RelationValue] = ModelAugmenter.identity
   ): Either[QueryError, VagueQueryResult] =
     try
       Right(toResolved(query, source, answerTuple, samplingParams, hdrConfig, modelAugmenter).evaluate())
@@ -107,7 +107,7 @@ object VagueSemantics:
     answerTuple: Map[String, RelationValue] = Map.empty,
     samplingParams: SamplingParams = SamplingParams.exact,
     hdrConfig: HDRConfig = HDRConfig.default,
-    modelAugmenter: ModelAugmenter[Any] = ModelAugmenter.identity
+    modelAugmenter: ModelAugmenter[RelationValue] = ModelAugmenter.identity
   ): Either[QueryError, EvaluationOutput] =
     try
       Right(toResolved(query, source, answerTuple, samplingParams, hdrConfig, modelAugmenter).evaluateWithOutput())

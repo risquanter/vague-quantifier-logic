@@ -38,14 +38,16 @@ class ModelAugmentationIntegrationSpec extends FunSuite:
         unary("A"), unary("B"), unary("C"), unary("D")
       ))
 
-  /** Custom augmenter that maps items to numeric scores. */
-  val scoreAugmenter: ModelAugmenter[Any] = ModelAugmenter.fromFunctions[Any](Map(
+  /** Custom augmenter that maps items to numeric scores.
+    * Returns Num(score) — the typed equivalent of the old Any-based Double values.
+    */
+  val scoreAugmenter: ModelAugmenter[RelationValue] = ModelAugmenter.fromFunctions[RelationValue](Map(
     "score" -> {
-      case List("A") => 80.0: Any
-      case List("B") => 60.0: Any
-      case List("C") => 40.0: Any
-      case List("D") => 20.0: Any
-      case List(x)   => 0.0: Any
+      case List(RelationValue.Const("A")) => RelationValue.Num(80)
+      case List(RelationValue.Const("B")) => RelationValue.Num(60)
+      case List(RelationValue.Const("C")) => RelationValue.Num(40)
+      case List(RelationValue.Const("D")) => RelationValue.Num(20)
+      case List(_)   => RelationValue.Num(0)
       case args       => throw new Exception(s"score expects 1 arg, got ${args.length}")
     }
   ))
@@ -133,10 +135,10 @@ class ModelAugmentationIntegrationSpec extends FunSuite:
 
   test("composed augmenter: numeric + custom domain functions") {
     val kb = createItemKB()
-    val bonusAugmenter = ModelAugmenter.fromFunctions[Any](Map(
+    val bonusAugmenter = ModelAugmenter.fromFunctions[RelationValue](Map(
       "bonus" -> {
-        case List("A") => 10.0: Any
-        case _         => 0.0: Any
+        case List(RelationValue.Const("A")) => RelationValue.Num(10)
+        case _                               => RelationValue.Num(0)
       }
     ))
     // Chain: numeric infra → scores → bonus

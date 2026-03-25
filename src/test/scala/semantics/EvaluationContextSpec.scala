@@ -3,14 +3,16 @@ package semantics
 import munit.FunSuite
 import logic.{FOL, Formula, Term}
 import semantics.{Domain, Interpretation, Model, Valuation, EvaluationContext, FOLSemantics}
+import semantics.holdsWithBinding
 import fol.datastore.RelationValue
+import fol.datastore.RelationValue.{Const, Num}
 
 /** Test suite for EvaluationContext
   * 
   * Tests the evaluation context wrapper that simplifies FOL formula evaluation.
   * EvaluationContext delegates to FOLSemantics, so we focus on:
   * - Context operations (withBinding, holds)
-  * - Extension methods (holdsWithRelationValue)
+  * - Extension method (holdsWithBinding)
   * - Factory methods
   * - Integration with FOLSemantics
   */
@@ -21,24 +23,24 @@ class EvaluationContextSpec extends FunSuite:
   /** Simple integer arithmetic model for testing */
   val intModel: Model[Int] = FOLSemantics.integerModel(-5 to 5)
   
-  /** Simple model with string domain */
-  def stringModel: Model[Any] =
-    val domain = Domain(Set[Any]("alice", "bob", "charlie"))
-    val functions = Map[String, List[Any] => Any](
-      "alice" -> ((args: List[Any]) => "alice"),
-      "bob" -> ((args: List[Any]) => "bob"),
-      "charlie" -> ((args: List[Any]) => "charlie")
+  /** Simple model with RelationValue domain for holdsWithBinding tests. */
+  def rvModel: Model[RelationValue] =
+    val domain = Domain(Set[RelationValue](Const("alice"), Const("bob"), Const("charlie")))
+    val functions = Map[String, List[RelationValue] => RelationValue](
+      "alice"   -> ((_: List[RelationValue]) => Const("alice")),
+      "bob"     -> ((_: List[RelationValue]) => Const("bob")),
+      "charlie" -> ((_: List[RelationValue]) => Const("charlie"))
     )
-    val predicates = Map[String, List[Any] => Boolean](
-      "person" -> ((args: List[Any]) => args match
-        case List(name: String) => Set("alice", "bob", "charlie").contains(name)
+    val predicates = Map[String, List[RelationValue] => Boolean](
+      "person" -> {
+        case List(Const(name)) => Set("alice", "bob", "charlie").contains(name)
         case _ => false
-      ),
-      "knows" -> ((args: List[Any]) => args match
-        case List("alice", "bob") => true
-        case List("bob", "charlie") => true
+      },
+      "knows" -> {
+        case List(Const("alice"), Const("bob")) => true
+        case List(Const("bob"), Const("charlie")) => true
         case _ => false
-      )
+      }
     )
     Model(Interpretation(domain, functions, predicates))
   
@@ -156,98 +158,58 @@ class EvaluationContextSpec extends FunSuite:
     assertEquals(result, 7)
   }
   
-  // ==================== holdsWithRelationValue Extension ====================
+  // ==================== holdsWithBinding Extension ====================
   
-  test("holdsWithRelationValue: Const value") {
-    val ctx = EvaluationContext.empty(stringModel)
+  test("holdsWithBinding: Const value") {
+    val ctx = EvaluationContext.empty(rvModel)
     val formula = Formula.Atom(FOL("person", List(Term.Var("x"))))
     
-    assert(ctx.holdsWithRelationValue(formula, "x", RelationValue.Const("alice")))
-    assert(ctx.holdsWithRelationValue(formula, "x", RelationValue.Const("bob")))
-    assert(!ctx.holdsWithRelationValue(formula, "x", RelationValue.Const("unknown")))
+    assert(ctx.holdsWithBinding(formula, "x", Const("alice")))
+    assert(ctx.holdsWithBinding(formula, "x", Const("bob")))
+    assert(!ctx.holdsWithBinding(formula, "x", Const("unknown")))
   }
   
-  test("holdsWithRelationValue: Num value") {
-    // Need Model[Any] for extension method to work
-    val anyModel = Model[Any](intModel.interpretation.asInstanceOf[Interpretation[Any]])
-    val ctx = EvaluationContext.empty(anyModel)
+  test("holdsWithBinding: Int domain") {
+    val ctx = EvaluationContext.empty(intModel)
     val formula = Formula.Atom(FOL("=", List(Term.Var("x"), Term.Const("5"))))
     
-    assert(ctx.holdsWithRelationValue(formula, "x", RelationValue.Num(5)))
-    assert(!ctx.holdsWithRelationValue(formula, "x", RelationValue.Num(3)))
+    assert(ctx.holdsWithBinding(formula, "x", 5))
+    assert(!ctx.holdsWithBinding(formula, "x", 3))
   }
   
-  test("holdsWithRelationValue: binary relation") {
-    val ctx = EvaluationContext(stringModel, Map("y" -> "bob"))
+  test("holdsWithBinding: binary relation") {
+    val ctx = EvaluationContext(rvModel, Map("y" -> Const("bob")))
     val formula = Formula.Atom(FOL("knows", List(Term.Var("x"), Term.Var("y"))))
     
     // alice knows bob
-    assert(ctx.holdsWithRelationValue(formula, "x", RelationValue.Const("alice")))
+    assert(ctx.holdsWithBinding(formula, "x", Const("alice")))
     // charlie doesn't know bob
-    assert(!ctx.holdsWithRelationValue(formula, "x", RelationValue.Const("charlie")))
+    assert(!ctx.holdsWithBinding(formula, "x", Const("charlie")))
   }
   
-  test("holdsWithRelationValue: preserves existing bindings") {
-    val ctx = EvaluationContext(stringModel, Map("y" -> "charlie"))
+  test("holdsWithBinding: preserves existing bindings") {
+    val ctx = EvaluationContext(rvModel, Map("y" -> Const("charlie")))
     val formula = Formula.Atom(FOL("knows", List(Term.Var("x"), Term.Var("y"))))
     
     // bob knows charlie (y already bound)
-    assert(ctx.holdsWithRelationValue(formula, "x", RelationValue.Const("bob")))
-  }
-  
-  // ==================== holdsWithRelationValues Extension ====================
-  
-  test("holdsWithRelationValues: multiple bindings") {
-    val ctx = EvaluationContext.empty(stringModel)
-    val formula = Formula.Atom(FOL("knows", List(Term.Var("x"), Term.Var("y"))))
-    
-    val bindings = Map(
-      "x" -> RelationValue.Const("alice"),
-      "y" -> RelationValue.Const("bob")
-    )
-    
-    assert(ctx.holdsWithRelationValues(formula, bindings))
-  }
-  
-  test("holdsWithRelationValues: empty bindings") {
-    val ctx = EvaluationContext.empty(stringModel)
-    val formula = Formula.Atom(FOL("person", List(Term.Const("alice"))))
-    
-    assert(ctx.holdsWithRelationValues(formula, Map.empty))
-  }
-  
-  test("holdsWithRelationValues: mixed Const and Num") {
-    // Need Model[Any] for extension method to work
-    val anyModel = Model[Any](intModel.interpretation.asInstanceOf[Interpretation[Any]])
-    val ctx = EvaluationContext.empty(anyModel)
-    val formula = Formula.And(
-      Formula.Atom(FOL("=", List(Term.Var("x"), Term.Const("3")))),
-      Formula.Atom(FOL("=", List(Term.Var("y"), Term.Const("5"))))
-    )
-    
-    val bindings = Map(
-      "x" -> RelationValue.Num(3),
-      "y" -> RelationValue.Num(5)
-    )
-    
-    assert(ctx.holdsWithRelationValues(formula, bindings))
+    assert(ctx.holdsWithBinding(formula, "x", Const("bob")))
   }
   
   // ==================== Integration Tests ====================
   
   test("integration: ScopeEvaluator pattern") {
-    // Simulate how ScopeEvaluator uses EvaluationContext
-    val ctx = EvaluationContext(stringModel, Map.empty)
+    // Simulate how ScopeEvaluator uses EvaluationContext with holdsWithBinding
+    val ctx = EvaluationContext(rvModel, Map.empty[String, RelationValue])
     val scopeFormula = Formula.Atom(FOL("person", List(Term.Var("x"))))
     
-    val rangeElements = Set(
-      RelationValue.Const("alice"),
-      RelationValue.Const("bob"),
-      RelationValue.Const("unknown")
+    val rangeElements = Set[RelationValue](
+      Const("alice"),
+      Const("bob"),
+      Const("unknown")
     )
     
     val satisfying = rangeElements.filter { elem =>
-      ctx.holdsWithRelationValue(scopeFormula, "x", elem)
+      ctx.holdsWithBinding(scopeFormula, "x", elem)
     }
     
     assertEquals(satisfying.size, 2)  // alice and bob are persons

@@ -2,10 +2,9 @@ package fol.bridge
 
 import logic.{FOL, Formula}
 import semantics.EvaluationContext
-import semantics.holdsWithRelationValue
-import fol.datastore.{KnowledgeSource, RelationValue, RelationValueUtil}
+import semantics.holdsWithBinding
+import fol.datastore.{KnowledgeSource, RelationValue}
 import semantics.ModelAugmenter
-import RelationValueUtil.*
 
 /** FOL → typed predicate bridge.
   * 
@@ -46,20 +45,15 @@ object FOLBridge:
     variable: String,
     source: KnowledgeSource[RelationValue],
     answerTuple: Map[String, RelationValue] = Map.empty,
-    modelAugmenter: ModelAugmenter[Any] = ModelAugmenter.identity
+    modelAugmenter: ModelAugmenter[RelationValue] = ModelAugmenter.identity
   ): RelationValue => Boolean =
     // Construct model once — this is the expensive part
     val model = modelAugmenter(KnowledgeSourceModel.toModel(source))
     
-    // Convert answer tuple to domain values for substitution
-    val substitution: Map[String, Any] = answerTuple.map { (k, v) =>
-      k -> toDomainValue(v)
-    }
-    
     // Return closure that evaluates formula for each element
     (element: RelationValue) =>
-      val ctx = EvaluationContext(model, substitution)
-      ctx.holdsWithRelationValue(formula, variable, element)
+      val ctx = EvaluationContext(model, answerTuple)
+      ctx.holdsWithBinding(formula, variable, element)
   
   /** Convert a FOL scope formula into a typed predicate over Strings.
     * 
@@ -77,7 +71,7 @@ object FOLBridge:
     variable: String,
     source: KnowledgeSource[RelationValue],
     answerTuple: Map[String, RelationValue] = Map.empty,
-    modelAugmenter: ModelAugmenter[Any] = ModelAugmenter.identity
+    modelAugmenter: ModelAugmenter[RelationValue] = ModelAugmenter.identity
   ): String => Boolean =
     val rvPredicate = scopeToPredicate(formula, variable, source, answerTuple, modelAugmenter)
     (s: String) => rvPredicate(RelationValue.Const(s))

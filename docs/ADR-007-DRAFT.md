@@ -1,0 +1,129 @@
+# ADR-007: Preserve OCaml-Ported Parser Combinator Core
+
+**Status:** Proposed  
+**Date:** 2026-03-25  
+**Tags:** parser, OCaml, Harrison, preservation, style
+
+---
+
+## Context
+
+- The foundation layer (`parser/`, `lexer/`, `logic/`, `util/StringUtil`, `printer/`, `semantics/FOLSemantics`) is a direct port of John Harrison's OCaml code from *Handbook of Practical Logic and Automated Reasoning* (2009)
+- The OCaml style differs intentionally from idiomatic Scala — it uses exception-based backtracking, tuple-threaded parsers, list-based sets, and character-level lexing
+- These stylistic choices preserve a **1:1 traceability link** to the textbook, which serves as the authoritative reference for correctness
+- Modernising this code into idiomatic Scala would **break traceability** without providing proportional benefit — the textbook can no longer be used as a direct cross-reference
+- Original OCaml source is embedded in scaladoc comments throughout; these comments are the primary documentation
+
+---
+
+## Decision
+
+The OCaml-ported core SHALL be preserved in its current style. Changes to these files must not break the characteristics listed below.
+
+---
+
+## Codified Characteristics
+
+### C1 — Parser signature: `List[String] => (A, List[String])`
+
+Every parser function consumes a token list and returns a **(result, remaining-tokens)** tuple. This is the `ParseResult[A]` alias in `parser/Combinators.scala`. It is the defining trait of the entire parsing approach — not monadic, not applicative, just bare tuples threaded through function composition.
+
+### C2 — Exception-based backtracking (not `Either`/`Option`)
+
+Parsers signal failure by **throwing exceptions**, and callers use `try/catch` to backtrack. This directly mirrors OCaml's `try … with Failure _` idiom. The exceptions are **internal control flow** — they never escape the parser's public API.
+
+### C3 — Higher-order combinator composition via function chaining
+
+Operator precedence is built by **nesting higher-order functions**: each precedence level wraps the next as its `subparser` argument. No intermediate data structures or precedence tables — the nesting *is* the precedence.
+
+### C4 — Accumulator-passing (`sof`) for associativity control
+
+`parseGinfix` uses a **continuation/accumulator function** (`sof: A => A`) to distinguish left-associative from right-associative parsing. The `opupdate` parameter controls associativity *without changing the algorithm*. The same `parseGinfix` drives `parseLeftInfix`, `parseRightInfix`, and `parseList`.
+
+### C5 — `papply` as functor-like map over parse results
+
+`papply` transforms the parsed value while leaving the remaining-tokens list untouched. It is the moral equivalent of `fmap` for the `(A, List[String])` representation — written as an explicit function, not a type class.
+
+### C6 — Mutually recursive functions (not objects/classes)
+
+Parsing is structured as **mutually recursive top-level functions** within singleton objects — `parseAtomicFormula` calls `parseFormula` and vice versa. No parser classes, no state, no mutable fields. This mirrors OCaml's `let rec … and …` for mutual recursion.
+
+### C7 — Variable scope threading via `vs: List[String]`
+
+Bound variables are tracked by passing a `vs: List[String]` parameter through the call chain. Each quantifier (`forall x`, `exists x`) prepends to this list. Pure functional scope tracking with no mutable state.
+
+### C8 — ADT data types map 1:1 to OCaml `type` definitions
+
+`Term`, `FOL`, `Formula[+A]` are direct Scala `enum`/`case class` equivalents of OCaml's algebraic types: `type term = Var of string | Fn of string * term list`, `type fol = R of string * term list`, `type 'a formula = False | True | Atom of 'a | …`. The structure is preserved verbatim.
+
+### C9 — List-based set operations (`union`, `subtract`, `insert`)
+
+`FOLUtil` re-implements OCaml's `lib.ml` set operations over **lists** (not `Set`). `union`, `subtract`, `insert` all work on `List[A]`. This preserves the OCaml idiom where lists serve as sets.
+
+### C10 — Character-level lexing via `explode`/`implode`
+
+The lexer works on `List[Char]` produced by `explode`, mirroring OCaml's character-list string processing. `lexwhile` accumulates via recursive prepend.
+
+### C11 — Original OCaml code preserved in scaladoc comments
+
+Nearly every function includes a **verbatim OCaml implementation** in its doc comment. These comments serve as the **traceability link** to Harrison's textbook.
+
+### C12 — `failwith` mapped to `throw new Exception(…)`
+
+OCaml's `failwith "message"` is consistently translated to `throw new Exception("message")`. Error messages are often preserved verbatim from the OCaml source.
+
+---
+
+## Scope — Files Covered
+
+### Tier 1 — Parser combinators & lexer (direct OCaml ports)
+
+| File | OCaml origin |
+|------|-------------|
+| `parser/Combinators.scala` | `formulas.ml` — `parse_ginfix`, `parse_left_infix`, `parse_right_infix`, `parse_list`, `papply`, `nextin`, `parse_bracketed` |
+| `parser/FormulaParser.scala` | `formulas.ml` — generic formula parser parametrized by atom parsers |
+| `parser/TermParser.scala` | `fol.ml` — 6-level precedence term parser |
+| `parser/FOLAtomParser.scala` | `fol.ml` — `parse_infix_atom`, `parse_atom` |
+| `parser/FOLParser.scala` | `fol.ml` — public API (`make_parser`) |
+| `parser/SimpleExpr.scala` | `intro.ml` — algebraic expression parser |
+| `lexer/Lexer.scala` | `intro.ml` — `lex`, `lexwhile` |
+| `util/StringUtil.scala` | `lib.ml` / `intro.ml` — `explode`, `implode`, `matches` |
+
+### Tier 2 — Data types & logic utilities (direct OCaml ports)
+
+| File | OCaml origin |
+|------|-------------|
+| `logic/Term.scala` | `type term = Var of string \| Fn of string * term list` |
+| `logic/FOL.scala` | `type fol = R of string * term list` |
+| `logic/Formula.scala` | `type ('a) formula = False \| True \| Atom of 'a \| …` |
+| `logic/FOLUtil.scala` | `fol.ml` / `lib.ml` — `fv`, `fvt`, `subst`, `tsubst`, `variant`, `generalize`, `union`, `subtract`, `insert` |
+
+### Tier 3 — Semantics & printing (direct OCaml ports)
+
+| File | OCaml origin |
+|------|-------------|
+| `printer/FOLPrinter.scala` | `fol.ml` — `print_term`, `print_fol_formula` |
+| `semantics/FOLSemantics.scala` | `fol.ml` (extended) — term evaluation, satisfaction |
+
+---
+
+## Consequences
+
+- **Positive:** Textbook remains a valid cross-reference; new contributors can read Harrison alongside the code
+- **Positive:** Correctness arguments transfer directly from the textbook's proofs
+- **Negative:** Code review must tolerate non-idiomatic Scala patterns in these files (exceptions for control flow, `List`-as-set, etc.)
+- **Negative:** Linters or style tools may flag these files; suppressions or exclusions may be needed
+
+---
+
+## Review Criterion
+
+Any change touching files in the scope table above must be benchmarked against characteristics C1–C12. A change that breaks a characteristic requires explicit justification and approval.
+
+---
+
+## References
+
+- Harrison, J. (2009). *Handbook of Practical Logic and Automated Reasoning*. Cambridge University Press.
+- ADR-002: Parser Combinators & Error Handling
+- ADR-004: Tagless Initial / ADT Separation

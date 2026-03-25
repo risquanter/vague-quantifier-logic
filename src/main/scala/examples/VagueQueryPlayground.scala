@@ -186,7 +186,7 @@ def folIntegrationDemo(): Unit =
   println()
   
   // Debug: check if auth_module is in the domain
-  val hasAuthModule = model.interpretation.domain.elements.contains("auth_module")
+  val hasAuthModule = model.interpretation.domain.elements.contains(RelationValue.Const("auth_module"))
   println(s"  'auth_module' in domain: $hasAuthModule")
   if !hasAuthModule then
     val sample = model.interpretation.domain.elements.take(10).mkString(", ")

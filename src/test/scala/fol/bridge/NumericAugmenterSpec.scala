@@ -1,131 +1,121 @@
 package fol.bridge
 
 import munit.FunSuite
+import fol.datastore.RelationValue
+import fol.datastore.RelationValue.{Const, Num}
 import semantics.{Domain, Interpretation, Model, ModelAugmenter}
 
-/** Tests for NumericAugmenter — built-in comparisons, arithmetic,
-  * and numeric literal resolution (ADR-005 §4).
+/** Tests for NumericAugmenter — backward-compatible composition of
+  * ComparisonAugmenter, ArithmeticAugmenter, and LiteralResolver.
+  *
+  * Also tests the generic augmenters directly with non-RelationValue domains.
   */
 class NumericAugmenterSpec extends FunSuite:
 
   // ==================== Test Fixtures ====================
 
-  /** Minimal KB-like model with string domain and one relation. */
-  def kbModel: Model[Any] =
-    val domain = Domain(Set[Any]("alice", "bob"))
-    val fns = Map[String, List[Any] => Any](
-      "alice" -> ((_: List[Any]) => "alice"),
-      "bob"   -> ((_: List[Any]) => "bob")
+  /** Minimal KB-like model with RelationValue domain. */
+  def kbModel: Model[RelationValue] =
+    val domain = Domain(Set[RelationValue](Const("alice"), Const("bob")))
+    val fns = Map[String, List[RelationValue] => RelationValue](
+      "alice" -> ((_: List[RelationValue]) => Const("alice")),
+      "bob"   -> ((_: List[RelationValue]) => Const("bob"))
     )
-    val preds = Map[String, List[Any] => Boolean](
-      "person" -> { case List(s: String) => Set("alice", "bob").contains(s)
+    val preds = Map[String, List[RelationValue] => Boolean](
+      "person" -> { case List(Const(s)) => Set("alice", "bob").contains(s)
                     case _ => false }
     )
     Model(Interpretation(domain, fns, preds))
 
   /** Apply the numeric augmenter to the KB model. */
-  def augmented: Model[Any] = NumericAugmenter.augmenter(kbModel)
+  def augmented: Model[RelationValue] = NumericAugmenter.augmenter(kbModel)
 
-  // ==================== Comparison Predicates ====================
+  // ==================== Comparison Predicates (RelationValue) ====================
 
-  test("> true") {
-    assert(augmented.interpretation.getPredicate(">")(List(5.0, 3.0)))
+  test("> true (Num)") {
+    assert(augmented.interpretation.getPredicate(">")(List(Num(5), Num(3))))
   }
 
-  test("> false") {
-    assert(!augmented.interpretation.getPredicate(">")(List(2.0, 7.0)))
+  test("> false (Num)") {
+    assert(!augmented.interpretation.getPredicate(">")(List(Num(2), Num(7))))
   }
 
-  test("< true") {
-    assert(augmented.interpretation.getPredicate("<")(List(1.0, 9.0)))
+  test("< true (Num)") {
+    assert(augmented.interpretation.getPredicate("<")(List(Num(1), Num(9))))
   }
 
-  test("< false") {
-    assert(!augmented.interpretation.getPredicate("<")(List(9.0, 1.0)))
+  test("< false (Num)") {
+    assert(!augmented.interpretation.getPredicate("<")(List(Num(9), Num(1))))
   }
 
-  test(">= boundary") {
-    assert(augmented.interpretation.getPredicate(">=")(List(5.0, 5.0)))
-    assert(augmented.interpretation.getPredicate(">=")(List(5.1, 5.0)))
-    assert(!augmented.interpretation.getPredicate(">=")(List(4.9, 5.0)))
+  test(">= boundary (Num)") {
+    assert(augmented.interpretation.getPredicate(">=")(List(Num(5), Num(5))))
+    assert(augmented.interpretation.getPredicate(">=")(List(Num(6), Num(5))))
+    assert(!augmented.interpretation.getPredicate(">=")(List(Num(4), Num(5))))
   }
 
-  test("<= boundary") {
-    assert(augmented.interpretation.getPredicate("<=")(List(5.0, 5.0)))
-    assert(augmented.interpretation.getPredicate("<=")(List(4.9, 5.0)))
-    assert(!augmented.interpretation.getPredicate("<=")(List(5.1, 5.0)))
+  test("<= boundary (Num)") {
+    assert(augmented.interpretation.getPredicate("<=")(List(Num(5), Num(5))))
+    assert(augmented.interpretation.getPredicate("<=")(List(Num(4), Num(5))))
+    assert(!augmented.interpretation.getPredicate("<=")(List(Num(6), Num(5))))
   }
 
-  test("= numeric equality") {
-    assert(augmented.interpretation.getPredicate("=")(List(3.0, 3.0)))
-    assert(!augmented.interpretation.getPredicate("=")(List(3.0, 4.0)))
+  test("= numeric equality (Num)") {
+    assert(augmented.interpretation.getPredicate("=")(List(Num(3), Num(3))))
+    assert(!augmented.interpretation.getPredicate("=")(List(Num(3), Num(4))))
   }
 
-  // ==================== Mixed Types ====================
-
-  test("Int > Long") {
-    assert(augmented.interpretation.getPredicate(">")(List(100, 50L)))
+  test("Const comparison: lexicographic") {
+    assert(augmented.interpretation.getPredicate("<")(List(Const("alice"), Const("bob"))))
+    assert(!augmented.interpretation.getPredicate("<")(List(Const("bob"), Const("alice"))))
   }
 
-  test("Double >= BigDecimal") {
-    assert(augmented.interpretation.getPredicate(">=")(List(3.14, BigDecimal("3.14"))))
+  // ==================== Arithmetic Functions (RelationValue) ====================
+
+  test("+ adds two Num values") {
+    val result = augmented.interpretation.getFunction("+")(List(Num(3), Num(4)))
+    assertEquals(result, Num(7))
   }
 
-  test("String '42' < Int 100") {
-    assert(augmented.interpretation.getPredicate("<")(List("42", 100)))
+  test("- binary subtraction (Num)") {
+    val result = augmented.interpretation.getFunction("-")(List(Num(10), Num(3)))
+    assertEquals(result, Num(7))
   }
 
-  // ==================== Arithmetic Functions ====================
-
-  test("+ adds two values") {
-    val result = augmented.interpretation.getFunction("+")(List(3.0, 4.0))
-    assertEquals(result.asInstanceOf[Double], 7.0)
+  test("- unary negation (Num)") {
+    val result = augmented.interpretation.getFunction("-")(List(Num(5)))
+    assertEquals(result, Num(-5))
   }
 
-  test("- binary subtraction") {
-    val result = augmented.interpretation.getFunction("-")(List(10.0, 3.0))
-    assertEquals(result.asInstanceOf[Double], 7.0)
+  test("* multiplies (Num)") {
+    val result = augmented.interpretation.getFunction("*")(List(Num(3), Num(4)))
+    assertEquals(result, Num(12))
   }
 
-  test("- unary negation") {
-    val result = augmented.interpretation.getFunction("-")(List(5.0))
-    assertEquals(result.asInstanceOf[Double], -5.0)
-  }
-
-  test("* multiplies") {
-    val result = augmented.interpretation.getFunction("*")(List(3.0, 4.0))
-    assertEquals(result.asInstanceOf[Double], 12.0)
-  }
-
-  test("/ divides") {
-    val result = augmented.interpretation.getFunction("/")(List(10.0, 4.0))
-    assertEquals(result.asInstanceOf[Double], 2.5)
+  test("/ divides (integer truncation)") {
+    val result = augmented.interpretation.getFunction("/")(List(Num(10), Num(4)))
+    assertEquals(result, Num(2))  // integer division: 10/4 = 2
   }
 
   test("/ division by zero throws") {
     intercept[Exception] {
-      augmented.interpretation.getFunction("/")(List(1.0, 0.0))
+      augmented.interpretation.getFunction("/")(List(Num(1), Num(0)))
     }
   }
 
-  // ==================== Numeric Literal Resolution ====================
+  // ==================== Numeric Literal Resolution (RelationValue) ====================
 
-  test("numeric literal: integer resolves to Double") {
+  test("numeric literal: integer resolves to Num") {
     val result = augmented.interpretation.getFunction("5000000")(Nil)
-    assertEquals(result.asInstanceOf[Double], 5000000.0)
+    assertEquals(result, Num(5000000))
   }
 
   test("numeric literal: negative") {
     val result = augmented.interpretation.getFunction("-100")(Nil)
-    assertEquals(result.asInstanceOf[Double], -100.0)
+    assertEquals(result, Num(-100))
   }
 
-  test("numeric literal: decimal") {
-    val result = augmented.interpretation.getFunction("3.14")(Nil)
-    assertEquals(result.asInstanceOf[Double], 3.14)
-  }
-
-  test("non-numeric string: throws") {
+  test("non-numeric string: throws (no fallback)") {
     intercept[Exception] {
       augmented.interpretation.getFunction("xyz")(Nil)
     }
@@ -134,55 +124,71 @@ class NumericAugmenterSpec extends FunSuite:
   // ==================== Preservation ====================
 
   test("augmenter does not clobber existing KB predicates") {
-    // The KB had "person" predicate — it should still work
-    assert(augmented.interpretation.getPredicate("person")(List("alice")))
-    assert(!augmented.interpretation.getPredicate("person")(List("unknown")))
+    assert(augmented.interpretation.getPredicate("person")(List(Const("alice"))))
+    assert(!augmented.interpretation.getPredicate("person")(List(Const("unknown"))))
   }
 
   test("augmenter does not clobber existing KB functions (fallback only)") {
-    // KB constants "alice" and "bob" should still resolve
-    assertEquals(augmented.interpretation.getFunction("alice")(Nil), "alice")
-    assertEquals(augmented.interpretation.getFunction("bob")(Nil), "bob")
+    assertEquals(augmented.interpretation.getFunction("alice")(Nil), Const("alice"))
+    assertEquals(augmented.interpretation.getFunction("bob")(Nil), Const("bob"))
   }
 
-  // ==================== toDouble edge cases ====================
+  // ==================== Generic ComparisonAugmenter[Double] ====================
 
-  test("toDouble: Int") {
-    assertEquals(NumericAugmenter.toDouble(42), 42.0)
+  test("ComparisonAugmenter[Double]: >, <, >=, <=, =") {
+    val domain = Domain(Set(1.0, 2.0, 3.0))
+    val model = Model[Double](Interpretation(domain, Map.empty, Map.empty))
+    val aug = ComparisonAugmenter.augmenter[Double](model)
+
+    assert(aug.interpretation.getPredicate(">")(List(3.0, 1.0)))
+    assert(!aug.interpretation.getPredicate(">")(List(1.0, 3.0)))
+    assert(aug.interpretation.getPredicate("=")(List(2.0, 2.0)))
   }
 
-  test("toDouble: Long") {
-    assertEquals(NumericAugmenter.toDouble(5000000L), 5000000.0)
+  // ==================== Generic ArithmeticAugmenter[Double] ====================
+
+  test("ArithmeticAugmenter[Double]: +, -, *, /") {
+    val domain = Domain(Set(1.0, 2.0, 3.0))
+    val model = Model[Double](Interpretation(domain, Map.empty, Map.empty))
+    val aug = ArithmeticAugmenter.augmenter[Double](model)
+
+    assertEquals(aug.interpretation.getFunction("+")(List(3.0, 4.0)), 7.0)
+    assertEquals(aug.interpretation.getFunction("-")(List(10.0, 3.0)), 7.0)
+    assertEquals(aug.interpretation.getFunction("-")(List(5.0)), -5.0)
+    assertEquals(aug.interpretation.getFunction("*")(List(3.0, 4.0)), 12.0)
+    assertEquals(aug.interpretation.getFunction("/")(List(10.0, 4.0)), 2.5)
   }
 
-  test("toDouble: BigDecimal") {
-    assertEquals(NumericAugmenter.toDouble(BigDecimal("1.5")), 1.5)
-  }
-
-  test("toDouble: numeric String") {
-    assertEquals(NumericAugmenter.toDouble("99.9"), 99.9)
-  }
-
-  test("toDouble: non-numeric String throws") {
+  test("ArithmeticAugmenter[Double]: division by zero throws") {
+    val domain = Domain(Set(1.0))
+    val model = Model[Double](Interpretation(domain, Map.empty, Map.empty))
+    val aug = ArithmeticAugmenter.augmenter[Double](model)
     intercept[Exception] {
-      NumericAugmenter.toDouble("alice")
+      aug.interpretation.getFunction("/")(List(1.0, 0.0))
     }
   }
 
-  test("toDouble: unsupported type throws") {
+  // ==================== Generic LiteralResolver[RelationValue] ====================
+
+  test("LiteralResolver[RelationValue]: integer literal resolves") {
+    val domain = Domain(Set[RelationValue](Const("a")))
+    val model = Model[RelationValue](Interpretation(domain,
+      Map("a" -> ((_: List[RelationValue]) => Const("a"))), Map.empty))
+    val aug = LiteralResolver.augmenter[RelationValue](model)
+
+    assertEquals(aug.interpretation.getFunction("42")(Nil), Num(42))
+  }
+
+  test("LiteralResolver[RelationValue]: non-numeric falls through") {
+    val domain = Domain(Set[RelationValue](Const("a")))
+    val model = Model[RelationValue](Interpretation(domain,
+      Map("a" -> ((_: List[RelationValue]) => Const("a"))), Map.empty))
+    val aug = LiteralResolver.augmenter[RelationValue](model)
+
+    // "a" is already a constant in the model, should resolve to Const("a")
+    assertEquals(aug.interpretation.getFunction("a")(Nil), Const("a"))
+    // "xyz" is neither a constant nor numeric — throws
     intercept[Exception] {
-      NumericAugmenter.toDouble(List(1, 2))
+      aug.interpretation.getFunction("xyz")(Nil)
     }
-  }
-
-  // ==================== numericLiteral ====================
-
-  test("numericLiteral: parseable returns Some") {
-    assert(NumericAugmenter.numericLiteral("42").isDefined)
-    assert(NumericAugmenter.numericLiteral("-3.14").isDefined)
-  }
-
-  test("numericLiteral: non-parseable returns None") {
-    assert(NumericAugmenter.numericLiteral("hello").isEmpty)
-    assert(NumericAugmenter.numericLiteral("").isEmpty)
   }

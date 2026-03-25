@@ -365,7 +365,7 @@ class FOLSemanticsSpec extends FunSuite:
     val singleInterp = Interpretation(
       singleDomain,
       Map("c" -> (_ => 42)),
-      Map("P" -> { case List(x) => x == 42 })
+      Map("P" -> ((args: List[Int]) => args match { case List(x) => x == 42; case _ => false }))
     )
     val singleModel = Model(singleInterp)
     

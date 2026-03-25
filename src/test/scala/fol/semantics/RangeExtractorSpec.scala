@@ -1,6 +1,7 @@
 package fol.semantics
 
 import munit.FunSuite
+import scala.language.implicitConversions
 import fol.error.{QueryError, QueryException}
 import logic.{FOL, Formula, Term}
 import fol.logic.{ParsedQuery, Quantifier}

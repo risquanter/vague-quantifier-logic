@@ -2,8 +2,7 @@ package fol.bridge
 
 import logic.{Term, Formula, FOL}
 import semantics.{Domain, Interpretation, Model, Valuation}
-import fol.datastore.{KnowledgeSource, RelationValue, RelationTuple, RelationValueUtil}
-import RelationValueUtil.*
+import fol.datastore.{DomainElement, KnowledgeSource, RelationValue, RelationTuple}
 
 /** Bridge between KnowledgeSource and FOL Model Theory.
   * 
@@ -56,29 +55,21 @@ object KnowledgeSourceModel:
     * - Constants (e.g., "alice", "C1") as 0-ary functions returning themselves
     * - Predicates (e.g., "person", "knows") as lookups in source relations
     * 
+    * @tparam D Domain element type (must have a `DomainElement` instance)
     * @param source Knowledge source to translate
     * @return FOL model with source semantics
     */
-  def toModel(source: KnowledgeSource[RelationValue]): Model[Any] =
+  def toModel[D: DomainElement](source: KnowledgeSource[D]): Model[D] =
     // 1. Domain: all values used in the source
-    val activeDomain = source.activeDomain
-    
-    // Convert RelationValues to their underlying values (String or Int)
-    val domainElements: Set[Any] = toDomainSet(activeDomain)
-    
+    val domainElements: Set[D] = source.activeDomain
     val domain = Domain(domainElements)
     
     // 2. Functions: Constants as 0-ary functions
-    // Each constant c is interpreted as a 0-ary function: () => c
-    val functions = domainElements.map { value =>
-      val name = value.toString
-      name -> ((_: List[Any]) => value)
+    val functions: Map[String, List[D] => D] = domainElements.map { d =>
+      d.show -> ((_: List[D]) => d)
     }.toMap
     
     // 3. Predicates: Wrap source relation lookups
-    // Note: We need to get schema from source to know arities
-    // For now, we create predicates lazily based on actual queries
-    // A better approach would be to have source.getAllRelations()
     val predicates = createPredicatesFromSource(source)
     
     val interpretation = Interpretation(domain, functions, predicates)
@@ -92,7 +83,7 @@ object KnowledgeSourceModel:
     * @param source Knowledge source to extract predicates from
     * @return Map of predicate names to predicate functions
     */
-  private def createPredicatesFromSource(source: KnowledgeSource[RelationValue]): Map[String, List[Any] => Boolean] =
+  private def createPredicatesFromSource[D](source: KnowledgeSource[D]): Map[String, List[D] => Boolean] =
     source.relationNames.flatMap { relationName =>
       source.getRelation(relationName).map { relation =>
         relationName -> createPredicateFunction(source, relationName, relation.arity)
@@ -106,22 +97,17 @@ object KnowledgeSourceModel:
     * @param arity Number of arguments
     * @return Predicate function for FOL interpretation
     */
-  private def createPredicateFunction(
-    source: KnowledgeSource[RelationValue],
+  private def createPredicateFunction[D](
+    source: KnowledgeSource[D],
     relationName: String,
     arity: Int
-  ): List[Any] => Boolean =
-    (args: List[Any]) =>
-      // Check arity
+  ): List[D] => Boolean =
+    (args: List[D]) =>
       if args.length != arity then
         false
       else
         try
-          // Convert FOL values back to RelationValues
-          val relationValues = args.map(fromDomainValue)
-          val tuple = RelationTuple(relationValues)
-          
-          // Check if tuple exists in source
+          val tuple = RelationTuple(args)
           source.contains(relationName, tuple)
         catch
           case _: Exception => false
@@ -136,17 +122,15 @@ object KnowledgeSourceModel:
     * @param predicateNames Map of predicate names to their arities
     * @return FOL model with source semantics
     */
-  def toModelWithPredicates(
-    source: KnowledgeSource[RelationValue],
+  def toModelWithPredicates[D: DomainElement](
+    source: KnowledgeSource[D],
     predicateNames: Map[String, Int]
-  ): Model[Any] =
-    val activeDomain = source.activeDomain
-    val domainElements: Set[Any] = toDomainSet(activeDomain)
+  ): Model[D] =
+    val domainElements: Set[D] = source.activeDomain
     val domain = Domain(domainElements)
     
-    val functions = domainElements.map { value =>
-      val name = value.toString
-      name -> ((_: List[Any]) => value)
+    val functions: Map[String, List[D] => D] = domainElements.map { d =>
+      d.show -> ((_: List[D]) => d)
     }.toMap
     
     val predicates = predicateNames.map { case (name, arity) =>
@@ -164,22 +148,15 @@ object KnowledgeSourceModel:
     * @param source Knowledge source to translate
     * @return FOL model with discovered predicates
     */
-  def toModelWithDiscovery(source: KnowledgeSource[RelationValue]): Model[Any] =
-    // Try to discover predicates from source
-    // This is a best-effort approach for sources that don't expose schema
-    val activeDomain = source.activeDomain
-    val domainElements: Set[Any] = toDomainSet(activeDomain)
+  def toModelWithDiscovery[D: DomainElement](source: KnowledgeSource[D]): Model[D] =
+    val domainElements: Set[D] = source.activeDomain
     val domain = Domain(domainElements)
     
-    val functions = domainElements.map { value =>
-      val name = value.toString
-      name -> ((_: List[Any]) => value)
+    val functions: Map[String, List[D] => D] = domainElements.map { d =>
+      d.show -> ((_: List[D]) => d)
     }.toMap
     
-    // For now, return empty predicates
-    // In practice, users should use toModelWithPredicates or ensure
-    // their source provides schema information
-    val predicates = Map.empty[String, List[Any] => Boolean]
+    val predicates = Map.empty[String, List[D] => Boolean]
     
     val interpretation = Interpretation(domain, functions, predicates)
     Model(interpretation)
