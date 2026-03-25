@@ -115,16 +115,6 @@ object QueryError:
       s"Evaluation error in $phase: $message$causeMsg" +
         (if context.isEmpty then "" else "\n" + context.map { case (k, v) => s"  $k: $v" }.mkString("\n"))
   
-  /** Empty range extracted (D_R = ∅) */
-  case class EmptyRangeError(
-    relationName: RelationName,
-    pattern: String,
-    suggestion: Option[String] = None
-  ) extends QueryError:
-    def message = s"Empty range: no tuples match pattern '$pattern' in relation '${relationName.value}'"
-    override val context = Map("relation" -> relationName.value, "pattern" -> pattern) ++
-      suggestion.map("suggestion" -> _)
-  
   /** Scope evaluation failed */
   case class ScopeEvaluationError(
     message: String,

@@ -54,17 +54,21 @@ object RangeExtractor:
     query: ParsedQuery,
     substitution: Map[String, D] = Map.empty[String, D]
   ): Either[QueryError, Set[D]] =
-    try
-      Right(extractRangeUnsafe(source, query, substitution))
-    catch
-      case e: QueryException => Left(e.error)
-      case e: Exception =>
-        Left(QueryError.EvaluationError(
-          s"Error during range extraction: ${e.getMessage}",
-          "range_extraction",
-          Some(e),
-          Map("predicate" -> query.range.predicate)
-        ))
+    val relName = RelationName(query.range.predicate)
+    if !source.hasRelation(relName) then
+      Left(QueryError.RelationNotFoundError(relName, source.relationNames))
+    else
+      try
+        Right(extractRangeUnsafe(source, query, substitution))
+      catch
+        case e: QueryException => Left(e.error)
+        case e: Exception =>
+          Left(QueryError.EvaluationError(
+            s"Error during range extraction: ${e.getMessage}",
+            "range_extraction",
+            Some(e),
+            Map("predicate" -> query.range.predicate)
+          ))
 
   /** Extract range for Boolean queries (no free variables).
     *
@@ -116,24 +120,28 @@ object RangeExtractor:
     source: KnowledgeSource[D],
     query: ParsedQuery
   ): Either[QueryError, Map[Map[String, D], Set[D]]] =
-    try
-      val result = if query.isBoolean then
-        Map(Map.empty[String, D] -> extractRangeUnsafe(source, query, Map.empty))
-      else
-        val substitutions = generateSubstitutions(source, query)
-        substitutions.map { subst =>
-          subst -> extractRangeUnsafe(source, query, subst)
-        }.toMap
-      Right(result)
-    catch
-      case e: QueryException => Left(e.error)
-      case e: Exception =>
-        Left(QueryError.EvaluationError(
-          s"Error extracting all ranges: ${e.getMessage}",
-          "range_extraction",
-          Some(e),
-          Map("predicate" -> query.range.predicate)
-        ))
+    val relName = RelationName(query.range.predicate)
+    if !source.hasRelation(relName) then
+      Left(QueryError.RelationNotFoundError(relName, source.relationNames))
+    else
+      try
+        val result = if query.isBoolean then
+          Map(Map.empty[String, D] -> extractRangeUnsafe(source, query, Map.empty))
+        else
+          val substitutions = generateSubstitutions(source, query)
+          substitutions.map { subst =>
+            subst -> extractRangeUnsafe(source, query, subst)
+          }.toMap
+        Right(result)
+      catch
+        case e: QueryException => Left(e.error)
+        case e: Exception =>
+          Left(QueryError.EvaluationError(
+            s"Error extracting all ranges: ${e.getMessage}",
+            "range_extraction",
+            Some(e),
+            Map("predicate" -> query.range.predicate)
+          ))
 
   // ── Internal (throwing — OCaml style) ───────────────────────────────
 

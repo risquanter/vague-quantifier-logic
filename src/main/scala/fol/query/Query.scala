@@ -63,23 +63,16 @@ case class UnresolvedQuery[D: ClassTag](
     */
   def resolve(source: KnowledgeSource[D]): Either[QueryError, ResolvedQuery[D]] =
     try
-      val elements: Set[D] = domain match
-        case DomainSpec.Relation(relationName, position) =>
-          source.getDomain(relationName, position)
-        case DomainSpec.ActiveDomain =>
-          source.activeDomain
-
-      if elements.isEmpty then
-        val relName = domain match
-          case DomainSpec.Relation(name, _) => name
-          case DomainSpec.ActiveDomain => RelationName("active_domain")
-        Left(QueryError.EmptyRangeError(
-          relName,
-          domain.toString,
-          Some("Check that the relation exists and has data")
-        ))
-      else
-        Right(ResolvedQuery(quantifier, elements, predicate, params, hdrConfig))
+      domain match
+        case DomainSpec.Relation(relationName, _) if !source.hasRelation(relationName) =>
+          Left(QueryError.RelationNotFoundError(relationName, source.relationNames))
+        case _ =>
+          val elements: Set[D] = domain match
+            case DomainSpec.Relation(relationName, position) =>
+              source.getDomain(relationName, position)
+            case DomainSpec.ActiveDomain =>
+              source.activeDomain
+          Right(ResolvedQuery(quantifier, elements, predicate, params, hdrConfig))
     catch
       case e: QueryException => Left(e.error)
       case NonFatal(e) =>

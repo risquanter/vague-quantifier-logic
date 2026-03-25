@@ -42,7 +42,7 @@ class UnresolvedQuerySpec extends FunSuite, RelationValueFixtures:
       .over("country")
       .whereConst(largeCountries.contains)
 
-  /** Query over a non-existent relation — yields empty range */
+  /** Query over a non-existent relation — yields RelationNotFoundError */
   def queryOverNonexistent: UnresolvedQuery[RelationValue] =
     Query
       .quantifier(VagueQuantifier.most)
@@ -69,15 +69,15 @@ class UnresolvedQuerySpec extends FunSuite, RelationValueFixtures:
     assertEquals(resolved.quantifier, VagueQuantifier.aboutHalf)
     assertEquals(resolved.params, SamplingParams.exact)
 
-  test("resolve returns Left(EvaluationError) for unknown relation"):
+  test("resolve returns Left(RelationNotFoundError) for unknown relation"):
     val result = queryOverNonexistent.resolve(source)
 
     result match
-      case Left(err: QueryError.EvaluationError) =>
-        assert(err.message.contains("nonexistent"))
-        assertEquals(err.phase, "domain_resolution")
+      case Left(err: QueryError.RelationNotFoundError) =>
+        assertEquals(err.relationName, RelationName("nonexistent"))
+        assert(err.availableRelations.contains(RelationName("country")))
       case Left(other) =>
-        fail(s"Expected EvaluationError, got $other")
+        fail(s"Expected RelationNotFoundError, got $other")
       case Right(_) =>
         fail("Expected Left for nonexistent relation")
 
@@ -99,11 +99,10 @@ class UnresolvedQuerySpec extends FunSuite, RelationValueFixtures:
     val result = queryOverNonexistent.evaluate(source)
 
     result match
-      case Left(err: QueryError.EvaluationError) =>
-        assert(err.message.contains("nonexistent"))
-        assertEquals(err.phase, "domain_resolution")
+      case Left(err: QueryError.RelationNotFoundError) =>
+        assertEquals(err.relationName, RelationName("nonexistent"))
       case Left(other) =>
-        fail(s"Expected EvaluationError, got $other")
+        fail(s"Expected RelationNotFoundError, got $other")
       case Right(_) =>
         fail("Expected Left for nonexistent relation")
 
@@ -129,8 +128,8 @@ class UnresolvedQuerySpec extends FunSuite, RelationValueFixtures:
     val result = queryOverNonexistent.evaluateWithOutput(source)
 
     result match
-      case Left(_: QueryError.EvaluationError) => () // pass
-      case Left(other)  => fail(s"Expected EvaluationError, got $other")
+      case Left(_: QueryError.RelationNotFoundError) => () // pass
+      case Left(other)  => fail(s"Expected RelationNotFoundError, got $other")
       case Right(_)     => fail("Expected Left for nonexistent relation")
 
   // ---------- KnowledgeSource extension methods ----------
@@ -144,7 +143,7 @@ class UnresolvedQuerySpec extends FunSuite, RelationValueFixtures:
     assertEquals(ext.toOption.get.proportion, direct.toOption.get.proportion)
     assertEquals(ext.toOption.get.satisfied, direct.toOption.get.satisfied)
 
-  test("source.execute returns Left for empty range"):
+  test("source.execute returns Left for unknown relation"):
     val query = queryOverNonexistent
     val result = source.execute(query)
     assert(result.isLeft)
@@ -164,7 +163,7 @@ class UnresolvedQuerySpec extends FunSuite, RelationValueFixtures:
       direct.toOption.get.satisfyingElements
     )
 
-  test("source.executeWithOutput returns Left for empty range"):
+  test("source.executeWithOutput returns Left for unknown relation"):
     val query = queryOverNonexistent
     val result = source.executeWithOutput(query)
     assert(result.isLeft)
@@ -187,7 +186,7 @@ class UnresolvedQuerySpec extends FunSuite, RelationValueFixtures:
     assertEquals(output.result.proportion, eval.proportion)
     assertEquals(output.result.satisfied, eval.satisfied)
 
-  test("all API variants produce consistent failures on empty domain"):
+  test("all API variants produce consistent failures on unknown relation"):
     val query = queryOverNonexistent
 
     val resolveResult = query.resolve(source)

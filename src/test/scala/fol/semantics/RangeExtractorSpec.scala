@@ -361,9 +361,14 @@ class RangeExtractorSpec extends FunSuite:
       Formula.True
     )
     
-    // Should return empty set (KB.query returns empty for unknown relations)
-    val range = ok(extractRangeBoolean(kb, query))
-    assertEquals(range, Set.empty[RelationValue])
+    // Should return Left(RelationNotFoundError) — relation not in schema
+    val result = extractRangeBoolean(kb, query)
+    result match
+      case Left(err: QueryError.RelationNotFoundError) =>
+        assertEquals(err.relationName, RelationName("nonexistent"))
+        assert(err.availableRelations.contains(RelationName("country")))
+      case Left(other) => fail(s"Expected RelationNotFoundError, got $other")
+      case Right(_)    => fail("Expected Left for nonexistent relation")
   }
   
   // ==================== Paper Examples ====================

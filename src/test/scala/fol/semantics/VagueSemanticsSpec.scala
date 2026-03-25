@@ -167,7 +167,7 @@ class VagueSemanticsSpec extends munit.FunSuite:
     assertEquals(result.satisfyingCount, 0)
     assertEquals(result.satisfied, true) // 0.0 is within [-0.01, 0.01]
 
-  test("empty range returns unsatisfied with zero proportion"):
+  test("unknown relation returns Left(RelationNotFoundError)"):
     val kb = createCountryKB()
     
     // Q[~#]^{1/2} x (nonexistent(x), large(x))
@@ -175,6 +175,26 @@ class VagueSemanticsSpec extends munit.FunSuite:
       quantifier = Quantifier.About(1, 2, 0.1),
       variable = "x",
       range = FOL("nonexistent", List(Term.Var("x"))),
+      scope = Formula.Atom(FOL("large", List(Term.Var("x"))))
+    )
+    
+    val result = VagueSemantics.holds(query, kb.asSource)
+    result match
+      case Left(err: QueryError.RelationNotFoundError) =>
+        assertEquals(err.relationName, RelationName("nonexistent"))
+      case Left(other) => fail(s"Expected RelationNotFoundError, got $other")
+      case Right(_)    => fail("Expected Left for nonexistent relation")
+
+  test("empty range returns unsatisfied with zero proportion"):
+    val kb = createCountryKB()
+      .addRelation(Relation(RelationName("empty_rel"), 1))
+    
+    // Q[~#]^{1/2} x (empty_rel(x), large(x))
+    // Relation exists in schema but has zero facts
+    val query = ParsedQuery(
+      quantifier = Quantifier.About(1, 2, 0.1),
+      variable = "x",
+      range = FOL("empty_rel", List(Term.Var("x"))),
       scope = Formula.Atom(FOL("large", List(Term.Var("x"))))
     )
     
@@ -368,13 +388,32 @@ class VagueSemanticsSpec extends munit.FunSuite:
     // Satisfying is a subset of range
     assert(output.satisfyingElements.subsetOf(output.rangeElements))
 
-  test("evaluate returns empty element sets for empty range"):
+  test("evaluate returns Left(RelationNotFoundError) for unknown relation"):
     val kb = createCountryKB()
 
     val query = ParsedQuery(
       quantifier = Quantifier.About(1, 2, 0.1),
       variable = "x",
       range = FOL("nonexistent", List(Term.Var("x"))),
+      scope = Formula.Atom(FOL("large", List(Term.Var("x"))))
+    )
+
+    val result = VagueSemantics.evaluate(query, kb.asSource)
+    result match
+      case Left(err: QueryError.RelationNotFoundError) =>
+        assertEquals(err.relationName, RelationName("nonexistent"))
+      case Left(other) => fail(s"Expected RelationNotFoundError, got $other")
+      case Right(_)    => fail("Expected Left for nonexistent relation")
+
+  test("evaluate returns empty element sets for empty range"):
+    val kb = createCountryKB()
+      .addRelation(Relation(RelationName("empty_rel"), 1))
+
+    // Relation exists in schema but has zero facts
+    val query = ParsedQuery(
+      quantifier = Quantifier.About(1, 2, 0.1),
+      variable = "x",
+      range = FOL("empty_rel", List(Term.Var("x"))),
       scope = Formula.Atom(FOL("large", List(Term.Var("x"))))
     )
 
