@@ -1,7 +1,7 @@
 package fol.semantics
 
 import logic.{FOL, Term}
-import fol.datastore.{KnowledgeBase, KnowledgeSource, RelationValue, RelationTuple}
+import fol.datastore.{KnowledgeSource, DomainCodec}
 import fol.logic.ParsedQuery
 import fol.error.{QueryError, QueryException}
 import logic.Formula
@@ -49,11 +49,11 @@ object RangeExtractor:
     * @param substitution Values for free variables (answer variables from query)
     * @return Either[QueryError, Set[RelationValue]]
     */
-  def extractRange(
-    source: KnowledgeSource[RelationValue],
+  def extractRange[D: DomainCodec](
+    source: KnowledgeSource[D],
     query: ParsedQuery,
-    substitution: Map[String, RelationValue] = Map.empty
-  ): Either[QueryError, Set[RelationValue]] =
+    substitution: Map[String, D] = Map.empty[String, D]
+  ): Either[QueryError, Set[D]] =
     try
       Right(extractRangeUnsafe(source, query, substitution))
     catch
@@ -70,7 +70,7 @@ object RangeExtractor:
     *
     * Convenience wrapper for Boolean queries.
     */
-  def extractRangeBoolean(source: KnowledgeSource[RelationValue], query: ParsedQuery): Either[QueryError, Set[RelationValue]] =
+  def extractRangeBoolean[D: DomainCodec](source: KnowledgeSource[D], query: ParsedQuery): Either[QueryError, Set[D]] =
     if !query.isBoolean then
       Left(QueryError.ValidationError(
         "Query must be Boolean (no answer variables)",
@@ -84,11 +84,11 @@ object RangeExtractor:
     *
     * Convenience wrapper for unary queries.
     */
-  def extractRangeUnary(
-    source: KnowledgeSource[RelationValue],
+  def extractRangeUnary[D: DomainCodec](
+    source: KnowledgeSource[D],
     query: ParsedQuery,
-    answerValue: RelationValue
-  ): Either[QueryError, Set[RelationValue]] =
+    answerValue: D
+  ): Either[QueryError, Set[D]] =
     if !query.isUnary then
       Left(QueryError.ValidationError(
         "Query must be unary (single answer variable)",
@@ -112,13 +112,13 @@ object RangeExtractor:
     *     ...
     *   )
     */
-  def extractAllRanges(
-    source: KnowledgeSource[RelationValue],
+  def extractAllRanges[D: DomainCodec](
+    source: KnowledgeSource[D],
     query: ParsedQuery
-  ): Either[QueryError, Map[Map[String, RelationValue], Set[RelationValue]]] =
+  ): Either[QueryError, Map[Map[String, D], Set[D]]] =
     try
       val result = if query.isBoolean then
-        Map(Map.empty[String, RelationValue] -> extractRangeUnsafe(source, query, Map.empty))
+        Map(Map.empty[String, D] -> extractRangeUnsafe(source, query, Map.empty))
       else
         val substitutions = generateSubstitutions(source, query)
         substitutions.map { subst =>
@@ -138,11 +138,11 @@ object RangeExtractor:
   // ── Internal (throwing — OCaml style) ───────────────────────────────
 
   /** Core extraction — throws on error, like FOLAtomParser. */
-  private def extractRangeUnsafe(
-    source: KnowledgeSource[RelationValue],
+  private def extractRangeUnsafe[D: DomainCodec](
+    source: KnowledgeSource[D],
     query: ParsedQuery,
-    substitution: Map[String, RelationValue]
-  ): Set[RelationValue] =
+    substitution: Map[String, D]
+  ): Set[D] =
     val range = query.range
     val quantifiedVar = query.variable
     val pattern = buildPattern(range, quantifiedVar, substitution)
@@ -167,11 +167,11 @@ object RangeExtractor:
     *   Pattern: [None, Some(Const("France"))]
     *   Meaning: "Find all x where capital(x, France) holds in KB"
     */
-  private def buildPattern(
+  private def buildPattern[D: DomainCodec](
     range: FOL,
     quantifiedVar: String,
-    substitution: Map[String, RelationValue]
-  ): List[Option[RelationValue]] =
+    substitution: Map[String, D]
+  ): List[Option[D]] =
     // Check for unsupported function terms
     range.terms.collectFirst {
       case Term.Fn(f, args) => (f, args)
@@ -196,10 +196,8 @@ object RangeExtractor:
             substitution.get(v) // Substitute if available, else wildcard
 
           case Term.Const(c) =>
-            Some(c.toIntOption match {
-              case Some(n) => RelationValue.Num(n)
-              case None    => RelationValue.Const(c)
-            })
+            val codec = summon[DomainCodec[D]]
+            Some(codec.fromNumericLiteral(c).getOrElse(codec.fromString(c)))
 
           case Term.Fn(_, _) =>
             None // Should never reach here due to check above
@@ -229,13 +227,13 @@ object RangeExtractor:
       case pos => pos
 
   /** Generate all possible substitutions for answer variables. */
-  private def generateSubstitutions(
-    source: KnowledgeSource[RelationValue],
+  private def generateSubstitutions[D](
+    source: KnowledgeSource[D],
     query: ParsedQuery
-  ): Set[Map[String, RelationValue]] =
+  ): Set[Map[String, D]] =
     val domain = source.activeDomain.toList
 
-    def generateForVars(vars: List[String]): Set[Map[String, RelationValue]] =
+    def generateForVars(vars: List[String]): Set[Map[String, D]] =
       vars match
         case Nil => Set(Map.empty)
         case v :: rest =>

@@ -1,6 +1,6 @@
 package fol.semantics
 
-import fol.datastore.{KnowledgeBase, KnowledgeSource, RelationValue, RelationTuple}
+import fol.datastore.{KnowledgeSource, RelationTuple}
 
 /** Shared utilities for domain extraction from knowledge sources.
   * 
@@ -48,11 +48,11 @@ object DomainExtraction:
     * @param position Zero-based position index
     * @return Set of values at that position
     */
-  def extractFromRelation(
-    source: KnowledgeSource[RelationValue],
+  def extractFromRelation[D](
+    source: KnowledgeSource[D],
     relationName: String,
     position: Int
-  ): Set[RelationValue] =
+  ): Set[D] =
     source.getDomain(relationName, position)
   
   /** Extract the active domain (all constants used in source).
@@ -74,7 +74,7 @@ object DomainExtraction:
     * @param source Knowledge source
     * @return Set of all values in source
     */
-  def extractActiveDomain(source: KnowledgeSource[RelationValue]): Set[RelationValue] =
+  def extractActiveDomain[D](source: KnowledgeSource[D]): Set[D] =
     source.activeDomain
   
   /** Extract domain using pattern matching (for FOL range predicates).
@@ -104,11 +104,11 @@ object DomainExtraction:
     * @param pattern Query pattern (None = wildcard, Some(v) = must equal v)
     * @return Set of matching tuples (full tuples, not just wildcard positions)
     */
-  def extractWithPattern(
-    source: KnowledgeSource[RelationValue],
+  def extractWithPattern[D](
+    source: KnowledgeSource[D],
     relationName: String,
-    pattern: List[Option[RelationValue]]
-  ): Set[RelationTuple[RelationValue]] =
+    pattern: List[Option[D]]
+  ): Set[RelationTuple[D]] =
     source.query(relationName, pattern)
   
   /** Extract values from specific positions in pattern query results.
@@ -138,12 +138,12 @@ object DomainExtraction:
     * @param positions Positions to extract from matching tuples
     * @return Set of values at specified positions
     */
-  def extractFromPatternAtPositions(
-    source: KnowledgeSource[RelationValue],
+  def extractFromPatternAtPositions[D](
+    source: KnowledgeSource[D],
     relationName: String,
-    pattern: List[Option[RelationValue]],
+    pattern: List[Option[D]],
     positions: List[Int]
-  ): Set[RelationValue] =
+  ): Set[D] =
     val matchingTuples = extractWithPattern(source, relationName, pattern)
     matchingTuples.flatMap { tuple =>
       positions.map(pos => tuple.values(pos))
@@ -160,12 +160,12 @@ object DomainExtraction:
     * @param position Single position to extract
     * @return Set of values at that position
     */
-  def extractFromPatternAtPosition(
-    source: KnowledgeSource[RelationValue],
+  def extractFromPatternAtPosition[D](
+    source: KnowledgeSource[D],
     relationName: String,
-    pattern: List[Option[RelationValue]],
+    pattern: List[Option[D]],
     position: Int
-  ): Set[RelationValue] =
+  ): Set[D] =
     extractFromPatternAtPositions(source, relationName, pattern, List(position))
   
   /** Count how many distinct values exist at a position in a relation.
@@ -178,8 +178,8 @@ object DomainExtraction:
     * @param position Position to count
     * @return Number of distinct values
     */
-  def domainSize(
-    source: KnowledgeSource[RelationValue],
+  def domainSize[D](
+    source: KnowledgeSource[D],
     relationName: String,
     position: Int
   ): Int =
@@ -190,5 +190,5 @@ object DomainExtraction:
     * @param source Knowledge source
     * @return Number of distinct values in entire source
     */
-  def activeDomainSize(source: KnowledgeSource[RelationValue]): Int =
+  def activeDomainSize[D](source: KnowledgeSource[D]): Int =
     extractActiveDomain(source).size

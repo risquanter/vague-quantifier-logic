@@ -93,7 +93,7 @@ class ResolvedQuerySpec extends munit.FunSuite:
       params = SamplingParams.exact
     )
 
-    val output: EvaluationOutput = rq.evaluateWithOutput()
+    val output: EvaluationOutput[RelationValue] = rq.evaluateWithOutput()
 
     // Statistics
     assertEquals(output.result.proportion, 0.5)

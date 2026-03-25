@@ -1,6 +1,6 @@
 package fol.semantics
 
-import fol.datastore.{KnowledgeSource, RelationValue}
+import fol.datastore.{KnowledgeSource, DomainElement, DomainCodec}
 import fol.logic.{Quantifier, ParsedQuery}
 import fol.quantifier.VagueQuantifier
 import fol.bridge.FOLBridge
@@ -10,6 +10,7 @@ import fol.sampling.{SamplingParams, HDRConfig}
 import fol.error.{QueryError, QueryException}
 import semantics.ModelAugmenter
 import scala.util.control.NonFatal
+import scala.reflect.ClassTag
 
 /** Vague quantifier semantics evaluation — thin facade.
   *
@@ -38,14 +39,14 @@ object VagueSemantics:
     *
     * Private — throws on error.  The public methods wrap this in Either.
     */
-  private def toResolved(
+  private def toResolved[D: DomainElement: DomainCodec: ClassTag](
     query: ParsedQuery,
-    source: KnowledgeSource[RelationValue],
-    answerTuple: Map[String, RelationValue],
+    source: KnowledgeSource[D],
+    answerTuple: Map[String, D],
     samplingParams: SamplingParams,
     hdrConfig: HDRConfig,
-    modelAugmenter: ModelAugmenter[RelationValue] = ModelAugmenter.identity
-  ): ResolvedQuery =
+    modelAugmenter: ModelAugmenter[D] = ModelAugmenter.identity[D]
+  ): ResolvedQuery[D] =
     val rangeElements = RangeExtractor.extractRange(source, query, answerTuple) match
       case Right(elems) => elems
       case Left(error) => throw error.toThrowable
@@ -69,13 +70,13 @@ object VagueSemantics:
     * @param hdrConfig      HDR PRNG configuration (relevant when sampling)
     * @return Either[QueryError, VagueQueryResult]
     */
-  def holds(
+  def holds[D: DomainElement: DomainCodec: ClassTag](
     query: ParsedQuery,
-    source: KnowledgeSource[RelationValue],
-    answerTuple: Map[String, RelationValue] = Map.empty,
+    source: KnowledgeSource[D],
+    answerTuple: Map[String, D] = Map.empty[String, D],
     samplingParams: SamplingParams = SamplingParams.exact,
     hdrConfig: HDRConfig = HDRConfig.default,
-    modelAugmenter: ModelAugmenter[RelationValue] = ModelAugmenter.identity
+    modelAugmenter: ModelAugmenter[D] = ModelAugmenter.identity[D]
   ): Either[QueryError, VagueQueryResult] =
     try
       Right(toResolved(query, source, answerTuple, samplingParams, hdrConfig, modelAugmenter).evaluate())
@@ -101,14 +102,14 @@ object VagueSemantics:
     * @param hdrConfig      HDR PRNG configuration
     * @return Either[QueryError, EvaluationOutput]
     */
-  def evaluate(
+  def evaluate[D: DomainElement: DomainCodec: ClassTag](
     query: ParsedQuery,
-    source: KnowledgeSource[RelationValue],
-    answerTuple: Map[String, RelationValue] = Map.empty,
+    source: KnowledgeSource[D],
+    answerTuple: Map[String, D] = Map.empty[String, D],
     samplingParams: SamplingParams = SamplingParams.exact,
     hdrConfig: HDRConfig = HDRConfig.default,
-    modelAugmenter: ModelAugmenter[RelationValue] = ModelAugmenter.identity
-  ): Either[QueryError, EvaluationOutput] =
+    modelAugmenter: ModelAugmenter[D] = ModelAugmenter.identity[D]
+  ): Either[QueryError, EvaluationOutput[D]] =
     try
       Right(toResolved(query, source, answerTuple, samplingParams, hdrConfig, modelAugmenter).evaluateWithOutput())
     catch

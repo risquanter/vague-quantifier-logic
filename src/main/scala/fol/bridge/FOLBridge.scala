@@ -3,7 +3,7 @@ package fol.bridge
 import logic.{FOL, Formula}
 import semantics.EvaluationContext
 import semantics.holdsWithBinding
-import fol.datastore.{KnowledgeSource, RelationValue}
+import fol.datastore.{KnowledgeSource, DomainElement, DomainCodec}
 import semantics.ModelAugmenter
 
 /** FOL → typed predicate bridge.
@@ -40,18 +40,18 @@ object FOLBridge:
     * @param answerTuple Substitution for answer variables y (e.g., y ↦ "R1")
     * @return Predicate that checks D ⊨_σ{x↦element} φ
     */
-  def scopeToPredicate(
+  def scopeToPredicate[D: DomainElement](
     formula: Formula[FOL],
     variable: String,
-    source: KnowledgeSource[RelationValue],
-    answerTuple: Map[String, RelationValue] = Map.empty,
-    modelAugmenter: ModelAugmenter[RelationValue] = ModelAugmenter.identity
-  ): RelationValue => Boolean =
+    source: KnowledgeSource[D],
+    answerTuple: Map[String, D] = Map.empty[String, D],
+    modelAugmenter: ModelAugmenter[D] = ModelAugmenter.identity[D]
+  ): D => Boolean =
     // Construct model once — this is the expensive part
     val model = modelAugmenter(KnowledgeSourceModel.toModel(source))
     
     // Return closure that evaluates formula for each element
-    (element: RelationValue) =>
+    (element: D) =>
       val ctx = EvaluationContext(model, answerTuple)
       ctx.holdsWithBinding(formula, variable, element)
   
@@ -66,12 +66,12 @@ object FOLBridge:
     * @param answerTuple Answer variable substitutions
     * @return Predicate over String domain elements
     */
-  def scopeToStringPredicate(
+  def scopeToStringPredicate[D: DomainElement: DomainCodec](
     formula: Formula[FOL],
     variable: String,
-    source: KnowledgeSource[RelationValue],
-    answerTuple: Map[String, RelationValue] = Map.empty,
-    modelAugmenter: ModelAugmenter[RelationValue] = ModelAugmenter.identity
+    source: KnowledgeSource[D],
+    answerTuple: Map[String, D] = Map.empty[String, D],
+    modelAugmenter: ModelAugmenter[D] = ModelAugmenter.identity[D]
   ): String => Boolean =
-    val rvPredicate = scopeToPredicate(formula, variable, source, answerTuple, modelAugmenter)
-    (s: String) => rvPredicate(RelationValue.Const(s))
+    val pred = scopeToPredicate(formula, variable, source, answerTuple, modelAugmenter)
+    (s: String) => pred(DomainCodec[D].fromString(s))

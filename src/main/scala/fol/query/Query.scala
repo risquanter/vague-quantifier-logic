@@ -6,6 +6,7 @@ import fol.sampling.{SamplingParams, HDRConfig}
 import fol.result.{VagueQueryResult, EvaluationOutput}
 import fol.error.{QueryError, QueryException}
 import scala.util.control.NonFatal
+import scala.reflect.ClassTag
 
 /** Query DSL for vague quantifier queries over knowledge bases.
   * 
@@ -34,22 +35,21 @@ import scala.util.control.NonFatal
 
 /** Unresolved vague quantifier query — domain not yet fetched.
   *
-  * Created by the typed DSL builder. Elements are always `RelationValue`
-  * (no type parameter — see Decision D9).
+  * Created by the typed DSL builder. Call `.resolve(source)` to
+  * produce a [[ResolvedQuery]], or `.evaluate(source)` as a
+  * convenience that chains resolve + evaluate.
   *
-  * Call `.resolve(source)` to produce a [[ResolvedQuery]], or
-  * `.evaluate(source)` as a convenience that chains resolve + evaluate.
-  *
-  * @param quantifier  The vague quantifier
-  * @param domain      Where to fetch elements (strategy, not data)
-  * @param predicate   Scope predicate over RelationValue elements
-  * @param params      Sampling parameters
-  * @param hdrConfig   HDR PRNG configuration
+  * @tparam D           Domain element type
+  * @param quantifier   The vague quantifier
+  * @param domain       Where to fetch elements (strategy, not data)
+  * @param predicate    Scope predicate over domain elements
+  * @param params       Sampling parameters
+  * @param hdrConfig    HDR PRNG configuration
   */
-case class UnresolvedQuery(
+case class UnresolvedQuery[D: ClassTag](
   quantifier: VagueQuantifier,
   domain: DomainSpec,
-  predicate: RelationValue => Boolean,
+  predicate: D => Boolean,
   params: SamplingParams = SamplingParams.exact,
   hdrConfig: HDRConfig = HDRConfig.default
 ):
@@ -61,9 +61,9 @@ case class UnresolvedQuery(
     * @param source Knowledge source to query
     * @return Either error or resolved query ready for evaluation
     */
-  def resolve(source: KnowledgeSource[RelationValue]): Either[QueryError, ResolvedQuery] =
+  def resolve(source: KnowledgeSource[D]): Either[QueryError, ResolvedQuery[D]] =
     try
-      val elements: Set[RelationValue] = domain match
+      val elements: Set[D] = domain match
         case DomainSpec.Relation(relationName, position) =>
           source.getDomain(relationName, position)
         case DomainSpec.ActiveDomain =>
@@ -90,28 +90,12 @@ case class UnresolvedQuery(
           Map("domain" -> domain.toString)
         ))
 
-  /** Convenience: resolve and evaluate in one step.
-    *
-    * The `params` stored in this query control evaluation mode:
-    * `SamplingParams.exact` for full enumeration,
-    * `SamplingParams.default` for statistical sampling.
-    * No boolean toggle — see D11.
-    *
-    * @param source Knowledge source to query
-    * @return Either error or VagueQueryResult
-    */
-  def evaluate(source: KnowledgeSource[RelationValue]): Either[QueryError, VagueQueryResult] =
+  /** Convenience: resolve and evaluate in one step. */
+  def evaluate(source: KnowledgeSource[D]): Either[QueryError, VagueQueryResult] =
     resolve(source).map(_.evaluate())
 
-  /** Convenience: resolve and evaluate with element sets in one step.
-    *
-    * Returns both statistical results and the concrete element sets
-    * needed for tree highlighting in register.
-    *
-    * @param source Knowledge source to query
-    * @return Either error or EvaluationOutput with result + element sets
-    */
-  def evaluateWithOutput(source: KnowledgeSource[RelationValue]): Either[QueryError, EvaluationOutput] =
+  /** Convenience: resolve and evaluate with element sets in one step. */
+  def evaluateWithOutput(source: KnowledgeSource[D]): Either[QueryError, EvaluationOutput[D]] =
     resolve(source).map(_.evaluateWithOutput())
 
 /** Specification of the domain to query over. */
@@ -164,7 +148,7 @@ object Query:
       * @param pred Predicate function on RelationValue
       * @return Complete unresolved query
       */
-    def where(pred: RelationValue => Boolean): UnresolvedQuery =
+    def where(pred: RelationValue => Boolean): UnresolvedQuery[RelationValue] =
       UnresolvedQuery(q, domain, pred)
 
     /** Specify the predicate over unwrapped Const names.
@@ -176,7 +160,7 @@ object Query:
       * @param pred Predicate function on the unwrapped String name
       * @return Complete unresolved query
       */
-    def whereConst(pred: String => Boolean): UnresolvedQuery =
+    def whereConst(pred: String => Boolean): UnresolvedQuery[RelationValue] =
       val rvPred: RelationValue => Boolean = {
         case RelationValue.Const(name) => pred(name)
         case _ => false
@@ -184,7 +168,7 @@ object Query:
       UnresolvedQuery(q, domain, rvPred)
     
     /** Alias for where. */
-    def satisfying(pred: RelationValue => Boolean): UnresolvedQuery =
+    def satisfying(pred: RelationValue => Boolean): UnresolvedQuery[RelationValue] =
       where(pred)
     
     /** Specify predicate with sampling parameters.
@@ -194,11 +178,11 @@ object Query:
       * @param config HDR PRNG configuration
       * @return Complete unresolved query
       */
-    def where(pred: RelationValue => Boolean, params: SamplingParams, config: HDRConfig = HDRConfig.default): UnresolvedQuery =
+    def where(pred: RelationValue => Boolean, params: SamplingParams, config: HDRConfig = HDRConfig.default): UnresolvedQuery[RelationValue] =
       UnresolvedQuery(q, domain, pred, params, config)
 
     /** Specify predicate over Const names with sampling parameters. */
-    def whereConst(pred: String => Boolean, params: SamplingParams, config: HDRConfig = HDRConfig.default): UnresolvedQuery =
+    def whereConst(pred: String => Boolean, params: SamplingParams, config: HDRConfig = HDRConfig.default): UnresolvedQuery[RelationValue] =
       val rvPred: RelationValue => Boolean = {
         case RelationValue.Const(name) => pred(name)
         case _ => false
@@ -213,7 +197,7 @@ extension (source: KnowledgeSource[RelationValue])
     * @param query Query to execute
     * @return Either error or VagueQueryResult
     */
-  def execute(query: UnresolvedQuery): Either[QueryError, VagueQueryResult] =
+  def execute(query: UnresolvedQuery[RelationValue]): Either[QueryError, VagueQueryResult] =
     query.evaluate(source)
 
   /** Execute with element sets (for tree highlighting).
@@ -221,7 +205,7 @@ extension (source: KnowledgeSource[RelationValue])
     * @param query Query to execute
     * @return Either error or EvaluationOutput with result + element sets
     */
-  def executeWithOutput(query: UnresolvedQuery): Either[QueryError, EvaluationOutput] =
+  def executeWithOutput(query: UnresolvedQuery[RelationValue]): Either[QueryError, EvaluationOutput[RelationValue]] =
     query.evaluateWithOutput(source)
 
 /** Predicate builders for common patterns. */

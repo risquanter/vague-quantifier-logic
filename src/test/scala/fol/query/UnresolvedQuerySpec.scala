@@ -31,21 +31,21 @@ class UnresolvedQuerySpec extends FunSuite:
   def source: KnowledgeSource[RelationValue] = KnowledgeSource.fromKnowledgeBase(createKB())
 
   /** Query: "most countries are large" — 4/8 = 0.5, does NOT satisfy "most" (0.7) */
-  def mostCountriesLarge: UnresolvedQuery =
+  def mostCountriesLarge: UnresolvedQuery[RelationValue] =
     Query
       .quantifier(VagueQuantifier.most)
       .over("country")
       .whereConst(largeCountries.contains)
 
   /** Query: "about half of countries are large" — 4/8 = 0.5, satisfies ~50% ±10% */
-  def aboutHalfCountriesLarge: UnresolvedQuery =
+  def aboutHalfCountriesLarge: UnresolvedQuery[RelationValue] =
     Query
       .quantifier(VagueQuantifier.aboutHalf)
       .over("country")
       .whereConst(largeCountries.contains)
 
   /** Query over a non-existent relation — yields empty range */
-  def queryOverNonexistent: UnresolvedQuery =
+  def queryOverNonexistent: UnresolvedQuery[RelationValue] =
     Query
       .quantifier(VagueQuantifier.most)
       .over("nonexistent")

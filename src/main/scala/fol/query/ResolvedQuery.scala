@@ -1,18 +1,17 @@
 package fol.query
 
-import fol.datastore.RelationValue
 import fol.quantifier.VagueQuantifier
 import fol.sampling.{SamplingParams, HDRConfig, HDRSampler, SampleSizeCalculator, ProportionEstimator}
 import fol.result.{VagueQueryResult, EvaluationOutput}
+import scala.reflect.ClassTag
 
-/** Resolved vague quantifier query — the concrete shared IL.
+/** Resolved vague quantifier query — the shared IL.
   *
   * Both entry points converge here:
   *   - String path: ParsedQuery → compile → ResolvedQuery
   *   - Typed DSL:   UnresolvedQuery → resolve → ResolvedQuery
   *
   * All fields are materialized — no KnowledgeSource dependency.
-  * Elements are always `RelationValue` (no type parameter).
   *
   * '''One code path — no boolean toggle (D11).'''
   * `SamplingParams` controls whether evaluation is exact or sampled.
@@ -23,18 +22,19 @@ import fol.result.{VagueQueryResult, EvaluationOutput}
   *
   * See docs/ADR-001.md §Decision.
   *
-  * @param quantifier  The vague quantifier to evaluate
-  * @param elements    Materialized domain (D_R from the paper)
-  * @param predicate   Scope predicate bound over elements
-  * @param params      Sampling parameters — controls precision.
-  *                    Use `SamplingParams.exact` for full enumeration,
-  *                    `SamplingParams.default` for statistical sampling.
-  * @param hdrConfig   HDR PRNG configuration
+  * @tparam D           Domain element type
+  * @param quantifier   The vague quantifier to evaluate
+  * @param elements     Materialized domain (D_R from the paper)
+  * @param predicate    Scope predicate bound over elements
+  * @param params       Sampling parameters — controls precision.
+  *                     Use `SamplingParams.exact` for full enumeration,
+  *                     `SamplingParams.default` for statistical sampling.
+  * @param hdrConfig    HDR PRNG configuration
   */
-case class ResolvedQuery(
+case class ResolvedQuery[D: ClassTag](
   quantifier: VagueQuantifier,
-  elements: Set[RelationValue],
-  predicate: RelationValue => Boolean,
+  elements: Set[D],
+  predicate: D => Boolean,
   params: SamplingParams = SamplingParams.exact,
   hdrConfig: HDRConfig = HDRConfig.default
 ):
@@ -70,7 +70,7 @@ case class ResolvedQuery(
     *
     * @return EvaluationOutput with result + element sets
     */
-  def evaluateWithOutput(): EvaluationOutput =
+  def evaluateWithOutput(): EvaluationOutput[D] =
     if elements.isEmpty then
       EvaluationOutput(
         result = ResolvedQuery.emptyResult(quantifier),
@@ -82,7 +82,7 @@ case class ResolvedQuery(
       val n = SampleSizeCalculator.calculateSampleSize(elements.size, params)
 
       // Step 2: sampler draws n elements (returns full set when n >= N)
-      val sampler = HDRSampler[RelationValue](hdrConfig)
+      val sampler = HDRSampler[D](hdrConfig)
       val sample = sampler.sample(elements, n)
 
       // Step 3: filter by predicate
