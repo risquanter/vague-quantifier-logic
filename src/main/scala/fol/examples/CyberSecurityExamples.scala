@@ -144,13 +144,13 @@ object CyberSecurityExamples:
       println("\n  Mitigated risks (answer set):")
       
       // Extract risks that have mitigations
-      val mitigatedRisks = domain.query("has_mitigation", List(None, None))
+      val mitigatedRisks = domain.query(RelationName("has_mitigation"), List(None, None))
         .map(_.values(0).toString)
         .toList
         .sorted
       
       mitigatedRisks.zipWithIndex.foreach { case (risk, idx) =>
-        val mitigations = domain.query("has_mitigation", List(Some(RelationValue.Const(risk)), None))
+        val mitigations = domain.query(RelationName("has_mitigation"), List(Some(RelationValue.Const(risk)), None))
           .map(_.values(1).toString)
         println(s"    ${idx+1}. $risk")
         mitigations.foreach(m => println(s"       → $m"))
@@ -223,21 +223,21 @@ object CyberSecurityExamples:
     // Show which critical assets have unmitigated risks
     println("\n  Critical assets with unmitigated risks:")
     
-    domain.query("critical_asset", List(None))
+    domain.query(RelationName("critical_asset"), List(None))
       .map(_.values(0))
       .filter { asset =>
-        domain.query("has_risk", List(Some(asset), None))
+        domain.query(RelationName("has_risk"), List(Some(asset), None))
           .exists { tuple =>
             val risk = tuple.values(1)
-            domain.query("has_mitigation", List(Some(risk), None)).isEmpty
+            domain.query(RelationName("has_mitigation"), List(Some(risk), None)).isEmpty
           }
       }
       .zipWithIndex
       .foreach { case (asset, idx) =>
         println(s"    ${idx+1}. $asset")
-        val unmitigatedRisks = domain.query("has_risk", List(Some(asset), None))
+        val unmitigatedRisks = domain.query(RelationName("has_risk"), List(Some(asset), None))
           .map(_.values(1))
-          .filter(risk => domain.query("has_mitigation", List(Some(risk), None)).isEmpty)
+          .filter(risk => domain.query(RelationName("has_mitigation"), List(Some(risk), None)).isEmpty)
         unmitigatedRisks.foreach(r => println(s"       ⚠ $r (no mitigation)"))
       }
     

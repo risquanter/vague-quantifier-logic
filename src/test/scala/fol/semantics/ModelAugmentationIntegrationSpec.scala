@@ -2,7 +2,7 @@ package fol.semantics
 
 import munit.FunSuite
 import logic.{FOL, Formula, Term}
-import fol.datastore.{KnowledgeBase, KnowledgeSource, Relation, RelationValue, RelationTuple}
+import fol.datastore.{KnowledgeBase, KnowledgeSource, Relation, RelationName, RelationValue, RelationTuple}
 import fol.logic.{Quantifier, ParsedQuery}
 import fol.bridge.{FOLBridge, NumericAugmenter}
 import fol.error.QueryError
@@ -29,12 +29,12 @@ class ModelAugmentationIntegrationSpec extends FunSuite:
   /** KB with items and a "score" concept that needs a function augmenter. */
   def createItemKB(): KnowledgeBase[RelationValue] =
     KnowledgeBase[RelationValue](Map.empty, Map.empty)
-      .addRelation(Relation("item", 1))
-      .addRelation(Relation("category", 1))
-      .addFacts("item", Set(
+      .addRelation(Relation(RelationName("item"), 1))
+      .addRelation(Relation(RelationName("category"), 1))
+      .addFacts(RelationName("item"), Set(
         unary("A"), unary("B"), unary("C"), unary("D")
       ))
-      .addFacts("category", Set(
+      .addFacts(RelationName("category"), Set(
         unary("A"), unary("B"), unary("C"), unary("D")
       ))
 

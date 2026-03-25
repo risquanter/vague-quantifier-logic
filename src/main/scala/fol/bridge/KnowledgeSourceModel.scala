@@ -2,7 +2,7 @@ package fol.bridge
 
 import logic.{Term, Formula, FOL}
 import semantics.{Domain, Interpretation, Model, Valuation}
-import fol.datastore.{DomainElement, KnowledgeSource, RelationValue, RelationTuple}
+import fol.datastore.{DomainElement, KnowledgeSource, RelationName, RelationValue, RelationTuple}
 
 /** Bridge between KnowledgeSource and FOL Model Theory.
   * 
@@ -86,7 +86,7 @@ object KnowledgeSourceModel:
   private def createPredicatesFromSource[D](source: KnowledgeSource[D]): Map[String, List[D] => Boolean] =
     source.relationNames.flatMap { relationName =>
       source.getRelation(relationName).map { relation =>
-        relationName -> createPredicateFunction(source, relationName, relation.arity)
+        relationName.value -> createPredicateFunction(source, relationName, relation.arity)
       }
     }.toMap
   
@@ -99,7 +99,7 @@ object KnowledgeSourceModel:
     */
   private def createPredicateFunction[D](
     source: KnowledgeSource[D],
-    relationName: String,
+    relationName: RelationName,
     arity: Int
   ): List[D] => Boolean =
     (args: List[D]) =>
@@ -134,7 +134,7 @@ object KnowledgeSourceModel:
     }.toMap
     
     val predicates = predicateNames.map { case (name, arity) =>
-      name -> createPredicateFunction(source, name, arity)
+      name -> createPredicateFunction(source, RelationName(name), arity)
     }
     
     val interpretation = Interpretation(domain, functions, predicates)

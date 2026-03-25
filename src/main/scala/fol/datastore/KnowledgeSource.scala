@@ -25,20 +25,20 @@ import scala.reflect.ClassTag
 trait KnowledgeSource[D]:
 
   /** Check if a relation exists in this knowledge source. */
-  def hasRelation(relationName: String): Boolean
+  def hasRelation(relationName: RelationName): Boolean
 
   /** Get the relation schema. */
-  def getRelation(relationName: String): Option[Relation]
+  def getRelation(relationName: RelationName): Option[Relation]
 
   /** Check if a specific fact holds. */
-  def contains(relationName: String, tuple: RelationTuple[D]): Boolean
+  def contains(relationName: RelationName, tuple: RelationTuple[D]): Boolean
 
   /** Get all unique values at a specific position of a relation.
     *
     * This returns the **full domain** for that position.
     * WARNING: For large datasets, use sampleDomain instead!
     */
-  def getDomain(relationName: String, position: Int): Set[D]
+  def getDomain(relationName: RelationName, position: Int): Set[D]
 
   /** Sample random elements from a relation's domain position.
     *
@@ -46,7 +46,7 @@ trait KnowledgeSource[D]:
     * For SQL backends, this should use "ORDER BY RANDOM() LIMIT n".
     */
   def sampleDomain(
-    relationName: String,
+    relationName: RelationName,
     position: Int,
     sampleSize: Int,
     seed: Option[Long] = None
@@ -58,10 +58,10 @@ trait KnowledgeSource[D]:
     * - Some(value): must match exactly
     * - None: wildcard (matches anything)
     */
-  def query(relationName: String, pattern: List[Option[D]]): Set[RelationTuple[D]]
+  def query(relationName: RelationName, pattern: List[Option[D]]): Set[RelationTuple[D]]
 
   /** Get the total number of facts in a relation. */
-  def count(relationName: String): Int
+  def count(relationName: RelationName): Int
 
   /** Get all values used in the knowledge source (active domain). */
   def activeDomain: Set[D]
@@ -70,7 +70,7 @@ trait KnowledgeSource[D]:
   def sampleActiveDomain(sampleSize: Int, seed: Option[Long] = None): Set[D]
 
   /** Get all relation names defined in this source. */
-  def relationNames: Set[String]
+  def relationNames: Set[RelationName]
 
 object KnowledgeSource:
 
@@ -84,16 +84,16 @@ object KnowledgeSource:
   */
 class InMemoryKnowledgeSource[D](kb: KnowledgeBase[D]) extends KnowledgeSource[D]:
 
-  def hasRelation(relationName: String): Boolean =
+  def hasRelation(relationName: RelationName): Boolean =
     kb.hasRelation(relationName)
 
-  def getRelation(relationName: String): Option[Relation] =
+  def getRelation(relationName: RelationName): Option[Relation] =
     kb.getRelation(relationName)
 
-  def contains(relationName: String, tuple: RelationTuple[D]): Boolean =
+  def contains(relationName: RelationName, tuple: RelationTuple[D]): Boolean =
     kb.contains(relationName, tuple)
 
-  def getDomain(relationName: String, position: Int): Set[D] =
+  def getDomain(relationName: RelationName, position: Int): Set[D] =
     kb.getDomain(relationName, position)
 
   // TODO: Replace scala.util.Random with HDRSampler when this method
@@ -101,7 +101,7 @@ class InMemoryKnowledgeSource[D](kb: KnowledgeBase[D]) extends KnowledgeSource[D
   //       evaluation uses getDomain + HDRSampler via ProportionEstimator).
   //       See gate G1b: "no scala.util.Random anywhere".
   def sampleDomain(
-    relationName: String,
+    relationName: RelationName,
     position: Int,
     sampleSize: Int,
     seed: Option[Long] = None
@@ -122,10 +122,10 @@ class InMemoryKnowledgeSource[D](kb: KnowledgeBase[D]) extends KnowledgeSource[D
         .take(sampleSize)
         .toSet
 
-  def query(relationName: String, pattern: List[Option[D]]): Set[RelationTuple[D]] =
+  def query(relationName: RelationName, pattern: List[Option[D]]): Set[RelationTuple[D]] =
     kb.query(relationName, pattern)
 
-  def count(relationName: String): Int =
+  def count(relationName: RelationName): Int =
     kb.count(relationName)
 
   def activeDomain: Set[D] =
@@ -148,7 +148,7 @@ class InMemoryKnowledgeSource[D](kb: KnowledgeBase[D]) extends KnowledgeSource[D
         .take(sampleSize)
         .toSet
 
-  def relationNames: Set[String] =
+  def relationNames: Set[RelationName] =
     kb.schema.keySet
 
 /** Extension methods for SQL backend implementation (future work).

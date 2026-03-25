@@ -1,6 +1,6 @@
 package fol.semantics
 
-import fol.datastore.{KnowledgeSource, RelationTuple}
+import fol.datastore.{KnowledgeSource, RelationName, RelationTuple}
 
 /** Shared utilities for domain extraction from knowledge sources.
   * 
@@ -50,7 +50,7 @@ object DomainExtraction:
     */
   def extractFromRelation[D](
     source: KnowledgeSource[D],
-    relationName: String,
+    relationName: RelationName,
     position: Int
   ): Set[D] =
     source.getDomain(relationName, position)
@@ -106,7 +106,7 @@ object DomainExtraction:
     */
   def extractWithPattern[D](
     source: KnowledgeSource[D],
-    relationName: String,
+    relationName: RelationName,
     pattern: List[Option[D]]
   ): Set[RelationTuple[D]] =
     source.query(relationName, pattern)
@@ -140,7 +140,7 @@ object DomainExtraction:
     */
   def extractFromPatternAtPositions[D](
     source: KnowledgeSource[D],
-    relationName: String,
+    relationName: RelationName,
     pattern: List[Option[D]],
     positions: List[Int]
   ): Set[D] =
@@ -162,7 +162,7 @@ object DomainExtraction:
     */
   def extractFromPatternAtPosition[D](
     source: KnowledgeSource[D],
-    relationName: String,
+    relationName: RelationName,
     pattern: List[Option[D]],
     position: Int
   ): Set[D] =
@@ -180,7 +180,7 @@ object DomainExtraction:
     */
   def domainSize[D](
     source: KnowledgeSource[D],
-    relationName: String,
+    relationName: RelationName,
     position: Int
   ): Int =
     extractFromRelation(source, relationName, position).size

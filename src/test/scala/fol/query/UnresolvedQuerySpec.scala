@@ -1,18 +1,16 @@
 package fol.query
 
 import munit.FunSuite
-import fol.datastore.{KnowledgeBase, KnowledgeSource, Relation, RelationValue, RelationTuple}
+import fol.datastore.{KnowledgeBase, KnowledgeSource, Relation, RelationName, RelationValue, RelationTuple}
 import fol.quantifier.VagueQuantifier
 import fol.sampling.{SamplingParams, HDRConfig}
 import fol.result.{VagueQueryResult, EvaluationOutput}
 import fol.error.QueryError
+import fol.RelationValueFixtures
 
-class UnresolvedQuerySpec extends FunSuite:
+class UnresolvedQuerySpec extends FunSuite, RelationValueFixtures:
 
   // ---------- Test fixtures ----------
-
-  def const(s: String): RelationValue = RelationValue.Const(s)
-  def unary(s: String): RelationTuple[RelationValue] = RelationTuple(List(const(s)))
 
   val countries: Set[String] = Set(
     "France", "Germany", "Italy", "Spain",
@@ -23,10 +21,10 @@ class UnresolvedQuerySpec extends FunSuite:
 
   def createKB(): KnowledgeBase[RelationValue] =
     KnowledgeBase[RelationValue](Map.empty, Map.empty)
-      .addRelation(Relation("country", 1))
-      .addRelation(Relation("large", 1))
-      .addFacts("country", countries.map(unary))
-      .addFacts("large", largeCountries.map(unary))
+      .addRelation(Relation(RelationName("country"), 1))
+      .addRelation(Relation(RelationName("large"), 1))
+      .addFacts(RelationName("country"), countries.map(unary))
+      .addFacts(RelationName("large"), largeCountries.map(unary))
 
   def source: KnowledgeSource[RelationValue] = KnowledgeSource.fromKnowledgeBase(createKB())
 
@@ -218,7 +216,7 @@ class UnresolvedQuerySpec extends FunSuite:
     val query = Query
       .quantifier(VagueQuantifier.most)
       .over("country")
-      .where(rv => largeCountries.contains(rv match
+      .where[RelationValue](rv => largeCountries.contains(rv match
         case RelationValue.Const(n) => n
         case _ => ""
       ))

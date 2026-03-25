@@ -1,5 +1,7 @@
 package fol.error
 
+import fol.datastore.RelationName
+
 /** Structured error types for vague quantifier evaluation.
   * 
   * This error hierarchy provides:
@@ -115,12 +117,12 @@ object QueryError:
   
   /** Empty range extracted (D_R = ∅) */
   case class EmptyRangeError(
-    relationName: String,
+    relationName: RelationName,
     pattern: String,
     suggestion: Option[String] = None
   ) extends QueryError:
-    def message = s"Empty range: no tuples match pattern '$pattern' in relation '$relationName'"
-    override val context = Map("relation" -> relationName, "pattern" -> pattern) ++
+    def message = s"Empty range: no tuples match pattern '$pattern' in relation '${relationName.value}'"
+    override val context = Map("relation" -> relationName.value, "pattern" -> pattern) ++
       suggestion.map("suggestion" -> _)
   
   /** Scope evaluation failed */
@@ -148,26 +150,26 @@ object QueryError:
   
   /** Relation not found in schema */
   case class RelationNotFoundError(
-    relationName: String,
-    availableRelations: Set[String]
+    relationName: RelationName,
+    availableRelations: Set[RelationName]
   ) extends QueryError:
-    def message = s"Relation '$relationName' not found"
+    def message = s"Relation '${relationName.value}' not found"
     override val context = Map(
-      "relation" -> relationName,
-      "available" -> availableRelations.mkString(", ")
+      "relation" -> relationName.value,
+      "available" -> availableRelations.map(_.value).mkString(", ")
     )
     override def formatted: String =
-      s"Relation '$relationName' not found. Available relations: ${availableRelations.mkString(", ")}"
+      s"Relation '${relationName.value}' not found. Available relations: ${availableRelations.map(_.value).mkString(", ")}"
   
   /** Schema validation error */
   case class SchemaError(
     message: String,
-    relationName: String,
+    relationName: RelationName,
     expectedArity: Int,
     actualArity: Int
   ) extends QueryError:
     override val context = Map(
-      "relation" -> relationName,
+      "relation" -> relationName.value,
       "expected_arity" -> expectedArity.toString,
       "actual_arity" -> actualArity.toString
     )

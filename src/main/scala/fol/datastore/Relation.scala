@@ -82,16 +82,49 @@ object RelationTuple:
   def of(values: RelationValue*): RelationTuple[RelationValue] =
     RelationTuple(values.toList)
 
-/** Relation schema (arity-only).
+/** Metadata properties for a relation.
   *
-  * @param name  Relation name (e.g., "component", "has_risk")
-  * @param arity Number of arguments
+  * Properties express schema-level constraints that the datastore
+  * enforces automatically.  Currently only `Symmetric` is supported;
+  * see ADR-009 for the decision record and future exploration notes
+  * (inverse relations, predicate combinators).
+  *
+  * @see [[Relation]]
+  * @see docs/ADR-009.md
+  */
+enum RelationProperty:
+  /** Symmetric relation: `R(a, b) ↔ R(b, a)`.
+    *
+    * Only meaningful for binary relations.  When set,
+    * [[KnowledgeBase.addFact]] automatically materialises the
+    * reverse tuple at insert time so that `contains`, `query`,
+    * and all downstream layers see both directions.
+    *
+    * Mirrors `owl:SymmetricProperty` (OWL) and the Datalog rule
+    * `R(Y,X) :- R(X,Y)` — eagerly evaluated.
+    */
+  case Symmetric
+
+/** Relation schema (arity + properties).
+  *
+  * @param name       Relation name (typed via `RelationName` — see ADR-010)
+  * @param arity      Number of arguments
+  * @param properties Schema-level properties (e.g. `Symmetric`)
+  *
+  * @see [[RelationProperty]]
+  * @see docs/ADR-009.md
+  * @see docs/ADR-010.md
   */
 case class Relation(
-  name: String,
-  arity: Int
+  name: RelationName,
+  arity: Int,
+  properties: Set[RelationProperty] = Set.empty
 ):
   require(arity >= 1, "Relation must have at least arity 1")
+  require(
+    !(properties.contains(RelationProperty.Symmetric) && !isBinary),
+    s"Symmetric property requires binary relation, but $name has arity $arity"
+  )
 
   /** Check if this is a unary relation */
   def isUnary: Boolean = arity == 1
@@ -99,13 +132,35 @@ case class Relation(
   /** Check if this is a binary relation */
   def isBinary: Boolean = arity == 2
 
-  override def toString: String = s"$name/${arity}"
+  /** Check if this relation has the Symmetric property. */
+  def isSymmetric: Boolean = properties.contains(RelationProperty.Symmetric)
+
+  override def toString: String =
+    val props = if properties.isEmpty then "" else s" [${properties.mkString(", ")}]"
+    s"${name.value}/$arity$props"
 
 object Relation:
-  /** Create a unary relation */
+  /** Create a unary relation.
+    *
+    * Accepts raw `String` — wraps to `RelationName` internally (ADR-010 §3).
+    */
   def unary(name: String): Relation =
-    Relation(name, 1)
+    Relation(RelationName(name), 1)
 
-  /** Create a binary relation */
+  /** Create a binary relation.
+    *
+    * Accepts raw `String` — wraps to `RelationName` internally (ADR-010 §3).
+    */
   def binary(name: String): Relation =
-    Relation(name, 2)
+    Relation(RelationName(name), 2)
+
+  /** Create a symmetric binary relation.
+    *
+    * Inserting `(A, B)` automatically materialises `(B, A)`.
+    * Accepts raw `String` — wraps to `RelationName` internally (ADR-010 §3).
+    *
+    * @see [[RelationProperty.Symmetric]]
+    * @see docs/ADR-009.md
+    */
+  def symmetricBinary(name: String): Relation =
+    Relation(RelationName(name), 2, Set(RelationProperty.Symmetric))

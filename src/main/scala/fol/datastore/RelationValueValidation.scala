@@ -61,4 +61,4 @@ object RelationValueValidation:
     * generic `Relation` path since `Relation` is now arity-only.
     */
   def binaryMixed(name: String): (Relation, List[PositionType]) =
-    (Relation(name, 2), List(PositionType.Constant, PositionType.Numeric))
+    (Relation(RelationName(name), 2), List(PositionType.Constant, PositionType.Numeric))

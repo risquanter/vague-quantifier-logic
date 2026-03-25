@@ -1,7 +1,7 @@
 package fol.semantics
 
 import logic.{FOL, Formula, Term}
-import fol.datastore.{KnowledgeBase, KnowledgeSource, Relation, RelationValue, RelationTuple}
+import fol.datastore.{KnowledgeBase, KnowledgeSource, Relation, RelationName, RelationValue, RelationTuple}
 import fol.logic.{Quantifier, ParsedQuery}
 import fol.result.{EvaluationOutput, VagueQueryResult}
 import fol.error.QueryError
@@ -24,21 +24,21 @@ class VagueSemanticsSpec extends munit.FunSuite:
   // Test knowledge base with countries
   def createCountryKB(): KnowledgeBase[RelationValue] =
     KnowledgeBase[RelationValue](Map.empty, Map.empty)
-      .addRelation(Relation("country", 1))
-      .addRelation(Relation("large", 1))
-      .addRelation(Relation("coastal", 1))
-      .addRelation(Relation("wealthy", 1))
-      .addFacts("country", Set(
+      .addRelation(Relation(RelationName("country"), 1))
+      .addRelation(Relation(RelationName("large"), 1))
+      .addRelation(Relation(RelationName("coastal"), 1))
+      .addRelation(Relation(RelationName("wealthy"), 1))
+      .addFacts(RelationName("country"), Set(
         unary("France"), unary("Germany"), unary("Italy"), unary("Spain"),
         unary("Luxembourg"), unary("Switzerland"), unary("Belgium"), unary("Austria")
       ))
-      .addFacts("large", Set(
+      .addFacts(RelationName("large"), Set(
         unary("France"), unary("Germany"), unary("Italy"), unary("Spain")
       ))
-      .addFacts("coastal", Set(
+      .addFacts(RelationName("coastal"), Set(
         unary("France"), unary("Italy"), unary("Spain")
       ))
-      .addFacts("wealthy", Set(
+      .addFacts(RelationName("wealthy"), Set(
         unary("Luxembourg"), unary("Switzerland")
       ))
 
@@ -314,14 +314,14 @@ class VagueSemanticsSpec extends munit.FunSuite:
     // Q[~#]^{1/2} x (european_country(x), large(x))
     
     val kb = KnowledgeBase[RelationValue](Map.empty, Map.empty)
-      .addRelation(Relation("european_country", 1))
-      .addRelation(Relation("large", 1))
-      .addFacts("european_country", Set(
+      .addRelation(Relation(RelationName("european_country"), 1))
+      .addRelation(Relation(RelationName("large"), 1))
+      .addFacts(RelationName("european_country"), Set(
         unary("France"), unary("Germany"), unary("Spain"), unary("Italy"), 
         unary("Poland"), unary("Romania"), unary("Luxembourg"), unary("Belgium"), 
         unary("Netherlands"), unary("Portugal")
       ))
-      .addFacts("large", Set(
+      .addFacts(RelationName("large"), Set(
         unary("France"), unary("Germany"), unary("Spain"), unary("Italy"), unary("Poland")
       ))
     

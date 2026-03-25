@@ -2,7 +2,7 @@ package fol.examples
 
 import fol.quantifier.*
 import fol.sampling.{SamplingParams, HDRConfig, ProportionEstimator}
-import fol.datastore.{KnowledgeBase, RiskDomain, RelationValue}
+import fol.datastore.{KnowledgeBase, RelationName, RiskDomain, RelationValue}
 import fol.result.VagueQueryResult
 
 /** Demonstration of Vague Quantifier Usage
@@ -252,7 +252,7 @@ object VagueQuantifierDemo:
     
     // Query 1: What proportion of components are critical?
     // Get all components from the "component" relation (unary relation)
-    val components = kb.getDomain("component", 0)
+    val components = kb.getDomain(RelationName("component"), 0)
     val componentNames = components.collect { case RelationValue.Const(name) => name }
     
     val criticalComponents = Set("auth-service", "payment-gateway", "database")
@@ -271,7 +271,7 @@ object VagueQuantifierDemo:
     
     // Query 2: What proportion of risks are high severity?
     // Get all risks from the "risk" relation (unary relation)
-    val risks = kb.getDomain("risk", 0)
+    val risks = kb.getDomain(RelationName("risk"), 0)
     val riskNames = risks.collect { case RelationValue.Const(name) => name }
     
     val highSeverityRisks = Set("auth-bypass", "sql-injection", "data-leak")

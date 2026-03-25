@@ -5,10 +5,7 @@ import fol.quantifier.VagueQuantifier
 import fol.sampling.{SamplingParams, HDRConfig}
 import fol.result.{VagueQueryResult, EvaluationOutput}
 
-class ResolvedQuerySpec extends munit.FunSuite:
-
-  // Helper to create RelationValue constants
-  def const(s: String): RelationValue = RelationValue.Const(s)
+class ResolvedQuerySpec extends munit.FunSuite, fol.RelationValueFixtures:
 
   val countries: Set[RelationValue] = Set(
     const("France"), const("Germany"), const("Italy"), const("Spain"),

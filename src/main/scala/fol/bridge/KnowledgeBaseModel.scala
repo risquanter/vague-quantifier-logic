@@ -2,7 +2,7 @@ package fol.bridge
 
 import logic.{Term, Formula, FOL}
 import semantics.{Domain, Interpretation, Model, Valuation}
-import fol.datastore.{DomainElement, KnowledgeBase, RelationValue, RelationTuple}
+import fol.datastore.{DomainElement, KnowledgeBase, RelationName, RelationValue, RelationTuple}
 
 /** Bridge between KnowledgeBase and FOL Model Theory.
   * 
@@ -58,7 +58,7 @@ object KnowledgeBaseModel:
     
     // 3. Predicates: Wrap KB relation lookups
     val predicates: Map[String, List[D] => Boolean] = kb.schema.map { case (relationName, relation) =>
-      relationName -> createPredicateFunction(kb, relationName, relation.arity)
+      relationName.value -> createPredicateFunction(kb, relationName, relation.arity)
     }.toMap
     
     val interpretation = Interpretation(domain, functions, predicates)
@@ -73,7 +73,7 @@ object KnowledgeBaseModel:
     */
   private def createPredicateFunction[D](
     kb: KnowledgeBase[D],
-    relationName: String,
+    relationName: RelationName,
     arity: Int
   ): List[D] => Boolean =
     (args: List[D]) =>

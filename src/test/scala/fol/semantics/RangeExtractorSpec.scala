@@ -5,7 +5,7 @@ import scala.language.implicitConversions
 import fol.error.{QueryError, QueryException}
 import logic.{FOL, Formula, Term}
 import fol.logic.{ParsedQuery, Quantifier}
-import fol.datastore.{KnowledgeBase, KnowledgeSource, Relation, RelationTuple, RelationValue}
+import fol.datastore.{KnowledgeBase, KnowledgeSource, Relation, RelationName, RelationTuple, RelationValue}
 
 class RangeExtractorSpec extends FunSuite:
   import RangeExtractor.*
@@ -24,30 +24,30 @@ class RangeExtractorSpec extends FunSuite:
   // Simple geography KB
   def geographyKB: KnowledgeBase[RelationValue] =
     val kb = KnowledgeBase[RelationValue](Map.empty, Map.empty)
-      .addRelation(Relation("country", 1))
-      .addRelation(Relation("city", 1))
-      .addRelation(Relation("capital", 2))
-      .addRelation(Relation("large_country", 1))
+      .addRelation(Relation(RelationName("country"), 1))
+      .addRelation(Relation(RelationName("city"), 1))
+      .addRelation(Relation(RelationName("capital"), 2))
+      .addRelation(Relation(RelationName("large_country"), 1))
     
-    kb.addFacts("country", Set(
+    kb.addFacts(RelationName("country"), Set(
       RelationTuple(List(RConst("France"))),
       RelationTuple(List(RConst("Germany"))),
       RelationTuple(List(RConst("Italy"))),
       RelationTuple(List(RConst("Spain")))
     ))
-    .addFacts("city", Set(
+    .addFacts(RelationName("city"), Set(
       RelationTuple(List(RConst("Paris"))),
       RelationTuple(List(RConst("Berlin"))),
       RelationTuple(List(RConst("Rome"))),
       RelationTuple(List(RConst("Madrid")))
     ))
-    .addFacts("capital", Set(
+    .addFacts(RelationName("capital"), Set(
       RelationTuple(List(RConst("Paris"), RConst("France"))),
       RelationTuple(List(RConst("Berlin"), RConst("Germany"))),
       RelationTuple(List(RConst("Rome"), RConst("Italy"))),
       RelationTuple(List(RConst("Madrid"), RConst("Spain")))
     ))
-    .addFacts("large_country", Set(
+    .addFacts(RelationName("large_country"), Set(
       RelationTuple(List(RConst("France"))),
       RelationTuple(List(RConst("Germany")))
     ))
@@ -55,15 +55,15 @@ class RangeExtractorSpec extends FunSuite:
   // KB with numeric values
   def numericKB: KnowledgeBase[RelationValue] =
     val kb = KnowledgeBase[RelationValue](Map.empty, Map.empty)
-      .addRelation(Relation("component", 1))
-      .addRelation(Relation("has_severity", 2))
+      .addRelation(Relation(RelationName("component"), 1))
+      .addRelation(Relation(RelationName("has_severity"), 2))
     
-    kb.addFacts("component", Set(
+    kb.addFacts(RelationName("component"), Set(
       RelationTuple(List(RConst("C1"))),
       RelationTuple(List(RConst("C2"))),
       RelationTuple(List(RConst("C3")))
     ))
-    .addFacts("has_severity", Set(
+    .addFacts(RelationName("has_severity"), Set(
       RelationTuple(List(RConst("C1"), Num(8))),
       RelationTuple(List(RConst("C2"), Num(3))),
       RelationTuple(List(RConst("C3"), Num(9)))
@@ -101,7 +101,7 @@ class RangeExtractorSpec extends FunSuite:
   
   test("extract range from empty relation") {
     val kb = KnowledgeBase[RelationValue](Map.empty, Map.empty)
-      .addRelation(Relation("empty_rel", 1))
+      .addRelation(Relation(RelationName("empty_rel"), 1))
     
     val query = ParsedQuery(
       Quantifier.aboutHalf,

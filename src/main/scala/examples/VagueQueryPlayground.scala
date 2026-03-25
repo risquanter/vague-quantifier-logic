@@ -3,7 +3,7 @@ package examples
 import fol.quantifier.VagueQuantifier
 import fol.query.{Query, Predicates, execute, UnresolvedQuery}
 import fol.sampling.{SamplingParams, HDRConfig}
-import fol.datastore.{KnowledgeBase, KnowledgeSource, RiskDomain, RelationValue}
+import fol.datastore.{KnowledgeBase, KnowledgeSource, RiskDomain, RelationValue, RelationName}
 import fol.result.VagueQueryResult
 import fol.bridge.{toModel, holds}
 import logic.Formula
@@ -102,7 +102,7 @@ def basicQueryDemo(): Unit =
   println("Query 3: Do ABOUT HALF of components have mitigations?")
   
   // Get components that have at least one mitigation
-  val componentsWithMitigations = kb.getDomain("has_mitigation", 0)
+  val componentsWithMitigations = kb.getDomain(RelationName("has_mitigation"), 0)
     .collect { case RelationValue.Const(name) => name }
   
   val hasMitigation = (comp: String) => componentsWithMitigations.contains(comp)
@@ -133,7 +133,7 @@ def predicateQueryDemo(): Unit =
   // Use predicate builder to check relation
   val componentHasRisk = (comp: String) =>
     val pattern = List(Some(RelationValue.Const(comp)), None)
-    source.query("has_risk", pattern).nonEmpty
+    source.query(RelationName("has_risk"), pattern).nonEmpty
   
   val q1 = Query
     .quantifier(VagueQuantifier.many)  // ≥50%
@@ -150,12 +150,12 @@ def predicateQueryDemo(): Unit =
   println("Query 2: Do SEVERAL mitigations have associated risks?")
   
   // Check if mitigations have at least one risk they mitigate
-  val mitigations = kb.getDomain("mitigation", 0)
+  val mitigations = kb.getDomain(RelationName("mitigation"), 0)
     .collect { case RelationValue.Const(name) => name }
   
   val hasRisks = (mit: String) =>
     val risksAddressed = kb.query(
-      "mitigates",
+      RelationName("mitigates"),
       List(Some(RelationValue.Const(mit)), None)
     )
     risksAddressed.nonEmpty
@@ -231,19 +231,19 @@ def folIntegrationDemo(): Unit =
   // "Most components satisfy ∃r. has_risk(c, r) ∧ ∃m. has_mitigation(c, m)"
   // Translation: Most components have both a risk and a mitigation
   val source = KnowledgeSource.fromKnowledgeBase(kb)
-  val components = kb.getDomain("component", 0)
+  val components = kb.getDomain(RelationName("component"), 0)
     .collect { case RelationValue.Const(name) => name }
   
   val hasRiskAndMitigation = (comp: String) =>
     // Check: ∃r. has_risk(comp, r)
     val hasRisk = kb.query(
-      "has_risk",
+      RelationName("has_risk"),
       List(Some(RelationValue.Const(comp)), None)
     ).nonEmpty
     
     // Check: ∃m. has_mitigation(comp, m)
     val hasMit = kb.query(
-      "has_mitigation",
+      RelationName("has_mitigation"),
       List(Some(RelationValue.Const(comp)), None)
     ).nonEmpty
     
@@ -279,7 +279,7 @@ def samplingScalabilityDemo(): Unit =
   val largeKB = builder.build()
   val source = KnowledgeSource.fromKnowledgeBase(largeKB)
   
-  println(s"  Created KB with ${largeKB.count("entity")} entities")
+  println(s"  Created KB with ${largeKB.count(RelationName("entity"))} entities")
   println()
   
   // Define predicate: first 7000 entities satisfy (70%)

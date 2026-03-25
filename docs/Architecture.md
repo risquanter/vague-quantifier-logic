@@ -26,7 +26,7 @@ src/main/scala/
     ├── result/      VagueQueryResult, EvaluationOutput
     ├── bridge/      FOLBridge, KnowledgeBaseModel, KnowledgeSourceModel,
     │                NumericAugmenter
-    ├── datastore/   KnowledgeBase, KnowledgeSource, RelationValue, RelationValueUtil
+    ├── datastore/   KnowledgeBase, KnowledgeSource, Relation, RelationValue
     ├── error/       QueryError, QueryException
     └── examples/    CyberSecurityDomain, CyberSecurityExamples, VagueQuantifierDemo
 ```
@@ -100,9 +100,9 @@ See [ADR-001](ADR-001.md) for the full trace diagram.
 ## Key Integration Points
 
 **KB → FOL Model:**
-`KnowledgeSourceModel.toModel(source)` converts a `KnowledgeSource`
-into `Model[Any]`. `RelationValueUtil` handles `RelationValue ↔ Any`
-conversion. See [ADR-004](ADR-004.md).
+`KnowledgeSourceModel.toModel(source)` converts a `KnowledgeSource[D]`
+into `Model[D]`.  Since ADR-008, the model is fully generic — no
+erasure to `Any`.  See [ADR-004](ADR-004.md) and [ADR-008](ADR-008.md).
 
 The resulting model contains only relation-membership predicates and
 identity constants. Numeric comparisons (`>`, `<`, `>=`, `<=`),
@@ -121,9 +121,9 @@ without fol-engine depending on any type class library.
 See [ADR-005](ADR-005.md).
 
 ```
-KnowledgeSourceModel.toModel(source)   →   KB-backed Model[Any]
+KnowledgeSourceModel.toModel(source)   →   KB-backed Model[D]
   │                                           (relations + constants only)
-  └── modelAugmenter ──────────────────→   Augmented Model[Any]
+  └── modelAugmenter ──────────────────→   Augmented Model[D]
         │                                    (+ comparisons, numerics,
         ├── NumericAugmenter                   custom functions)
         └── consumer augmenter
@@ -161,6 +161,10 @@ See [ADR-002](ADR-002.md).
 | [ADR-003](ADR-003.md) | HDR Deterministic Sampling — Fisher-Yates, reproducibility |
 | [ADR-004](ADR-004.md) | Tagless Initial Architecture — ADTs + operations, layering |
 | [ADR-005](ADR-005.md) | Model Augmentation — endomorphism monoid, numeric infra, extensibility |
+| [ADR-006](ADR-006.md) | Domain Type Erasure — superseded by ADR-008 (historical) |
+| [ADR-007](ADR-007.md) | Preserve OCaml-Ported Parser Combinator Core |
+| [ADR-008](ADR-008.md) | Domain Type Safety — generic `KnowledgeBase[D]` |
+| [ADR-009](ADR-009.md) | Symmetric Relation Support via Schema Metadata |
 
 ---
 
@@ -172,8 +176,8 @@ No external runtime dependencies beyond `com.risquanter::hdr-rng`.
 Test framework: munit 1.0.0.
 
 ```
-sbt test          # 792 tests
-sbt publishLocal  # com.risquanter::fol-engine:0.1.0-SNAPSHOT
+sbt test          # 918 tests
+sbt publishLocal  # com.risquanter::fol-engine:0.2.0-SNAPSHOT
 ```
 
 ---

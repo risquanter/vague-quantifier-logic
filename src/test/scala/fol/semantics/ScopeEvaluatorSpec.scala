@@ -3,7 +3,7 @@ package fol.semantics
 import munit.FunSuite
 import logic.{FOL, Formula, Term}
 import semantics.{Model, Valuation}
-import fol.datastore.{KnowledgeBase, Relation, RelationTuple, RelationValue}
+import fol.datastore.{KnowledgeBase, Relation, RelationName, RelationTuple, RelationValue}
 import fol.bridge.KnowledgeBaseModel
 
 class ScopeEvaluatorSpec extends FunSuite:
@@ -16,37 +16,37 @@ class ScopeEvaluatorSpec extends FunSuite:
   // Geography KB with countries and properties
   def geographyKB: KnowledgeBase[RelationValue] =
     val kb = KnowledgeBase[RelationValue](Map.empty, Map.empty)
-      .addRelation(Relation("country", 1))
-      .addRelation(Relation("city", 1))
-      .addRelation(Relation("capital", 2))
-      .addRelation(Relation("large", 1))
-      .addRelation(Relation("has_pop", 2))
+      .addRelation(Relation(RelationName("country"), 1))
+      .addRelation(Relation(RelationName("city"), 1))
+      .addRelation(Relation(RelationName("capital"), 2))
+      .addRelation(Relation(RelationName("large"), 1))
+      .addRelation(Relation(RelationName("has_pop"), 2))
     
-    kb.addFacts("country", Set(
+    kb.addFacts(RelationName("country"), Set(
       RelationTuple(List(RConst("France"))),
       RelationTuple(List(RConst("Germany"))),
       RelationTuple(List(RConst("Italy"))),
       RelationTuple(List(RConst("Spain"))),
       RelationTuple(List(RConst("Luxembourg")))
     ))
-    .addFacts("city", Set(
+    .addFacts(RelationName("city"), Set(
       RelationTuple(List(RConst("Paris"))),
       RelationTuple(List(RConst("Berlin"))),
       RelationTuple(List(RConst("Rome"))),
       RelationTuple(List(RConst("Madrid")))
     ))
-    .addFacts("capital", Set(
+    .addFacts(RelationName("capital"), Set(
       RelationTuple(List(RConst("Paris"), RConst("France"))),
       RelationTuple(List(RConst("Berlin"), RConst("Germany"))),
       RelationTuple(List(RConst("Rome"), RConst("Italy"))),
       RelationTuple(List(RConst("Madrid"), RConst("Spain")))
     ))
-    .addFacts("large", Set(
+    .addFacts(RelationName("large"), Set(
       RelationTuple(List(RConst("France"))),
       RelationTuple(List(RConst("Germany"))),
       RelationTuple(List(RConst("Italy")))
     ))
-    .addFacts("has_pop", Set(
+    .addFacts(RelationName("has_pop"), Set(
       RelationTuple(List(RConst("France"), Num(67))),
       RelationTuple(List(RConst("Germany"), Num(83))),
       RelationTuple(List(RConst("Italy"), Num(60))),
@@ -57,21 +57,21 @@ class ScopeEvaluatorSpec extends FunSuite:
   // Component/risk KB for numeric tests
   def componentKB: KnowledgeBase[RelationValue] =
     val kb = KnowledgeBase[RelationValue](Map.empty, Map.empty)
-      .addRelation(Relation("component", 1))
-      .addRelation(Relation("critical", 1))
-      .addRelation(Relation("has_severity", 2))
+      .addRelation(Relation(RelationName("component"), 1))
+      .addRelation(Relation(RelationName("critical"), 1))
+      .addRelation(Relation(RelationName("has_severity"), 2))
     
-    kb.addFacts("component", Set(
+    kb.addFacts(RelationName("component"), Set(
       RelationTuple(List(RConst("C1"))),
       RelationTuple(List(RConst("C2"))),
       RelationTuple(List(RConst("C3"))),
       RelationTuple(List(RConst("C4")))
     ))
-    .addFacts("critical", Set(
+    .addFacts(RelationName("critical"), Set(
       RelationTuple(List(RConst("C1"))),
       RelationTuple(List(RConst("C2")))
     ))
-    .addFacts("has_severity", Set(
+    .addFacts(RelationName("has_severity"), Set(
       RelationTuple(List(RConst("C1"), Num(8))),
       RelationTuple(List(RConst("C2"), Num(9))),
       RelationTuple(List(RConst("C3"), Num(3))),
@@ -200,8 +200,8 @@ class ScopeEvaluatorSpec extends FunSuite:
   test("evaluate complex formula from paper: ∃y (capital(x,y) ∧ large(y))") {
     val kb = geographyKB
     // Add relation: large countries
-    val kb2 = kb.addRelation(Relation("country_large", 1))
-      .addFacts("country_large", Set(
+    val kb2 = kb.addRelation(Relation(RelationName("country_large"), 1))
+      .addFacts(RelationName("country_large"), Set(
         RelationTuple(List(RConst("France"))),
         RelationTuple(List(RConst("Germany")))
       ))

@@ -1,7 +1,7 @@
 package fol.semantics
 
 import logic.{FOL, Term}
-import fol.datastore.{KnowledgeSource, DomainCodec}
+import fol.datastore.{KnowledgeSource, DomainCodec, RelationName}
 import fol.logic.ParsedQuery
 import fol.error.{QueryError, QueryException}
 import logic.Formula
@@ -47,7 +47,7 @@ object RangeExtractor:
     * @param source       The knowledge source to query
     * @param query        The vague query containing the range predicate
     * @param substitution Values for free variables (answer variables from query)
-    * @return Either[QueryError, Set[RelationValue]]
+    * @return Either[QueryError, Set[D]]
     */
   def extractRange[D: DomainCodec](
     source: KnowledgeSource[D],
@@ -148,7 +148,7 @@ object RangeExtractor:
     val pattern = buildPattern(range, quantifiedVar, substitution)
     val quantVarPosition = findVariablePosition(range, quantifiedVar)
     DomainExtraction.extractFromPatternAtPosition(
-      source, range.predicate, pattern, quantVarPosition
+      source, RelationName(range.predicate), pattern, quantVarPosition
     )
 
   /** Build query pattern for source lookup.
