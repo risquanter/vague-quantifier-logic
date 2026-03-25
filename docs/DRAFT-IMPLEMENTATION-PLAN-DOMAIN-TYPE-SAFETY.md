@@ -954,6 +954,10 @@ Internal: `HDRSampler[D]`, `ProportionEstimator.estimateWithSampling[D]`
 
 ##### 5b: `UnresolvedQuery[D]`
 
+> **Historical note:** Phase 5b was implemented but subsequently removed.
+> The typed DSL (`UnresolvedQuery`, `Query` builder, `DomainSpec`, `Predicates`)
+> was retired in favour of `ResolvedQuery.fromRelation` — see ADR-011.
+
 ```scala
 case class UnresolvedQuery[D](
   quantifier: VagueQuantifier,

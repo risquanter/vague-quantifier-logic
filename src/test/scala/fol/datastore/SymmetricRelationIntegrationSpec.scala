@@ -1,7 +1,7 @@
 package fol.datastore
 
 import munit.FunSuite
-import fol.query.{Query, Predicates, execute, executeWithOutput}
+import fol.query.ResolvedQuery
 import fol.quantifier.VagueQuantifier
 import fol.bridge.{toModel, holds}
 import logic.{Term, Formula, FOL}
@@ -11,12 +11,11 @@ import fol.RelationValueFixtures
 /** Integration tests for symmetric relations across all layers (ADR-009).
   *
   * Validates that symmetric materialisation propagates correctly through:
-  * - DSL `Predicates.relatedTo` / `hasRelation` / `inRelation`
-  * - DSL `Query` builder + evaluation
-  * - FOL bridge (`toModel`) + formula evaluation
+  * - Programmatic path: ResolvedQuery.fromRelation + inline predicates
+  * - FOL bridge (toModel) + formula evaluation
   *
   * This ensures no divergent code paths — the same materialised data
-  * is visible at the KB, KnowledgeSource, DSL, and FOL layers.
+  * is visible at the KB, KnowledgeSource, and FOL layers.
   */
 class SymmetricRelationIntegrationSpec extends FunSuite, RelationValueFixtures:
 
@@ -46,21 +45,22 @@ class SymmetricRelationIntegrationSpec extends FunSuite, RelationValueFixtures:
     KnowledgeSource.fromKnowledgeBase(createSymmetricCountryKB())
 
   // ══════════════════════════════════════════════════════════════════
-  //  Section 1: DSL Predicates with symmetric relations
+  //  Section 1: Programmatic path with symmetric relations
   // ══════════════════════════════════════════════════════════════════
 
-  test("Predicates.relatedTo works in BOTH directions on symmetric relation"):
+  test("Inline relatedTo predicate works in BOTH directions on symmetric relation"):
     val src = symmetricSource
 
-    // borders(France, Germany) was inserted — but relatedTo checks (entity, target)
-    val bordersGermany = Predicates.relatedTo[RelationValue](src, "borders", const("Germany"))
+    // borders(x, Germany) — pattern-match query
+    val bordersGermany: RelationValue => Boolean =
+      d => src.query(RelationName("borders"), List(Some(d), Some(const("Germany")))).nonEmpty
 
     // France → Germany (forward direction)
     assert(bordersGermany(const("France")), "France borders Germany (forward)")
 
-    // Germany → France would be relatedTo checking (Germany, Germany) — no.
-    // But Belgium → Germany: was originally (Germany, Belgium), so reverse = (Belgium, Germany)
-    val bordersFrance = Predicates.relatedTo[RelationValue](src, "borders", const("France"))
+    // borders(x, France) — reverse direction
+    val bordersFrance: RelationValue => Boolean =
+      d => src.query(RelationName("borders"), List(Some(d), Some(const("France")))).nonEmpty
 
     // Germany → France (reverse direction — materialised)
     assert(bordersFrance(const("Germany")), "Germany borders France (reverse, symmetric)")
@@ -69,13 +69,12 @@ class SymmetricRelationIntegrationSpec extends FunSuite, RelationValueFixtures:
     // Austria → France should NOT hold (no fact)
     assert(!bordersFrance(const("Austria")), "Austria does NOT border France")
 
-  test("Predicates.hasRelation works symmetrically"):
+  test("Inline hasRelation predicate works symmetrically"):
     val src = symmetricSource
 
-    // Check borders(entity, Germany) — using argMapper
-    val pred = Predicates.hasRelation[RelationValue](
-      src, "borders", entity => List(entity, const("Germany"))
-    )
+    // Check borders(entity, Germany) via pattern-match
+    val pred: RelationValue => Boolean =
+      entity => src.query(RelationName("borders"), List(Some(entity), Some(const("Germany")))).nonEmpty
 
     assert(pred(const("France")), "France→Germany (forward)")
     // Belgium→Germany: original was (Germany, Belgium), symmetric → (Belgium, Germany) exists
@@ -84,42 +83,47 @@ class SymmetricRelationIntegrationSpec extends FunSuite, RelationValueFixtures:
     assert(!pred(const("Spain")), "Spain does NOT border Germany")
 
   // ══════════════════════════════════════════════════════════════════
-  //  Section 2: DSL Query evaluation with symmetric relations
+  //  Section 2: ResolvedQuery.fromRelation with symmetric relations
   // ══════════════════════════════════════════════════════════════════
 
-  test("DSL query: 'Most countries border France' — symmetric makes reverse visible"):
+  test("fromRelation: 'Most countries border France' — symmetric makes reverse visible"):
     val src = symmetricSource
 
-    val q = Query
-      .quantifier(VagueQuantifier.most)
-      .over("country")
-      .where[RelationValue](Predicates.relatedTo(src, "borders", const("France")))
+    val bordersFrance: RelationValue => Boolean =
+      d => src.query(RelationName("borders"), List(Some(d), Some(const("France")))).nonEmpty
 
-    val result = q.evaluate(src)
+    val result = ResolvedQuery.fromRelation(
+      source = src,
+      relationName = RelationName("country"),
+      quantifier = VagueQuantifier.most,
+      predicate = bordersFrance
+    )
     assert(result.isRight, s"Expected Right, got $result")
 
     // France has symmetric borders with: Germany, Belgium, Switzerland, Italy, Spain = 5 neighbours
     // 7 countries total, 5 border France → 5/7 ≈ 0.714
     // "most" = ≥ 70% → should be satisfied
-    val r = result.toOption.get
+    val r = result.toOption.get.evaluate()
     assertEquals(r.satisfyingCount, 5) // Germany, Belgium, Switzerland, Italy, Spain
     assertEquals(r.domainSize, 7)
     assertEquals(r.satisfied, true)
 
-  test("DSL query: executeWithOutput shows symmetric satisfying sets"):
+  test("fromRelation: evaluateWithOutput shows symmetric satisfying sets"):
     val src = symmetricSource
 
-    val q = Query
-      .quantifier(VagueQuantifier.several)
-      .over("country")
-      .where[RelationValue](Predicates.relatedTo(src, "borders", const("Germany")))
+    val bordersGermany: RelationValue => Boolean =
+      d => src.query(RelationName("borders"), List(Some(d), Some(const("Germany")))).nonEmpty
 
-    val output = src.executeWithOutput(q)
-    assert(output.isRight)
+    val result = ResolvedQuery.fromRelation(
+      source = src,
+      relationName = RelationName("country"),
+      quantifier = VagueQuantifier.several,
+      predicate = bordersGermany
+    )
+    assert(result.isRight)
 
-    val o = output.toOption.get
+    val o = result.toOption.get.evaluateWithOutput()
     // Germany's symmetric borders: France, Austria, Switzerland, Belgium = 4
-    // (original: Germany→Austria, Germany→Switzerland, Germany→Belgium + reverse from France→Germany)
     assertEquals(o.satisfyingElements.size, 4)
     assert(o.satisfyingElements.contains(const("France")))
     assert(o.satisfyingElements.contains(const("Austria")))
@@ -173,28 +177,27 @@ class SymmetricRelationIntegrationSpec extends FunSuite, RelationValueFixtures:
     )
 
   // ══════════════════════════════════════════════════════════════════
-  //  Section 4: End-to-end consistency — DSL and FOL agree
+  //  Section 4: End-to-end consistency — programmatic path and FOL agree
   // ══════════════════════════════════════════════════════════════════
 
-  test("DSL and FOL produce consistent results for symmetric queries"):
+  test("IL and FOL produce consistent results for symmetric queries"):
     val kb = createSymmetricCountryKB()
     val src = KnowledgeSource.fromKnowledgeBase(kb)
     val model = kb.toModel
 
-    // Check all (country, France) pairs — DSL and FOL must agree
+    // Check all (country, France) pairs — IL predicate and FOL must agree
     val countries = Set("France", "Germany", "Italy", "Spain",
                         "Belgium", "Austria", "Switzerland")
 
     countries.foreach { country =>
-      val dslResult = Predicates.relatedTo[RelationValue](
-        src, "borders", const("France")
-      )(const(country))
+      val ilResult =
+        src.query(RelationName("borders"), List(Some(const(country)), Some(const("France")))).nonEmpty
 
       val folFormula = Formula.Atom(FOL("borders", List(
         Term.Const(country), Term.Const("France")
       )))
       val folResult = semantics.FOLSemantics.holds(folFormula, model, Valuation(Map.empty))
 
-      assertEquals(dslResult, folResult,
-        s"DSL and FOL disagree on borders($country, France): DSL=$dslResult, FOL=$folResult")
+      assertEquals(ilResult, folResult,
+        s"IL and FOL disagree on borders($country, France): IL=$ilResult, FOL=$folResult")
     }

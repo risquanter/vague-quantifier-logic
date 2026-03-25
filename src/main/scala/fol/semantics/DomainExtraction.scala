@@ -6,15 +6,16 @@ import fol.datastore.{KnowledgeSource, RelationName, RelationTuple}
   * 
   * Provides common operations used by both:
   * - RangeExtractor: FOL-based extraction with pattern matching
-  * - Query DSL: Direct relation/position lookup
+  * - ResolvedQuery.fromRelation: Programmatic domain lookup
   * 
   * These utilities centralize the basic domain extraction operations,
   * making it easier to add caching, optimization, or alternative
   * implementations in the future.
   * 
   * Design principle: Non-invasive additions that complement existing code,
-  * not replacements. Both RangeExtractor and Query can continue using
-  * their specialized logic while sharing these common utilities.
+  * not replacements. Both RangeExtractor and ResolvedQuery.fromRelation
+  * can continue using their specialized logic while sharing these
+  * common utilities.
   * 
   * Updated to work with KnowledgeSource abstraction, supporting
   * in-memory, SQL, and other backend implementations.
@@ -27,7 +28,7 @@ object DomainExtraction:
     * across all tuples in the relation.
     * 
     * Used by:
-    * - Query DSL: Direct domain specification (e.g., "all employees")
+    * - ResolvedQuery.fromRelation: Direct domain specification
     * - RangeExtractor: Can use this for simple single-relation ranges
     * 
     * Example:
@@ -60,9 +61,8 @@ object DomainExtraction:
     * Returns the union of all values appearing in any position
     * of any relation in the knowledge source.
     * 
-    * Used by:
-    * - Query DSL: When domain is DomainSpec.ActiveDomain
-    * - General queries: When you want to quantify over "everything in source"
+    * Used by FOL evaluation when quantifying over the full universe
+    * (e.g. ∀x or ∃x with no restricting range predicate).
     * 
     * Example:
     * {{{

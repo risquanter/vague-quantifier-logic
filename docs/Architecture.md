@@ -19,7 +19,7 @@ src/main/scala/
 └── fol/             Vague quantifier extension (imports foundation ↑, never imported by it)
     ├── parser/      VagueQueryParser
     ├── logic/       ParsedQuery, Quantifier
-    ├── query/       UnresolvedQuery, ResolvedQuery
+    ├── query/       ResolvedQuery
     ├── semantics/   VagueSemantics, RangeExtractor, ScopeEvaluator, DomainExtraction
     ├── sampling/    HDRSampler, ProportionEstimator, SampleSizeCalculator, NormalApprox, SamplingParams
     ├── quantifier/  VagueQuantifier
@@ -41,7 +41,7 @@ src/main/scala/
 │  VagueQueryParser.parse(s)     → Either[QueryError, ParsedQuery]│
 │  VagueSemantics.holds(q, src)  → Either[QueryError, Result]     │
 │  VagueSemantics.evaluate(q, …) → Either[QueryError, Output]    │
-│  UnresolvedQuery.resolve(src)  → ResolvedQuery                 │
+│  ResolvedQuery.fromRelation(…)  → Either[QueryError, RQ]       │
 └────────────────────────────┬────────────────────────────────────┘
                              │
 ┌────────────────────────────┼────────────────────────────────────┐
@@ -86,12 +86,12 @@ src/main/scala/
 
 ## Two Entry Points, One Evaluator
 
-Both the string parser and the typed DSL converge on `ResolvedQuery`:
+Both the string parser and the programmatic API converge on `ResolvedQuery`:
 
 | Entry Point | Phase 1 | Phase 2 | Phase 3 |
 |---|---|---|---|
 | String | `VagueQueryParser.parse(s)` → `ParsedQuery` | `VagueSemantics.toResolved()` → `ResolvedQuery` | `.evaluate()` |
-| Typed DSL | Build `UnresolvedQuery` | `.resolve(source)` → `ResolvedQuery` | `.evaluate()` |
+| Programmatic | `ResolvedQuery.fromRelation(source, …)` | → `ResolvedQuery` | `.evaluate()` |
 
 See [ADR-001](ADR-001.md) for the full trace diagram.
 
@@ -165,6 +165,8 @@ See [ADR-002](ADR-002.md).
 | [ADR-007](ADR-007.md) | Preserve OCaml-Ported Parser Combinator Core |
 | [ADR-008](ADR-008.md) | Domain Type Safety — generic `KnowledgeBase[D]` |
 | [ADR-009](ADR-009.md) | Symmetric Relation Support via Schema Metadata |
+| [ADR-010](ADR-010.md) | Typed Relation Names — `RelationName` Opaque Type |
+| [ADR-011](ADR-011.md) | DSL Removal — IL-Direct Construction |
 
 ---
 
@@ -176,7 +178,7 @@ No external runtime dependencies beyond `com.risquanter::hdr-rng`.
 Test framework: munit 1.0.0.
 
 ```
-sbt test          # 918 tests
+sbt test          # 854 tests
 sbt publishLocal  # com.risquanter::fol-engine:0.2.0-SNAPSHOT
 ```
 

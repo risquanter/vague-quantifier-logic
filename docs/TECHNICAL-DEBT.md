@@ -11,16 +11,18 @@ Items here are acknowledged — not bugs, not forgotten.
 
 `KnowledgeSource` methods (`getDomain`, `query`, `contains`, etc.) return
 bare `Set[D]` or throw exceptions for invalid inputs.  Callers at the
-Either boundary (`UnresolvedQuery.resolve`, `RangeExtractor.extractRange`)
+Either boundary (`ResolvedQuery.fromRelation`, `RangeExtractor.extractRange`)
 must duplicate schema-existence checks (`hasRelation`) before calling into
 the trait, because the trait itself does not surface errors in a typed way.
 
 ### Observation
 
 Both entry points perform the same logical validation — "does this relation
-exist?" — independently.  This is proportionate today (two call sites), but
-would compound if additional entry points or `KnowledgeSource` implementations
-are added.
+exist?" — independently.  With DSL removal (ADR-011), the two check sites
+are now `ResolvedQuery.fromRelation` and `RangeExtractor.extractRange` —
+both co-located in the `fol` layer.  This is proportionate today (two call
+sites), but would compound if additional entry points or `KnowledgeSource`
+implementations are added.
 
 ### Preference
 
@@ -48,31 +50,11 @@ This list may be incomplete.
 
 ---
 
-## TD-002: ActiveDomain Has No Formal Counterpart
+## TD-002: ActiveDomain Has No Formal Counterpart — CLOSED
 
-### Description
+**Closed by:** ADR-011 (DSL Removal)
 
-`DomainSpec.ActiveDomain` in the typed DSL specifies the query domain as
-"all values in the entire knowledge base, regardless of relation."  This has
-no counterpart in the FOL string parser grammar — every FOL query requires
-an explicit range predicate `R(x, ...)` that names a relation.
-
-### Semantic Smell
-
-The typed DSL was designed as a typed equivalent of the FOL string path, not
-a superset.  `ActiveDomain` makes the DSL strictly richer than the formal
-language, creating a semantic surface that:
-
-- Cannot be expressed in the paper's formalism (Definition 2 requires a
-  named range predicate R)
-- Cannot be reached through the FOL string entry point
-- Has no precedent in the evaluation-path-unification architecture (ADR-001)
-
-The empty-domain semantics (vacuously-false result, `domainSize = 0`) are
-correctly unified — `ResolvedQuery.evaluate()` handles empty D_R identically
-regardless of source.  The concern is not behavioral correctness but
-**semantic alignment** with the formal model.
-
-### Status
-
-Flagged for design review.  No prescriptive action recorded.
+`DomainSpec.ActiveDomain` was deleted along with the typed DSL.
+The `KnowledgeSource.activeDomain` method remains for FOL evaluation
+(quantifier scope over full universe), but no programmatic entry point
+exposes it as a quantification domain.  See ADR-011 §3.

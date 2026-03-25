@@ -7,9 +7,9 @@ import scala.reflect.ClassTag
 
 /** Resolved vague quantifier query — the shared IL.
   *
-  * Both entry points converge here:
-  *   - String path: ParsedQuery → compile → ResolvedQuery
-  *   - Typed DSL:   UnresolvedQuery → resolve → ResolvedQuery
+  * Entry points:
+  *   - String path:       ParsedQuery → compile → ResolvedQuery
+  *   - Programmatic path: ResolvedQuery.fromRelation(source, …)
   *
   * All fields are materialized — no KnowledgeSource dependency.
   *
@@ -103,6 +103,52 @@ case class ResolvedQuery[D: ClassTag](
       )
 
 object ResolvedQuery:
+
+  import fol.datastore.{KnowledgeSource, RelationName}
+  import fol.error.{QueryError, QueryException}
+  import scala.util.control.NonFatal
+
+  /** Create a ResolvedQuery by fetching domain from a named relation.
+    *
+    * This is the programmatic entry point — the typed analogue of the
+    * string path (ParsedQuery → compile → ResolvedQuery).  Fetches
+    * domain elements from `source.getDomain(relationName, position)`,
+    * performs a `hasRelation` boundary check, and seals everything
+    * into a ResolvedQuery ready for evaluation.
+    *
+    * @tparam D           Domain element type
+    * @param source        Knowledge source to query
+    * @param relationName  Name of the relation whose domain to fetch
+    * @param position      Argument position within the relation (default 0)
+    * @param quantifier    The vague quantifier to evaluate
+    * @param predicate     Scope predicate over domain elements
+    * @param params        Sampling parameters (default: exact)
+    * @param hdrConfig     HDR PRNG configuration (default: default)
+    * @return Either error or resolved query ready for evaluation
+    */
+  def fromRelation[D: ClassTag](
+    source: KnowledgeSource[D],
+    relationName: RelationName,
+    position: Int = 0,
+    quantifier: VagueQuantifier,
+    predicate: D => Boolean,
+    params: SamplingParams = SamplingParams.exact,
+    hdrConfig: HDRConfig = HDRConfig.default
+  ): Either[QueryError, ResolvedQuery[D]] =
+    try
+      if !source.hasRelation(relationName) then
+        Left(QueryError.RelationNotFoundError(relationName, source.relationNames))
+      else
+        val elements = source.getDomain(relationName, position)
+        Right(ResolvedQuery(quantifier, elements, predicate, params, hdrConfig))
+    catch
+      case e: QueryException => Left(e.error)
+      case NonFatal(e) =>
+        Left(QueryError.EvaluationError(
+          s"Error resolving query domain: ${e.getMessage}",
+          phase = "fromRelation",
+          cause = Some(e)
+        ))
 
   /** Create an empty result for queries against empty ranges. */
   private def emptyResult(quantifier: VagueQuantifier): VagueQueryResult =

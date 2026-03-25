@@ -1170,9 +1170,10 @@ Core FOL infrastructure: 358+ tests (all passing)
 
 **Option A: Phase 5 (Parser)** - Most logical next step
 - Enables paper syntax usage
-- Completes the DSL experience
 - Medium complexity, well-defined scope
 - Can leverage existing FOLParser infrastructure
+- Note: the typed DSL was removed in favour of IL-direct construction
+  via `ResolvedQuery.fromRelation` — see ADR-011
 
 **Option B: Phase 6 (Examples) without parser** - Validate functionality
 - Use VagueQuery constructors directly
