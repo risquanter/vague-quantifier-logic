@@ -25,8 +25,11 @@ src/main/scala/
     ├── quantifier/  VagueQuantifier
     ├── result/      VagueQueryResult, EvaluationOutput
     ├── bridge/      FOLBridge, KnowledgeBaseModel, KnowledgeSourceModel,
-    │                NumericAugmenter
-    ├── datastore/   KnowledgeBase, KnowledgeSource, Relation, RelationValue
+    │                NumericAugmenter, ArithmeticAugmenter,
+    │                ComparisonAugmenter, LiteralResolver
+    ├── datastore/   KnowledgeBase[D], KnowledgeSource[D], Relation,
+    │                RelationName, RelationTuple[D], DomainElement,
+    │                DomainCodec, RelationValueValidation
     ├── error/       QueryError, QueryException
     └── examples/    CyberSecurityDomain, CyberSecurityExamples, VagueQuantifierDemo
 ```
@@ -48,8 +51,8 @@ src/main/scala/
 │  SHARED IL: ResolvedQuery  │                                    │
 │  ┌─────────────────────────┴──────────────────────────────────┐ │
 │  │ quantifier: VagueQuantifier                                │ │
-│  │ elements:   Set[RelationValue]                             │ │
-│  │ predicate:  RelationValue => Boolean                       │ │
+│  │ elements:   Set[D]                                                │ │
+│  │ predicate:  D => Boolean                                     │ │
 │  │ params:     SamplingParams                                 │ │
 │  │ hdrConfig:  HDRConfig                                      │ │
 │  │                                                            │ │
@@ -130,15 +133,15 @@ KnowledgeSourceModel.toModel(source)   →   KB-backed Model[D]
 ```
 
 **FOL Scope → Predicate Closure:**
-`FOLBridge.scopeToPredicate(scope, variable, source, augmenter)` compiles
-an FOL formula into `RelationValue => Boolean` by applying the augmenter
+`FOLBridge.scopeToPredicate[D](scope, variable, source, augmenter)` compiles
+an FOL formula into `D => Boolean` by applying the augmenter
 to the KB-backed model, then closing over the result. The closure calls
 `FOLSemantics.holds()` per element.
 
 **Range Extraction:**
-`RangeExtractor.extractRange(source, query, substitution)` queries the
-`KnowledgeSource` with a pattern derived from the range predicate.
-Returns `Set[RelationValue]` — the domain D_R.
+`RangeExtractor.extractRange[D](source, query, substitution)` queries the
+`KnowledgeSource[D]` with a pattern derived from the range predicate.
+Returns `Set[D]` — the domain D_R.
 
 **Sampling:**
 `HDRSampler` (Fisher-Yates + counter-based PRNG) draws samples.

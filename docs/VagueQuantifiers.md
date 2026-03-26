@@ -130,8 +130,8 @@ Q[<=]^{1/3} x (critical_asset(x),
 |---|---|---|
 | Parse query | `fol.parser.VagueQueryParser` | `parse(s): Either[QueryError, ParsedQuery]` |
 | Extract D_R | `fol.semantics.RangeExtractor` | `extractRange(source, query, subst)` |
-| Build model | `fol.bridge.KnowledgeSourceModel` | `toModel(source): Model[Any]` |
-| Compile scope | `fol.bridge.FOLBridge` | `scopeToPredicate(scope, var, source)` |
+| Build model | `fol.bridge.KnowledgeSourceModel` | `toModel[D](source): Model[D]` |
+| Compile scope | `fol.bridge.FOLBridge` | `scopeToPredicate[D](scope, var, source, augmenter)` |
 | Sample S ⊆ D_R | `fol.sampling.HDRSampler` | `sample(population, n): Set[A]` |
 | Calculate Prop_D | `fol.sampling.ProportionEstimator` | `estimateWithSampling(…)` |
 | Check quantifier | `fol.result.VagueQueryResult` | `fromEstimate(vq, estimate, N)` |
