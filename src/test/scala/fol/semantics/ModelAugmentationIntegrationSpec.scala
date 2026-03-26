@@ -28,15 +28,16 @@ class ModelAugmentationIntegrationSpec extends FunSuite:
 
   /** KB with items and a "score" concept that needs a function augmenter. */
   def createItemKB(): KnowledgeBase[RelationValue] =
-    KnowledgeBase[RelationValue](Map.empty, Map.empty)
-      .addRelation(Relation(RelationName("item"), 1))
-      .addRelation(Relation(RelationName("category"), 1))
-      .addFacts(RelationName("item"), Set(
+    KnowledgeBase.builder[RelationValue]
+      .withRelation(Relation(RelationName("item"), 1))
+      .withRelation(Relation(RelationName("category"), 1))
+      .withFacts("item", Set(
         unary("A"), unary("B"), unary("C"), unary("D")
       ))
-      .addFacts(RelationName("category"), Set(
+      .withFacts("category", Set(
         unary("A"), unary("B"), unary("C"), unary("D")
       ))
+      .build()
 
   /** Custom augmenter that maps items to numeric scores.
     * Returns Num(score) — the typed equivalent of the old Any-based Double values.

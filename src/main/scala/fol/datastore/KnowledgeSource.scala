@@ -1,11 +1,17 @@
 package fol.datastore
 
+import fol.error.QueryError
 import scala.reflect.ClassTag
 
 /** Knowledge source abstraction for querying relational data.
   *
   * This trait provides a uniform interface for accessing relational data,
   * whether stored in-memory (KnowledgeBase) or in external databases.
+  *
+  * State-dependent methods return `Either[QueryError, A]` so that
+  * callers handle missing relations, schema mismatches, and (for future
+  * implementations) I/O errors through a typed channel.
+  * See ADR-012 (Error Channel Policy).
   *
   * Sampling is handled externally by `HDRSampler` after domain
   * materialisation — the source's job is to provide complete domain
@@ -24,22 +30,34 @@ trait KnowledgeSource[D]:
   /** Get the relation schema. */
   def getRelation(relationName: RelationName): Option[Relation]
 
-  /** Check if a specific fact holds. */
-  def contains(relationName: RelationName, tuple: RelationTuple[D]): Boolean
+  /** Check if a specific fact holds.
+    *
+    * Returns `Left` if the relation does not exist in the schema.
+    */
+  def contains(relationName: RelationName, tuple: RelationTuple[D]): Either[QueryError, Boolean]
 
-  /** Get all unique values at a specific position of a relation. */
-  def getDomain(relationName: RelationName, position: Int): Set[D]
+  /** Get all unique values at a specific position of a relation.
+    *
+    * Returns `Left` if the relation does not exist or position is out of bounds.
+    */
+  def getDomain(relationName: RelationName, position: Int): Either[QueryError, Set[D]]
 
   /** Query facts matching a pattern.
     *
     * Pattern uses Option[D]:
     * - Some(value): must match exactly
     * - None: wildcard (matches anything)
+    *
+    * Returns `Left` if the relation does not exist or pattern length
+    * does not match the relation's arity.
     */
-  def query(relationName: RelationName, pattern: List[Option[D]]): Set[RelationTuple[D]]
+  def query(relationName: RelationName, pattern: List[Option[D]]): Either[QueryError, Set[RelationTuple[D]]]
 
-  /** Get the total number of facts in a relation. */
-  def count(relationName: RelationName): Int
+  /** Get the total number of facts in a relation.
+    *
+    * Returns `Left` if the relation does not exist in the schema.
+    */
+  def count(relationName: RelationName): Either[QueryError, Int]
 
   /** Get all values used in the knowledge source (active domain). */
   def activeDomain: Set[D]
@@ -65,16 +83,16 @@ class InMemoryKnowledgeSource[D](kb: KnowledgeBase[D]) extends KnowledgeSource[D
   def getRelation(relationName: RelationName): Option[Relation] =
     kb.getRelation(relationName)
 
-  def contains(relationName: RelationName, tuple: RelationTuple[D]): Boolean =
+  def contains(relationName: RelationName, tuple: RelationTuple[D]): Either[QueryError, Boolean] =
     kb.contains(relationName, tuple)
 
-  def getDomain(relationName: RelationName, position: Int): Set[D] =
+  def getDomain(relationName: RelationName, position: Int): Either[QueryError, Set[D]] =
     kb.getDomain(relationName, position)
 
-  def query(relationName: RelationName, pattern: List[Option[D]]): Set[RelationTuple[D]] =
+  def query(relationName: RelationName, pattern: List[Option[D]]): Either[QueryError, Set[RelationTuple[D]]] =
     kb.query(relationName, pattern)
 
-  def count(relationName: RelationName): Int =
+  def count(relationName: RelationName): Either[QueryError, Int] =
     kb.count(relationName)
 
   def activeDomain: Set[D] =

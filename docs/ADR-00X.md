@@ -22,7 +22,7 @@ This meta-ADR defines the structure, style, and content depth for all ADRs.
 **Tags:** [3-5 relevant tags]
 ```
 
-### Context (3-5 bullet points)
+### Context (3-6 bullet points)
 **Purpose:** Establish the problem space and constraints.  
 **Style:** Bullet points, not paragraphs. Each point states a core principle or constraint.
 
@@ -113,7 +113,7 @@ def computeLEC(nTrials: PositiveInt, depth: NonNegativeInt) = {
 
 ### Implementation (Optional table)
 **Purpose:** Quick reference to where patterns are implemented.  
-**Style:** Table mapping location to pattern. 3-6 rows typical.
+**Style:** Table mapping location to pattern. 3-12 rows typical. Group related items when the list exceeds 6.
 
 **Example (from ADR-001):**
 ```markdown
@@ -147,6 +147,18 @@ def computeLEC(nTrials: PositiveInt, depth: NonNegativeInt) = {
 
 > **Schema note:** This section is a deliberate, documented extension to the base ADR schema. It is optional and appears after Implementation, before References. ADRs that capture multi-option decisions (technology choices, operator selection, secret delivery strategies) should include it. ADRs that record a single obvious pattern (e.g., a coding convention) should omit it.
 
+### Cross-ADR Relationship (Optional — Approved Extension)
+**Purpose:** Clarify scope boundaries or potential conflicts with other accepted ADRs.  
+**Style:** Brief section explaining how this ADR coexists with related ADRs. States which files/packages each governs and where the boundary lies.
+
+**Guidelines:**
+- Include only when two ADRs could appear to contradict each other
+- Name the related ADR explicitly and state why there is no conflict
+- Keep to one short section (5-10 lines), not a per-ADR enumeration
+- Omit when the ADR is self-contained with no overlap risk
+
+> **Schema note:** This section is optional and appears after Code Smells, before Implementation. It exists for ADRs that govern overlapping concerns (e.g., error handling policy vs. OCaml preservation policy) where readers might reasonably ask "doesn't ADR-X contradict this?".
+
 ### References (Optional)
 **Purpose:** External documentation links.  
 **Style:** Bulleted list, 2-4 links maximum.
@@ -160,10 +172,11 @@ def computeLEC(nTrials: PositiveInt, depth: NonNegativeInt) = {
 **Context window:** Minimal for AI agents
 
 **Section sizing:**
-- Context: 3-5 bullet points
+- Context: 3-6 bullet points
 - Decision: 3-5 patterns with code
 - Code Smells: 3-5 anti-patterns with examples
-- Implementation: 3-6 row table (optional)
+- Implementation: 3-12 row table (optional; group related items when exceeding 6)
+- Cross-ADR Relationship: 5-10 lines (optional extension — include when overlap risk exists)
 - Alternatives Rejected: per-option sub-headings (optional extension — include when ≥2 real options were evaluated)
 
 ---
@@ -215,9 +228,10 @@ def computeLEC(nTrials: PositiveInt, depth: NonNegativeInt) = {
 
 When creating a new ADR:
 1. Copy structure from ADR-001
-2. Keep Context to 3-5 bullets stating principles
+2. Keep Context to 3-6 bullets stating principles
 3. Show 3-5 Decision patterns with minimal code
 4. Provide 3-5 Code Smells with BAD/GOOD examples
-5. Add Implementation table if helpful
-6. Add Alternatives Rejected if ≥2 real options were evaluated (approved optional extension)
-7. Target 100-200 lines total
+5. Add Implementation table if helpful (up to 12 rows; group when >6)
+6. Add Cross-ADR Relationship section if overlap with another ADR could confuse readers
+7. Add Alternatives Rejected if ≥2 real options were evaluated (approved optional extension)
+8. Target 100-200 lines total

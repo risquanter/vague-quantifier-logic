@@ -106,11 +106,8 @@ object KnowledgeSourceModel:
       if args.length != arity then
         false
       else
-        try
-          val tuple = RelationTuple(args)
-          source.contains(relationName, tuple)
-        catch
-          case _: Exception => false
+        val tuple = RelationTuple(args)
+        source.contains(relationName, tuple).getOrElse(false)
 
   /** Extended version of toModel that includes known predicate names.
     * 

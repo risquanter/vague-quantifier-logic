@@ -163,6 +163,19 @@ object QueryError:
       "expected_arity" -> expectedArity.toString,
       "actual_arity" -> actualArity.toString
     )
+
+  /** Position out of bounds for a relation */
+  case class PositionOutOfBoundsError(
+    message: String,
+    relationName: RelationName,
+    arity: Int,
+    position: Int
+  ) extends QueryError:
+    override val context = Map(
+      "relation" -> relationName.value,
+      "arity" -> arity.toString,
+      "position" -> position.toString
+    )
   
   // ==================== FOL Semantics Errors ====================
   

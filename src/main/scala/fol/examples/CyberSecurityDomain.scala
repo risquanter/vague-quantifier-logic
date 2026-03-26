@@ -288,14 +288,14 @@ object CyberSecurityDomain:
     println("CYBERSECURITY RISK MANAGEMENT DOMAIN")
     println("="*70)
     
-    val assets = domain.getDomain(RelationName("asset")).size
-    val criticalAssets = domain.getDomain(RelationName("critical_asset")).size
-    val highValueAssets = domain.getDomain(RelationName("high_value")).size
-    val risks = domain.getDomain(RelationName("risk")).size
-    val criticalRisks = domain.getDomain(RelationName("critical_risk")).size
-    val exploitableRisks = domain.getDomain(RelationName("exploitable")).size
-    val mitigations = domain.getDomain(RelationName("mitigation")).size
-    val patchedMits = domain.getDomain(RelationName("patched")).size
+    val assets = domain.getDomain(RelationName("asset")).map(_.size).getOrElse(0)
+    val criticalAssets = domain.getDomain(RelationName("critical_asset")).map(_.size).getOrElse(0)
+    val highValueAssets = domain.getDomain(RelationName("high_value")).map(_.size).getOrElse(0)
+    val risks = domain.getDomain(RelationName("risk")).map(_.size).getOrElse(0)
+    val criticalRisks = domain.getDomain(RelationName("critical_risk")).map(_.size).getOrElse(0)
+    val exploitableRisks = domain.getDomain(RelationName("exploitable")).map(_.size).getOrElse(0)
+    val mitigations = domain.getDomain(RelationName("mitigation")).map(_.size).getOrElse(0)
+    val patchedMits = domain.getDomain(RelationName("patched")).map(_.size).getOrElse(0)
     
     println(s"\nAssets: $assets total")
     println(s"  - Critical: $criticalAssets")
@@ -308,8 +308,8 @@ object CyberSecurityDomain:
     println(s"\nMitigations: $mitigations total")
     println(s"  - Deployed/Patched: $patchedMits")
     
-    val hasRiskFacts = domain.query(RelationName("has_risk"), List(None, None)).size
-    val hasMitigationFacts = domain.query(RelationName("has_mitigation"), List(None, None)).size
+    val hasRiskFacts = domain.query(RelationName("has_risk"), List(None, None)).map(_.size).getOrElse(0)
+    val hasMitigationFacts = domain.query(RelationName("has_mitigation"), List(None, None)).map(_.size).getOrElse(0)
     
     println(s"\nRelationships:")
     println(s"  - has_risk: $hasRiskFacts facts")
@@ -317,17 +317,20 @@ object CyberSecurityDomain:
     
     // Calculate key metrics for example queries
     val assetsWithCriticalRisks = domain.query(RelationName("has_risk"), List(None, None))
+      .getOrElse(Set.empty)
       .map(_.values(0))
       .toSet
       .count { asset =>
         domain.query(RelationName("has_risk"), List(Some(asset), None))
+          .getOrElse(Set.empty)
           .exists { tuple =>
             val risk = tuple.values(1)
-            domain.query(RelationName("critical_risk"), List(Some(risk))).nonEmpty
+            domain.query(RelationName("critical_risk"), List(Some(risk))).getOrElse(Set.empty).nonEmpty
           }
       }
     
     val risksWithMitigations = domain.query(RelationName("has_mitigation"), List(None, None))
+      .getOrElse(Set.empty)
       .map(_.values(0))
       .toSet
       .size
@@ -337,12 +340,14 @@ object CyberSecurityDomain:
     println(s"  - Risks with mitigations: $risksWithMitigations / $risks (${risksWithMitigations * 100 / risks}%)")
     
     val criticalAssetsWithUnmitigatedRisks = domain.query(RelationName("critical_asset"), List(None))
+      .getOrElse(Set.empty)
       .map(_.values(0))
       .count { critAsset =>
         domain.query(RelationName("has_risk"), List(Some(critAsset), None))
+          .getOrElse(Set.empty)
           .exists { tuple =>
             val risk = tuple.values(1)
-            domain.query(RelationName("has_mitigation"), List(Some(risk), None)).isEmpty
+            domain.query(RelationName("has_mitigation"), List(Some(risk), None)).getOrElse(Set.empty).isEmpty
           }
       }
     

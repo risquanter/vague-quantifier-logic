@@ -63,143 +63,153 @@ class SymmetricRelationSpec extends FunSuite, RelationValueFixtures:
   // ══════════════════════════════════════════════════════════════════
 
   test("addFact on symmetric relation materialises reverse tuple"):
-    val kb = KnowledgeBase.empty[RelationValue]
-      .addRelation(Relation.symmetricBinary("borders"))
-      .addFact(RelationName("borders"), binary("France", "Germany"))
+    val kb = KnowledgeBase.builder[RelationValue]
+      .withRelation(Relation.symmetricBinary("borders"))
+      .withFactTuple("borders", binary("France", "Germany"))
+      .build()
 
-    assert(kb.contains(RelationName("borders"), binary("France", "Germany")),
-      "Forward tuple should exist")
-    assert(kb.contains(RelationName("borders"), binary("Germany", "France")),
-      "Reverse tuple should be auto-materialised")
+    assertEquals(kb.contains(RelationName("borders"), binary("France", "Germany")),
+      Right(true), "Forward tuple should exist")
+    assertEquals(kb.contains(RelationName("borders"), binary("Germany", "France")),
+      Right(true), "Reverse tuple should be auto-materialised")
 
   test("addFact on non-symmetric relation does NOT materialise reverse"):
-    val kb = KnowledgeBase.empty[RelationValue]
-      .addRelation(Relation.binary("has_risk"))
-      .addFact(RelationName("has_risk"), binary("C1", "R1"))
+    val kb = KnowledgeBase.builder[RelationValue]
+      .withRelation(Relation.binary("has_risk"))
+      .withFactTuple("has_risk", binary("C1", "R1"))
+      .build()
 
-    assert(kb.contains(RelationName("has_risk"), binary("C1", "R1")),
-      "Forward tuple should exist")
-    assert(!kb.contains(RelationName("has_risk"), binary("R1", "C1")),
-      "Reverse should NOT exist for non-symmetric")
+    assertEquals(kb.contains(RelationName("has_risk"), binary("C1", "R1")),
+      Right(true), "Forward tuple should exist")
+    assertEquals(kb.contains(RelationName("has_risk"), binary("R1", "C1")),
+      Right(false), "Reverse should NOT exist for non-symmetric")
 
   test("addFacts materialises reverse for all tuples"):
-    val kb = KnowledgeBase.empty[RelationValue]
-      .addRelation(Relation.symmetricBinary("borders"))
-      .addFacts(RelationName("borders"), Set(
+    val kb = KnowledgeBase.builder[RelationValue]
+      .withRelation(Relation.symmetricBinary("borders"))
+      .withFacts("borders", Set(
         binary("France", "Germany"),
         binary("Italy", "Austria")
       ))
+      .build()
 
     // All four directions
-    assert(kb.contains(RelationName("borders"), binary("France", "Germany")))
-    assert(kb.contains(RelationName("borders"), binary("Germany", "France")))
-    assert(kb.contains(RelationName("borders"), binary("Italy", "Austria")))
-    assert(kb.contains(RelationName("borders"), binary("Austria", "Italy")))
+    assertEquals(kb.contains(RelationName("borders"), binary("France", "Germany")), Right(true))
+    assertEquals(kb.contains(RelationName("borders"), binary("Germany", "France")), Right(true))
+    assertEquals(kb.contains(RelationName("borders"), binary("Italy", "Austria")), Right(true))
+    assertEquals(kb.contains(RelationName("borders"), binary("Austria", "Italy")), Right(true))
 
   test("symmetric materialisation is idempotent"):
-    val kb = KnowledgeBase.empty[RelationValue]
-      .addRelation(Relation.symmetricBinary("knows"))
-      .addFact(RelationName("knows"), binary("Alice", "Bob"))
-      .addFact(RelationName("knows"), binary("Bob", "Alice")) // redundant
+    val kb = KnowledgeBase.builder[RelationValue]
+      .withRelation(Relation.symmetricBinary("knows"))
+      .withFactTuple("knows", binary("Alice", "Bob"))
+      .withFactTuple("knows", binary("Bob", "Alice")) // redundant
+      .build()
 
     // Should have exactly 2 facts (forward + reverse), not 4
-    assertEquals(kb.count(RelationName("knows")), 2)
-    assert(kb.contains(RelationName("knows"), binary("Alice", "Bob")))
-    assert(kb.contains(RelationName("knows"), binary("Bob", "Alice")))
+    assertEquals(kb.count(RelationName("knows")), Right(2))
+    assertEquals(kb.contains(RelationName("knows"), binary("Alice", "Bob")), Right(true))
+    assertEquals(kb.contains(RelationName("knows"), binary("Bob", "Alice")), Right(true))
 
   test("self-referential tuple in symmetric relation — no duplication"):
-    val kb = KnowledgeBase.empty[RelationValue]
-      .addRelation(Relation.symmetricBinary("linked"))
-      .addFact(RelationName("linked"), binary("A", "A"))
+    val kb = KnowledgeBase.builder[RelationValue]
+      .withRelation(Relation.symmetricBinary("linked"))
+      .withFactTuple("linked", binary("A", "A"))
+      .build()
 
     // (A, A) reversed is (A, A) — same tuple, set absorbs
-    assertEquals(kb.count(RelationName("linked")), 1)
-    assert(kb.contains(RelationName("linked"), binary("A", "A")))
+    assertEquals(kb.count(RelationName("linked")), Right(1))
+    assertEquals(kb.contains(RelationName("linked"), binary("A", "A")), Right(true))
 
   test("symmetric fact count reflects materialised tuples"):
-    val kb = KnowledgeBase.empty[RelationValue]
-      .addRelation(Relation.symmetricBinary("borders"))
-      .addFacts(RelationName("borders"), Set(
+    val kb = KnowledgeBase.builder[RelationValue]
+      .withRelation(Relation.symmetricBinary("borders"))
+      .withFacts("borders", Set(
         binary("France", "Germany"),
         binary("France", "Italy"),
         binary("Germany", "Italy")
       ))
+      .build()
 
     // 3 original tuples × 2 directions = 6 facts
-    assertEquals(kb.count(RelationName("borders")), 6)
+    assertEquals(kb.count(RelationName("borders")), Right(6))
 
   // ══════════════════════════════════════════════════════════════════
   //  Section 3: query and getDomain with symmetric relations
   // ══════════════════════════════════════════════════════════════════
 
   test("query with wildcard finds both directions"):
-    val kb = KnowledgeBase.empty[RelationValue]
-      .addRelation(Relation.symmetricBinary("borders"))
-      .addFact(RelationName("borders"), binary("France", "Germany"))
+    val kb = KnowledgeBase.builder[RelationValue]
+      .withRelation(Relation.symmetricBinary("borders"))
+      .withFactTuple("borders", binary("France", "Germany"))
+      .build()
 
     // Query: borders(France, ?)
     val fromFrance = kb.query(RelationName("borders"), List(Some(const("France")), None))
-    assertEquals(fromFrance.size, 1)
-    assert(fromFrance.contains(binary("France", "Germany")))
+    assertEquals(fromFrance.map(_.size), Right(1))
+    assert(fromFrance.exists(_.contains(binary("France", "Germany"))))
 
     // Query: borders(?, France) — should also find the reverse
     val toFrance = kb.query(RelationName("borders"), List(None, Some(const("France"))))
-    assertEquals(toFrance.size, 1)
-    assert(toFrance.contains(binary("Germany", "France")))
+    assertEquals(toFrance.map(_.size), Right(1))
+    assert(toFrance.exists(_.contains(binary("Germany", "France"))))
 
     // Query: borders(Germany, ?)
     val fromGermany = kb.query(RelationName("borders"), List(Some(const("Germany")), None))
-    assertEquals(fromGermany.size, 1)
-    assert(fromGermany.contains(binary("Germany", "France")))
+    assertEquals(fromGermany.map(_.size), Right(1))
+    assert(fromGermany.exists(_.contains(binary("Germany", "France"))))
 
   test("getDomain includes values from both directions"):
-    val kb = KnowledgeBase.empty[RelationValue]
-      .addRelation(Relation.symmetricBinary("borders"))
-      .addFact(RelationName("borders"), binary("France", "Germany"))
+    val kb = KnowledgeBase.builder[RelationValue]
+      .withRelation(Relation.symmetricBinary("borders"))
+      .withFactTuple("borders", binary("France", "Germany"))
+      .build()
 
     // Position 0 should include both France and Germany
     val pos0 = kb.getDomain(RelationName("borders"), 0)
-    assertEquals(pos0, Set(const("France"), const("Germany")))
+    assertEquals(pos0, Right(Set(const("France"), const("Germany"))))
 
     // Position 1 should also include both
     val pos1 = kb.getDomain(RelationName("borders"), 1)
-    assertEquals(pos1, Set(const("Germany"), const("France")))
+    assertEquals(pos1, Right(Set(const("Germany"), const("France"))))
 
   // ══════════════════════════════════════════════════════════════════
   //  Section 4: KnowledgeSource integration
   // ══════════════════════════════════════════════════════════════════
 
   test("KnowledgeSource.fromKnowledgeBase preserves symmetric materialisation"):
-    val kb = KnowledgeBase.empty[RelationValue]
-      .addRelation(Relation.symmetricBinary("borders"))
-      .addFact(RelationName("borders"), binary("France", "Germany"))
+    val kb = KnowledgeBase.builder[RelationValue]
+      .withRelation(Relation.symmetricBinary("borders"))
+      .withFactTuple("borders", binary("France", "Germany"))
+      .build()
 
     val source = KnowledgeSource.fromKnowledgeBase(kb)
 
-    assert(source.contains(RelationName("borders"), binary("France", "Germany")))
-    assert(source.contains(RelationName("borders"), binary("Germany", "France")))
+    assertEquals(source.contains(RelationName("borders"), binary("France", "Germany")), Right(true))
+    assertEquals(source.contains(RelationName("borders"), binary("Germany", "France")), Right(true))
 
   test("KnowledgeSource.query returns symmetric results"):
-    val kb = KnowledgeBase.empty[RelationValue]
-      .addRelation(Relation.symmetricBinary("borders"))
-      .addFacts(RelationName("borders"), Set(
+    val kb = KnowledgeBase.builder[RelationValue]
+      .withRelation(Relation.symmetricBinary("borders"))
+      .withFacts("borders", Set(
         binary("France", "Germany"),
         binary("France", "Italy")
       ))
+      .build()
 
     val source = KnowledgeSource.fromKnowledgeBase(kb)
 
     // All neighbours OF France (position 0 = France)
     val neighboursOfFrance = source.query(RelationName("borders"), List(Some(const("France")), None))
-    assertEquals(neighboursOfFrance.size, 2)
+    assertEquals(neighboursOfFrance.map(_.size), Right(2))
 
     // All countries that border Germany (position 1 = Germany) → should find (France, Germany)
     val borderGermany = source.query(RelationName("borders"), List(None, Some(const("Germany"))))
-    assert(borderGermany.contains(binary("France", "Germany")))
+    assert(borderGermany.exists(_.contains(binary("France", "Germany"))))
 
     // Germany IN position 0 → should find (Germany, France) and (Germany, Italy) via reverse  
     val fromGermany = source.query(RelationName("borders"), List(Some(const("Germany")), None))
-    assert(fromGermany.nonEmpty, "Symmetric relation should have Germany in position 0 too")
+    assert(fromGermany.exists(_.nonEmpty), "Symmetric relation should have Germany in position 0 too")
 
   // ══════════════════════════════════════════════════════════════════
   //  Section 5: Builder API
@@ -211,57 +221,61 @@ class SymmetricRelationSpec extends FunSuite, RelationValueFixtures:
       .withFact("borders", const("France"), const("Germany"))
       .build()
 
-    assert(kb.contains(RelationName("borders"), binary("France", "Germany")))
-    assert(kb.contains(RelationName("borders"), binary("Germany", "France")))
+    assertEquals(kb.contains(RelationName("borders"), binary("France", "Germany")), Right(true))
+    assertEquals(kb.contains(RelationName("borders"), binary("Germany", "France")), Right(true))
 
   // ══════════════════════════════════════════════════════════════════
   //  Section 6: String domain (generic typing)
   // ══════════════════════════════════════════════════════════════════
 
   test("Symmetric relation works with String domain"):
-    val kb = KnowledgeBase.empty[String]
-      .addRelation(Relation.symmetricBinary("friends"))
-      .addFact(RelationName("friends"), RelationTuple(List("Alice", "Bob")))
+    val kb = KnowledgeBase.builder[String]
+      .withRelation(Relation.symmetricBinary("friends"))
+      .withFactTuple("friends", RelationTuple(List("Alice", "Bob")))
+      .build()
 
-    assert(kb.contains(RelationName("friends"), RelationTuple(List("Alice", "Bob"))))
-    assert(kb.contains(RelationName("friends"), RelationTuple(List("Bob", "Alice"))))
+    assertEquals(kb.contains(RelationName("friends"), RelationTuple(List("Alice", "Bob"))), Right(true))
+    assertEquals(kb.contains(RelationName("friends"), RelationTuple(List("Bob", "Alice"))), Right(true))
 
   test("Symmetric relation works with Int domain"):
-    val kb = KnowledgeBase.empty[Int]
-      .addRelation(Relation.symmetricBinary("adjacent"))
-      .addFact(RelationName("adjacent"), RelationTuple(List(1, 2)))
+    val kb = KnowledgeBase.builder[Int]
+      .withRelation(Relation.symmetricBinary("adjacent"))
+      .withFactTuple("adjacent", RelationTuple(List(1, 2)))
+      .build()
 
-    assert(kb.contains(RelationName("adjacent"), RelationTuple(List(1, 2))))
-    assert(kb.contains(RelationName("adjacent"), RelationTuple(List(2, 1))))
+    assertEquals(kb.contains(RelationName("adjacent"), RelationTuple(List(1, 2))), Right(true))
+    assertEquals(kb.contains(RelationName("adjacent"), RelationTuple(List(2, 1))), Right(true))
 
   // ══════════════════════════════════════════════════════════════════
   //  Section 7: Mixed schema — symmetric and non-symmetric coexist
   // ══════════════════════════════════════════════════════════════════
 
   test("KB with both symmetric and non-symmetric relations"):
-    val kb = KnowledgeBase.empty[RelationValue]
-      .addRelation(Relation.symmetricBinary("borders"))
-      .addRelation(Relation.binary("has_risk"))
-      .addRelation(Relation.unary("country"))
-      .addFact(RelationName("borders"), binary("France", "Germany"))
-      .addFact(RelationName("has_risk"), binary("C1", "R1"))
-      .addFact(RelationName("country"), RelationTuple(List(const("France"))))
+    val kb = KnowledgeBase.builder[RelationValue]
+      .withRelation(Relation.symmetricBinary("borders"))
+      .withRelation(Relation.binary("has_risk"))
+      .withRelation(Relation.unary("country"))
+      .withFactTuple("borders", binary("France", "Germany"))
+      .withFactTuple("has_risk", binary("C1", "R1"))
+      .withFactTuple("country", RelationTuple(List(const("France"))))
+      .build()
 
     // borders is symmetric
-    assert(kb.contains(RelationName("borders"), binary("France", "Germany")))
-    assert(kb.contains(RelationName("borders"), binary("Germany", "France")))
+    assertEquals(kb.contains(RelationName("borders"), binary("France", "Germany")), Right(true))
+    assertEquals(kb.contains(RelationName("borders"), binary("Germany", "France")), Right(true))
 
     // has_risk is NOT symmetric
-    assert(kb.contains(RelationName("has_risk"), binary("C1", "R1")))
-    assert(!kb.contains(RelationName("has_risk"), binary("R1", "C1")))
+    assertEquals(kb.contains(RelationName("has_risk"), binary("C1", "R1")), Right(true))
+    assertEquals(kb.contains(RelationName("has_risk"), binary("R1", "C1")), Right(false))
 
     // country is unary — unaffected
-    assert(kb.contains(RelationName("country"), RelationTuple(List(const("France")))))
+    assertEquals(kb.contains(RelationName("country"), RelationTuple(List(const("France")))), Right(true))
 
   test("activeDomain includes all symmetric materialised values"):
-    val kb = KnowledgeBase.empty[RelationValue]
-      .addRelation(Relation.symmetricBinary("borders"))
-      .addFact(RelationName("borders"), binary("France", "Germany"))
+    val kb = KnowledgeBase.builder[RelationValue]
+      .withRelation(Relation.symmetricBinary("borders"))
+      .withFactTuple("borders", binary("France", "Germany"))
+      .build()
 
     val domain = kb.activeDomain
     assert(domain.contains(const("France")))

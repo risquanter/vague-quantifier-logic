@@ -80,7 +80,7 @@ object KnowledgeBaseModel:
       if args.length != arity then
         false
       else
-        kb.contains(relationName, RelationTuple(args))
+        kb.contains(relationName, RelationTuple(args)).getOrElse(false)
 
 /** Extension methods for KnowledgeBase. */
 extension [D: DomainElement](kb: KnowledgeBase[D])

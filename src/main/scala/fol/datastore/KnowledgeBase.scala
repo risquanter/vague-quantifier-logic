@@ -1,5 +1,7 @@
 package fol.datastore
 
+import fol.error.QueryError
+
 /** Knowledge Base
   *
   * A lightweight, in-memory datastore for relational facts.
@@ -38,16 +40,29 @@ case class KnowledgeBase[D](
   def getFacts(relationName: RelationName): Set[RelationTuple[D]] =
     facts.getOrElse(relationName, Set.empty)
 
-  /** Check if a fact exists */
-  def contains(relationName: RelationName, tuple: RelationTuple[D]): Boolean =
-    getFacts(relationName).contains(tuple)
-
-  /** Add a relation to the schema */
-  def addRelation(relation: Relation): KnowledgeBase[D] =
-    if schema.contains(relation.name) then
-      throw new IllegalArgumentException(s"Relation ${relation.name.value} already exists")
+  /** Check if a fact exists.
+    *
+    * Returns `Left` if the relation does not exist in the schema.
+    */
+  def contains(relationName: RelationName, tuple: RelationTuple[D]): Either[QueryError, Boolean] =
+    if !schema.contains(relationName) then
+      Left(QueryError.RelationNotFoundError(relationName, schema.keySet))
     else
-      copy(schema = schema + (relation.name -> relation))
+      Right(getFacts(relationName).contains(tuple))
+
+  /** Add a relation to the schema.
+    *
+    * Returns `Left` if a relation with the same name already exists.
+    */
+  def addRelation(relation: Relation): Either[QueryError, KnowledgeBase[D]] =
+    if schema.contains(relation.name) then
+      Left(QueryError.DataStoreError(
+        s"Relation ${relation.name.value} already exists",
+        operation = "addRelation",
+        relation = Some(relation.name.value)
+      ))
+    else
+      Right(copy(schema = schema + (relation.name -> relation)))
 
   /** Add a fact (validates arity against schema).
     *
@@ -58,28 +73,37 @@ case class KnowledgeBase[D](
     *
     * @see docs/ADR-009.md
     */
-  def addFact(relationName: RelationName, tuple: RelationTuple[D]): KnowledgeBase[D] =
+  def addFact(relationName: RelationName, tuple: RelationTuple[D]): Either[QueryError, KnowledgeBase[D]] =
     schema.get(relationName) match
       case None =>
-        throw new IllegalArgumentException(s"Unknown relation: ${relationName.value}")
+        Left(QueryError.RelationNotFoundError(relationName, schema.keySet))
       case Some(relation) =>
         if tuple.arity != relation.arity then
-          throw new IllegalArgumentException(
-            s"Tuple $tuple has arity ${tuple.arity}, expected ${relation.arity} for relation ${relation}"
-          )
-        val currentFacts = facts.getOrElse(relationName, Set.empty)
-        val withForward = currentFacts + tuple
-        val updated =
-          if relation.isSymmetric then
-            val reversed = RelationTuple(tuple.values.reverse)
-            withForward + reversed
-          else
-            withForward
-        copy(facts = facts + (relationName -> updated))
+          Left(QueryError.SchemaError(
+            s"Tuple $tuple has arity ${tuple.arity}, expected ${relation.arity} for relation ${relation}",
+            relationName = relationName,
+            expectedArity = relation.arity,
+            actualArity = tuple.arity
+          ))
+        else
+          val currentFacts = facts.getOrElse(relationName, Set.empty)
+          val withForward = currentFacts + tuple
+          val updated =
+            if relation.isSymmetric then
+              val reversed = RelationTuple(tuple.values.reverse)
+              withForward + reversed
+            else
+              withForward
+          Right(copy(facts = facts + (relationName -> updated)))
 
-  /** Add multiple facts at once */
-  def addFacts(relationName: RelationName, tuples: Set[RelationTuple[D]]): KnowledgeBase[D] =
-    tuples.foldLeft(this)((kb, tuple) => kb.addFact(relationName, tuple))
+  /** Add multiple facts at once.
+    *
+    * Stops at the first error and returns it.
+    */
+  def addFacts(relationName: RelationName, tuples: Set[RelationTuple[D]]): Either[QueryError, KnowledgeBase[D]] =
+    tuples.foldLeft(Right(this): Either[QueryError, KnowledgeBase[D]]) { (acc, tuple) =>
+      acc.flatMap(_.addFact(relationName, tuple))
+    }
 
   /** Query facts matching a pattern
     *
@@ -90,30 +114,53 @@ case class KnowledgeBase[D](
     * Example: query("has_risk", List(Some(Const("C1")), None))
     *   matches all risks for component C1
     */
-  def query(relationName: RelationName, pattern: List[Option[D]]): Set[RelationTuple[D]] =
-    getFacts(relationName).filter(_.matches(pattern))
+  def query(relationName: RelationName, pattern: List[Option[D]]): Either[QueryError, Set[RelationTuple[D]]] =
+    schema.get(relationName) match
+      case None =>
+        Left(QueryError.RelationNotFoundError(relationName, schema.keySet))
+      case Some(relation) =>
+        if pattern.length != relation.arity then
+          Left(QueryError.SchemaError(
+            s"Pattern has length ${pattern.length}, expected ${relation.arity} for relation ${relation}",
+            relationName = relationName,
+            expectedArity = relation.arity,
+            actualArity = pattern.length
+          ))
+        else
+          Right(getFacts(relationName).filter(_.matches(pattern)))
 
-  /** Get all unique values at a specific position of a relation
+  /** Get all unique values at a specific position of a relation.
     *
-    * Useful for getting all domain elements (e.g., all component IDs)
+    * Returns `Left` if the relation does not exist or position is out of bounds.
     */
-  def getDomain(relationName: RelationName, position: Int = 0): Set[D] =
-    val rel = schema.get(relationName).getOrElse(
-      throw new IllegalArgumentException(s"Unknown relation: ${relationName.value}")
-    )
-    if position < 0 || position >= rel.arity then
-      throw new IllegalArgumentException(
-        s"Position $position out of bounds for relation ${relationName.value} (arity ${rel.arity})"
-      )
-    getFacts(relationName).map(_.values(position))
+  def getDomain(relationName: RelationName, position: Int = 0): Either[QueryError, Set[D]] =
+    schema.get(relationName) match
+      case None =>
+        Left(QueryError.RelationNotFoundError(relationName, schema.keySet))
+      case Some(rel) =>
+        if position < 0 || position >= rel.arity then
+          Left(QueryError.PositionOutOfBoundsError(
+            s"Position $position out of bounds for relation ${relationName.value} (arity ${rel.arity})",
+            relationName = relationName,
+            arity = rel.arity,
+            position = position
+          ))
+        else
+          Right(getFacts(relationName).map(_.values(position)))
 
   /** Get active domain: all values used in the KB */
   def activeDomain: Set[D] =
     facts.values.flatten.flatMap(_.values).toSet
 
-  /** Count facts in a relation */
-  def count(relationName: RelationName): Int =
-    getFacts(relationName).size
+  /** Count facts in a relation.
+    *
+    * Returns `Left` if the relation does not exist in the schema.
+    */
+  def count(relationName: RelationName): Either[QueryError, Int] =
+    if !schema.contains(relationName) then
+      Left(QueryError.RelationNotFoundError(relationName, schema.keySet))
+    else
+      Right(getFacts(relationName).size)
 
   /** Total number of facts across all relations */
   def totalFacts: Int =
@@ -128,7 +175,7 @@ case class KnowledgeBase[D](
     sb.append(s"  Active domain size: ${activeDomain.size}\n")
     sb.append(s"\nRelations:\n")
     schema.values.toSeq.sortBy(_.name).foreach { rel =>
-      sb.append(s"  ${rel.name.value}/${rel.arity}: ${count(rel.name)} facts\n")
+      sb.append(s"  ${rel.name.value}/${rel.arity}: ${getFacts(rel.name).size} facts\n")
     }
     sb.toString
 
@@ -149,7 +196,9 @@ object KnowledgeBase:
 
     /** Add a relation to the schema */
     def withRelation(relation: Relation): Builder[D] =
-      kb = kb.addRelation(relation)
+      kb = kb.addRelation(relation) match
+        case Right(updated) => updated
+        case Left(err) => throw err.toThrowable
       this
 
     /** Add a unary relation */
@@ -166,7 +215,9 @@ object KnowledgeBase:
       */
     def withFact(relationName: String, values: D*): Builder[D] =
       val tuple = RelationTuple(values.toList)
-      kb = kb.addFact(RelationName(relationName), tuple)
+      kb = kb.addFact(RelationName(relationName), tuple) match
+        case Right(updated) => updated
+        case Left(err) => throw err.toThrowable
       this
 
     /** Add a fact using a pre-built tuple.
@@ -174,7 +225,9 @@ object KnowledgeBase:
       * Accepts raw `String` — wraps to `RelationName` (ADR-010 §3).
       */
     def withFactTuple(relationName: String, tuple: RelationTuple[D]): Builder[D] =
-      kb = kb.addFact(RelationName(relationName), tuple)
+      kb = kb.addFact(RelationName(relationName), tuple) match
+        case Right(updated) => updated
+        case Left(err) => throw err.toThrowable
       this
 
     /** Add multiple facts from tuples.
@@ -182,7 +235,9 @@ object KnowledgeBase:
       * Accepts raw `String` — wraps to `RelationName` (ADR-010 §3).
       */
     def withFacts(relationName: String, tuples: Set[RelationTuple[D]]): Builder[D] =
-      kb = kb.addFacts(RelationName(relationName), tuples)
+      kb = kb.addFacts(RelationName(relationName), tuples) match
+        case Right(updated) => updated
+        case Left(err) => throw err.toThrowable
       this
 
     /** Build the final knowledge base */

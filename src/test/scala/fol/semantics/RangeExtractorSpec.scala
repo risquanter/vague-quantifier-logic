@@ -23,51 +23,51 @@ class RangeExtractorSpec extends FunSuite:
   
   // Simple geography KB
   def geographyKB: KnowledgeBase[RelationValue] =
-    val kb = KnowledgeBase[RelationValue](Map.empty, Map.empty)
-      .addRelation(Relation(RelationName("country"), 1))
-      .addRelation(Relation(RelationName("city"), 1))
-      .addRelation(Relation(RelationName("capital"), 2))
-      .addRelation(Relation(RelationName("large_country"), 1))
-    
-    kb.addFacts(RelationName("country"), Set(
-      RelationTuple(List(RConst("France"))),
-      RelationTuple(List(RConst("Germany"))),
-      RelationTuple(List(RConst("Italy"))),
-      RelationTuple(List(RConst("Spain")))
-    ))
-    .addFacts(RelationName("city"), Set(
-      RelationTuple(List(RConst("Paris"))),
-      RelationTuple(List(RConst("Berlin"))),
-      RelationTuple(List(RConst("Rome"))),
-      RelationTuple(List(RConst("Madrid")))
-    ))
-    .addFacts(RelationName("capital"), Set(
-      RelationTuple(List(RConst("Paris"), RConst("France"))),
-      RelationTuple(List(RConst("Berlin"), RConst("Germany"))),
-      RelationTuple(List(RConst("Rome"), RConst("Italy"))),
-      RelationTuple(List(RConst("Madrid"), RConst("Spain")))
-    ))
-    .addFacts(RelationName("large_country"), Set(
-      RelationTuple(List(RConst("France"))),
-      RelationTuple(List(RConst("Germany")))
-    ))
+    KnowledgeBase.builder[RelationValue]
+      .withRelation(Relation(RelationName("country"), 1))
+      .withRelation(Relation(RelationName("city"), 1))
+      .withRelation(Relation(RelationName("capital"), 2))
+      .withRelation(Relation(RelationName("large_country"), 1))
+      .withFacts("country", Set(
+        RelationTuple(List(RConst("France"))),
+        RelationTuple(List(RConst("Germany"))),
+        RelationTuple(List(RConst("Italy"))),
+        RelationTuple(List(RConst("Spain")))
+      ))
+      .withFacts("city", Set(
+        RelationTuple(List(RConst("Paris"))),
+        RelationTuple(List(RConst("Berlin"))),
+        RelationTuple(List(RConst("Rome"))),
+        RelationTuple(List(RConst("Madrid")))
+      ))
+      .withFacts("capital", Set(
+        RelationTuple(List(RConst("Paris"), RConst("France"))),
+        RelationTuple(List(RConst("Berlin"), RConst("Germany"))),
+        RelationTuple(List(RConst("Rome"), RConst("Italy"))),
+        RelationTuple(List(RConst("Madrid"), RConst("Spain")))
+      ))
+      .withFacts("large_country", Set(
+        RelationTuple(List(RConst("France"))),
+        RelationTuple(List(RConst("Germany")))
+      ))
+      .build()
   
   // KB with numeric values
   def numericKB: KnowledgeBase[RelationValue] =
-    val kb = KnowledgeBase[RelationValue](Map.empty, Map.empty)
-      .addRelation(Relation(RelationName("component"), 1))
-      .addRelation(Relation(RelationName("has_severity"), 2))
-    
-    kb.addFacts(RelationName("component"), Set(
-      RelationTuple(List(RConst("C1"))),
-      RelationTuple(List(RConst("C2"))),
-      RelationTuple(List(RConst("C3")))
-    ))
-    .addFacts(RelationName("has_severity"), Set(
-      RelationTuple(List(RConst("C1"), Num(8))),
-      RelationTuple(List(RConst("C2"), Num(3))),
-      RelationTuple(List(RConst("C3"), Num(9)))
-    ))
+    KnowledgeBase.builder[RelationValue]
+      .withRelation(Relation(RelationName("component"), 1))
+      .withRelation(Relation(RelationName("has_severity"), 2))
+      .withFacts("component", Set(
+        RelationTuple(List(RConst("C1"))),
+        RelationTuple(List(RConst("C2"))),
+        RelationTuple(List(RConst("C3")))
+      ))
+      .withFacts("has_severity", Set(
+        RelationTuple(List(RConst("C1"), Num(8))),
+        RelationTuple(List(RConst("C2"), Num(3))),
+        RelationTuple(List(RConst("C3"), Num(9)))
+      ))
+      .build()
   
   // ==================== Unary Range Tests ====================
   
@@ -100,8 +100,9 @@ class RangeExtractorSpec extends FunSuite:
   }
   
   test("extract range from empty relation") {
-    val kb = KnowledgeBase[RelationValue](Map.empty, Map.empty)
-      .addRelation(Relation(RelationName("empty_rel"), 1))
+    val kb = KnowledgeBase.builder[RelationValue]
+      .withRelation(Relation(RelationName("empty_rel"), 1))
+      .build()
     
     val query = ParsedQuery(
       Quantifier.aboutHalf,

@@ -172,20 +172,20 @@ class ResolvedQuerySpec extends munit.FunSuite, fol.RelationValueFixtures:
   // Fixtures for fromRelation tests
 
   def createCountryKB(): KnowledgeBase[RelationValue] =
-    KnowledgeBase[RelationValue](Map.empty, Map.empty)
-      .addRelation(Relation(RelationName("country"), 1))
-      .addRelation(Relation(RelationName("large"), 1))
-      .addRelation(Relation(RelationName("coastal"), 1))
-      .addRelation(Relation(RelationName("wealthy"), 1))
-      .addRelation(Relation(RelationName("borders"), 2))
-      .addFacts(RelationName("country"), Set(
+    KnowledgeBase.builder[RelationValue]
+      .withRelation(Relation(RelationName("country"), 1))
+      .withRelation(Relation(RelationName("large"), 1))
+      .withRelation(Relation(RelationName("coastal"), 1))
+      .withRelation(Relation(RelationName("wealthy"), 1))
+      .withRelation(Relation(RelationName("borders"), 2))
+      .withFacts("country", Set(
         "France", "Germany", "Italy", "Spain",
         "Luxembourg", "Switzerland", "Belgium", "Austria"
       ).map(unary))
-      .addFacts(RelationName("large"), Set("France", "Germany", "Italy", "Spain").map(unary))
-      .addFacts(RelationName("coastal"), Set("France", "Italy", "Spain").map(unary))
-      .addFacts(RelationName("wealthy"), Set("Luxembourg", "Switzerland").map(unary))
-      .addFacts(RelationName("borders"), Set(
+      .withFacts("large", Set("France", "Germany", "Italy", "Spain").map(unary))
+      .withFacts("coastal", Set("France", "Italy", "Spain").map(unary))
+      .withFacts("wealthy", Set("Luxembourg", "Switzerland").map(unary))
+      .withFacts("borders", Set(
         binary("France", "Germany"),
         binary("France", "Belgium"),
         binary("France", "Luxembourg"),
@@ -200,25 +200,27 @@ class ResolvedQuerySpec extends munit.FunSuite, fol.RelationValueFixtures:
         binary("Italy", "Switzerland"),
         binary("Belgium", "Luxembourg")
       ))
+      .build()
 
   def rvSource: KnowledgeSource[RelationValue] =
     KnowledgeSource.fromKnowledgeBase(createCountryKB())
 
   def createStringKB(): KnowledgeBase[String] =
-    KnowledgeBase[String](Map.empty, Map.empty)
-      .addRelation(Relation(RelationName("employee"), 1))
-      .addRelation(Relation(RelationName("satisfied"), 1))
-      .addRelation(Relation(RelationName("works_in"), 2))
-      .addFacts(RelationName("employee"), Set("Alice", "Bob", "Charlie", "Diana", "Eve",
+    KnowledgeBase.builder[String]
+      .withRelation(Relation(RelationName("employee"), 1))
+      .withRelation(Relation(RelationName("satisfied"), 1))
+      .withRelation(Relation(RelationName("works_in"), 2))
+      .withFacts("employee", Set("Alice", "Bob", "Charlie", "Diana", "Eve",
                                  "Frank", "Grace", "Hank", "Ivy", "Jack").map(e => RelationTuple(List(e))))
-      .addFacts(RelationName("satisfied"), Set("Alice", "Bob", "Charlie", "Diana", "Eve",
+      .withFacts("satisfied", Set("Alice", "Bob", "Charlie", "Diana", "Eve",
                                   "Frank", "Grace").map(e => RelationTuple(List(e))))
-      .addFacts(RelationName("works_in"), Set(
+      .withFacts("works_in", Set(
         ("Alice", "Engineering"), ("Bob", "Engineering"), ("Charlie", "Engineering"),
         ("Diana", "Sales"), ("Eve", "Sales"),
         ("Frank", "HR"), ("Grace", "HR"),
         ("Hank", "Engineering"), ("Ivy", "Sales"), ("Jack", "HR")
       ).map((e, d) => RelationTuple(List(e, d))))
+      .build()
 
   def strSource: KnowledgeSource[String] =
     KnowledgeSource.fromKnowledgeBase(createStringKB())
@@ -253,8 +255,9 @@ class ResolvedQuerySpec extends munit.FunSuite, fol.RelationValueFixtures:
         fail("Expected Left for nonexistent relation")
 
   test("fromRelation with empty-but-existing relation returns Right (vacuously-false)"):
-    val kb = KnowledgeBase[RelationValue](Map.empty, Map.empty)
-      .addRelation(Relation(RelationName("empty_rel"), 1))
+    val kb = KnowledgeBase.builder[RelationValue]
+      .withRelation(Relation(RelationName("empty_rel"), 1))
+      .build()
     val src = KnowledgeSource.fromKnowledgeBase(kb)
 
     val result = ResolvedQuery.fromRelation(
@@ -394,7 +397,7 @@ class ResolvedQuerySpec extends munit.FunSuite, fol.RelationValueFixtures:
 
   test("fromRelation evaluateWithOutput satisfying elements are correct on String domain"):
     val worksInHR: String => Boolean =
-      d => strSource.query(RelationName("works_in"), List(Some(d), Some("HR"))).nonEmpty
+      d => strSource.query(RelationName("works_in"), List(Some(d), Some("HR"))).exists(_.nonEmpty)
 
     val result = ResolvedQuery.fromRelation(
       source = strSource,

@@ -1,6 +1,7 @@
 package fol.semantics
 
 import fol.datastore.{KnowledgeSource, RelationName, RelationTuple}
+import fol.error.QueryError
 
 /** Shared utilities for domain extraction from knowledge sources.
   * 
@@ -53,7 +54,7 @@ object DomainExtraction:
     source: KnowledgeSource[D],
     relationName: RelationName,
     position: Int
-  ): Set[D] =
+  ): Either[QueryError, Set[D]] =
     source.getDomain(relationName, position)
   
   /** Extract the active domain (all constants used in source).
@@ -108,7 +109,7 @@ object DomainExtraction:
     source: KnowledgeSource[D],
     relationName: RelationName,
     pattern: List[Option[D]]
-  ): Set[RelationTuple[D]] =
+  ): Either[QueryError, Set[RelationTuple[D]]] =
     source.query(relationName, pattern)
   
   /** Extract values from specific positions in pattern query results.
@@ -143,10 +144,11 @@ object DomainExtraction:
     relationName: RelationName,
     pattern: List[Option[D]],
     positions: List[Int]
-  ): Set[D] =
-    val matchingTuples = extractWithPattern(source, relationName, pattern)
-    matchingTuples.flatMap { tuple =>
-      positions.map(pos => tuple.values(pos))
+  ): Either[QueryError, Set[D]] =
+    extractWithPattern(source, relationName, pattern).map { matchingTuples =>
+      matchingTuples.flatMap { tuple =>
+        positions.map(pos => tuple.values(pos))
+      }
     }
   
   /** Extract domain from pattern at single position (most common case).
@@ -165,7 +167,7 @@ object DomainExtraction:
     relationName: RelationName,
     pattern: List[Option[D]],
     position: Int
-  ): Set[D] =
+  ): Either[QueryError, Set[D]] =
     extractFromPatternAtPositions(source, relationName, pattern, List(position))
   
   /** Count how many distinct values exist at a position in a relation.
@@ -182,8 +184,8 @@ object DomainExtraction:
     source: KnowledgeSource[D],
     relationName: RelationName,
     position: Int
-  ): Int =
-    extractFromRelation(source, relationName, position).size
+  ): Either[QueryError, Int] =
+    extractFromRelation(source, relationName, position).map(_.size)
   
   /** Count size of active domain.
     * 

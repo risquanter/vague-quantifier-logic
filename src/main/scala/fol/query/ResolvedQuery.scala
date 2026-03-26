@@ -136,11 +136,8 @@ object ResolvedQuery:
     hdrConfig: HDRConfig = HDRConfig.default
   ): Either[QueryError, ResolvedQuery[D]] =
     try
-      if !source.hasRelation(relationName) then
-        Left(QueryError.RelationNotFoundError(relationName, source.relationNames))
-      else
-        val elements = source.getDomain(relationName, position)
-        Right(ResolvedQuery(quantifier, elements, predicate, params, hdrConfig))
+      source.getDomain(relationName, position)
+        .map(elements => ResolvedQuery(quantifier, elements, predicate, params, hdrConfig))
     catch
       case e: QueryException => Left(e.error)
       case NonFatal(e) =>

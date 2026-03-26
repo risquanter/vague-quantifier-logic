@@ -23,24 +23,25 @@ class VagueSemanticsSpec extends munit.FunSuite:
 
   // Test knowledge base with countries
   def createCountryKB(): KnowledgeBase[RelationValue] =
-    KnowledgeBase[RelationValue](Map.empty, Map.empty)
-      .addRelation(Relation(RelationName("country"), 1))
-      .addRelation(Relation(RelationName("large"), 1))
-      .addRelation(Relation(RelationName("coastal"), 1))
-      .addRelation(Relation(RelationName("wealthy"), 1))
-      .addFacts(RelationName("country"), Set(
+    KnowledgeBase.builder[RelationValue]
+      .withRelation(Relation(RelationName("country"), 1))
+      .withRelation(Relation(RelationName("large"), 1))
+      .withRelation(Relation(RelationName("coastal"), 1))
+      .withRelation(Relation(RelationName("wealthy"), 1))
+      .withFacts("country", Set(
         unary("France"), unary("Germany"), unary("Italy"), unary("Spain"),
         unary("Luxembourg"), unary("Switzerland"), unary("Belgium"), unary("Austria")
       ))
-      .addFacts(RelationName("large"), Set(
+      .withFacts("large", Set(
         unary("France"), unary("Germany"), unary("Italy"), unary("Spain")
       ))
-      .addFacts(RelationName("coastal"), Set(
+      .withFacts("coastal", Set(
         unary("France"), unary("Italy"), unary("Spain")
       ))
-      .addFacts(RelationName("wealthy"), Set(
+      .withFacts("wealthy", Set(
         unary("Luxembourg"), unary("Switzerland")
       ))
+      .build()
 
   test("evaluate simple query: about half of countries are large (exact)"):
     val kb = createCountryKB()
@@ -187,7 +188,7 @@ class VagueSemanticsSpec extends munit.FunSuite:
 
   test("empty range returns unsatisfied with zero proportion"):
     val kb = createCountryKB()
-      .addRelation(Relation(RelationName("empty_rel"), 1))
+      .addRelation(Relation(RelationName("empty_rel"), 1)).toOption.get
     
     // Q[~#]^{1/2} x (empty_rel(x), large(x))
     // Relation exists in schema but has zero facts
@@ -333,17 +334,18 @@ class VagueSemanticsSpec extends munit.FunSuite:
     // Simplified version of query q₁ from paper Section 5.2
     // Q[~#]^{1/2} x (european_country(x), large(x))
     
-    val kb = KnowledgeBase[RelationValue](Map.empty, Map.empty)
-      .addRelation(Relation(RelationName("european_country"), 1))
-      .addRelation(Relation(RelationName("large"), 1))
-      .addFacts(RelationName("european_country"), Set(
+    val kb = KnowledgeBase.builder[RelationValue]
+      .withRelation(Relation(RelationName("european_country"), 1))
+      .withRelation(Relation(RelationName("large"), 1))
+      .withFacts("european_country", Set(
         unary("France"), unary("Germany"), unary("Spain"), unary("Italy"), 
         unary("Poland"), unary("Romania"), unary("Luxembourg"), unary("Belgium"), 
         unary("Netherlands"), unary("Portugal")
       ))
-      .addFacts(RelationName("large"), Set(
+      .withFacts("large", Set(
         unary("France"), unary("Germany"), unary("Spain"), unary("Italy"), unary("Poland")
       ))
+      .build()
     
     val query = ParsedQuery(
       quantifier = Quantifier.About(1, 2, 0.1),
@@ -407,7 +409,7 @@ class VagueSemanticsSpec extends munit.FunSuite:
 
   test("evaluate returns empty element sets for empty range"):
     val kb = createCountryKB()
-      .addRelation(Relation(RelationName("empty_rel"), 1))
+      .addRelation(Relation(RelationName("empty_rel"), 1)).toOption.get
 
     // Relation exists in schema but has zero facts
     val query = ParsedQuery(

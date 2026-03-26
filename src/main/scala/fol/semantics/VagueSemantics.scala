@@ -37,7 +37,8 @@ object VagueSemantics:
 
   /** Compile a string-parsed query into a [[ResolvedQuery]].
     *
-    * Private — throws on error.  The public methods wrap this in Either.
+    * Private — returns Either.  Composes the Either from RangeExtractor
+    * with the remaining (throwing) compilation steps inside map.
     */
   private def toResolved[D: DomainElement: DomainCodec: ClassTag](
     query: ParsedQuery,
@@ -46,15 +47,14 @@ object VagueSemantics:
     samplingParams: SamplingParams,
     hdrConfig: HDRConfig,
     modelAugmenter: ModelAugmenter[D] = ModelAugmenter.identity[D]
-  ): ResolvedQuery[D] =
-    val rangeElements = RangeExtractor.extractRange(source, query, answerTuple) match
-      case Right(elems) => elems
-      case Left(error) => throw error.toThrowable
-    val predicate = FOLBridge.scopeToPredicate(
-      query.scope, query.variable, source, answerTuple, modelAugmenter
-    )
-    val vq = VagueQuantifier.fromQuantifier(query.quantifier)
-    ResolvedQuery(vq, rangeElements, predicate, samplingParams, hdrConfig)
+  ): Either[QueryError, ResolvedQuery[D]] =
+    RangeExtractor.extractRange(source, query, answerTuple).map { rangeElements =>
+      val predicate = FOLBridge.scopeToPredicate(
+        query.scope, query.variable, source, answerTuple, modelAugmenter
+      )
+      val vq = VagueQuantifier.fromQuantifier(query.quantifier)
+      ResolvedQuery(vq, rangeElements, predicate, samplingParams, hdrConfig)
+    }
 
   /** Evaluate a vague quantifier query.
     *
@@ -79,7 +79,8 @@ object VagueSemantics:
     modelAugmenter: ModelAugmenter[D] = ModelAugmenter.identity[D]
   ): Either[QueryError, VagueQueryResult] =
     try
-      Right(toResolved(query, source, answerTuple, samplingParams, hdrConfig, modelAugmenter).evaluate())
+      toResolved(query, source, answerTuple, samplingParams, hdrConfig, modelAugmenter)
+        .map(_.evaluate())
     catch
       case e: QueryException => Left(e.error)
       case NonFatal(e) =>
@@ -111,7 +112,8 @@ object VagueSemantics:
     modelAugmenter: ModelAugmenter[D] = ModelAugmenter.identity[D]
   ): Either[QueryError, EvaluationOutput[D]] =
     try
-      Right(toResolved(query, source, answerTuple, samplingParams, hdrConfig, modelAugmenter).evaluateWithOutput())
+      toResolved(query, source, answerTuple, samplingParams, hdrConfig, modelAugmenter)
+        .map(_.evaluateWithOutput())
     catch
       case e: QueryException => Left(e.error)
       case NonFatal(e) =>

@@ -21,14 +21,14 @@ class SymmetricRelationIntegrationSpec extends FunSuite, RelationValueFixtures:
 
   /** Countries KB with symmetric `borders` relation. */
   def createSymmetricCountryKB(): KnowledgeBase[RelationValue] =
-    KnowledgeBase.empty[RelationValue]
-      .addRelation(Relation.unary("country"))
-      .addRelation(Relation.symmetricBinary("borders"))
-      .addFacts(RelationName("country"), Set(
+    KnowledgeBase.builder[RelationValue]
+      .withRelation(Relation.unary("country"))
+      .withRelation(Relation.symmetricBinary("borders"))
+      .withFacts("country", Set(
         "France", "Germany", "Italy", "Spain",
         "Belgium", "Austria", "Switzerland"
       ).map(n => RelationTuple(List(const(n)))))
-      .addFacts(RelationName("borders"), Set(
+      .withFacts("borders", Set(
         binary("France", "Germany"),
         binary("France", "Belgium"),
         binary("France", "Switzerland"),
@@ -40,6 +40,7 @@ class SymmetricRelationIntegrationSpec extends FunSuite, RelationValueFixtures:
         binary("Italy", "Austria"),
         binary("Italy", "Switzerland")
       ))
+      .build()
 
   def symmetricSource: KnowledgeSource[RelationValue] =
     KnowledgeSource.fromKnowledgeBase(createSymmetricCountryKB())
@@ -53,14 +54,14 @@ class SymmetricRelationIntegrationSpec extends FunSuite, RelationValueFixtures:
 
     // borders(x, Germany) — pattern-match query
     val bordersGermany: RelationValue => Boolean =
-      d => src.query(RelationName("borders"), List(Some(d), Some(const("Germany")))).nonEmpty
+      d => src.query(RelationName("borders"), List(Some(d), Some(const("Germany")))).exists(_.nonEmpty)
 
     // France → Germany (forward direction)
     assert(bordersGermany(const("France")), "France borders Germany (forward)")
 
     // borders(x, France) — reverse direction
     val bordersFrance: RelationValue => Boolean =
-      d => src.query(RelationName("borders"), List(Some(d), Some(const("France")))).nonEmpty
+      d => src.query(RelationName("borders"), List(Some(d), Some(const("France")))).exists(_.nonEmpty)
 
     // Germany → France (reverse direction — materialised)
     assert(bordersFrance(const("Germany")), "Germany borders France (reverse, symmetric)")
@@ -74,7 +75,7 @@ class SymmetricRelationIntegrationSpec extends FunSuite, RelationValueFixtures:
 
     // Check borders(entity, Germany) via pattern-match
     val pred: RelationValue => Boolean =
-      entity => src.query(RelationName("borders"), List(Some(entity), Some(const("Germany")))).nonEmpty
+      entity => src.query(RelationName("borders"), List(Some(entity), Some(const("Germany")))).exists(_.nonEmpty)
 
     assert(pred(const("France")), "France→Germany (forward)")
     // Belgium→Germany: original was (Germany, Belgium), symmetric → (Belgium, Germany) exists
@@ -90,7 +91,7 @@ class SymmetricRelationIntegrationSpec extends FunSuite, RelationValueFixtures:
     val src = symmetricSource
 
     val bordersFrance: RelationValue => Boolean =
-      d => src.query(RelationName("borders"), List(Some(d), Some(const("France")))).nonEmpty
+      d => src.query(RelationName("borders"), List(Some(d), Some(const("France")))).exists(_.nonEmpty)
 
     val result = ResolvedQuery.fromRelation(
       source = src,
@@ -112,7 +113,7 @@ class SymmetricRelationIntegrationSpec extends FunSuite, RelationValueFixtures:
     val src = symmetricSource
 
     val bordersGermany: RelationValue => Boolean =
-      d => src.query(RelationName("borders"), List(Some(d), Some(const("Germany")))).nonEmpty
+      d => src.query(RelationName("borders"), List(Some(d), Some(const("Germany")))).exists(_.nonEmpty)
 
     val result = ResolvedQuery.fromRelation(
       source = src,
@@ -191,7 +192,7 @@ class SymmetricRelationIntegrationSpec extends FunSuite, RelationValueFixtures:
 
     countries.foreach { country =>
       val ilResult =
-        src.query(RelationName("borders"), List(Some(const(country)), Some(const("France")))).nonEmpty
+        src.query(RelationName("borders"), List(Some(const(country)), Some(const("France")))).exists(_.nonEmpty)
 
       val folFormula = Formula.Atom(FOL("borders", List(
         Term.Const(country), Term.Const("France")

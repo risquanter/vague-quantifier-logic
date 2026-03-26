@@ -15,68 +15,68 @@ class ScopeEvaluatorSpec extends FunSuite:
   
   // Geography KB with countries and properties
   def geographyKB: KnowledgeBase[RelationValue] =
-    val kb = KnowledgeBase[RelationValue](Map.empty, Map.empty)
-      .addRelation(Relation(RelationName("country"), 1))
-      .addRelation(Relation(RelationName("city"), 1))
-      .addRelation(Relation(RelationName("capital"), 2))
-      .addRelation(Relation(RelationName("large"), 1))
-      .addRelation(Relation(RelationName("has_pop"), 2))
-    
-    kb.addFacts(RelationName("country"), Set(
-      RelationTuple(List(RConst("France"))),
-      RelationTuple(List(RConst("Germany"))),
-      RelationTuple(List(RConst("Italy"))),
-      RelationTuple(List(RConst("Spain"))),
-      RelationTuple(List(RConst("Luxembourg")))
-    ))
-    .addFacts(RelationName("city"), Set(
-      RelationTuple(List(RConst("Paris"))),
-      RelationTuple(List(RConst("Berlin"))),
-      RelationTuple(List(RConst("Rome"))),
-      RelationTuple(List(RConst("Madrid")))
-    ))
-    .addFacts(RelationName("capital"), Set(
-      RelationTuple(List(RConst("Paris"), RConst("France"))),
-      RelationTuple(List(RConst("Berlin"), RConst("Germany"))),
-      RelationTuple(List(RConst("Rome"), RConst("Italy"))),
-      RelationTuple(List(RConst("Madrid"), RConst("Spain")))
-    ))
-    .addFacts(RelationName("large"), Set(
-      RelationTuple(List(RConst("France"))),
-      RelationTuple(List(RConst("Germany"))),
-      RelationTuple(List(RConst("Italy")))
-    ))
-    .addFacts(RelationName("has_pop"), Set(
-      RelationTuple(List(RConst("France"), Num(67))),
-      RelationTuple(List(RConst("Germany"), Num(83))),
-      RelationTuple(List(RConst("Italy"), Num(60))),
-      RelationTuple(List(RConst("Spain"), Num(47))),
-      RelationTuple(List(RConst("Luxembourg"), Num(1)))
-    ))
+    KnowledgeBase.builder[RelationValue]
+      .withRelation(Relation(RelationName("country"), 1))
+      .withRelation(Relation(RelationName("city"), 1))
+      .withRelation(Relation(RelationName("capital"), 2))
+      .withRelation(Relation(RelationName("large"), 1))
+      .withRelation(Relation(RelationName("has_pop"), 2))
+      .withFacts("country", Set(
+        RelationTuple(List(RConst("France"))),
+        RelationTuple(List(RConst("Germany"))),
+        RelationTuple(List(RConst("Italy"))),
+        RelationTuple(List(RConst("Spain"))),
+        RelationTuple(List(RConst("Luxembourg")))
+      ))
+      .withFacts("city", Set(
+        RelationTuple(List(RConst("Paris"))),
+        RelationTuple(List(RConst("Berlin"))),
+        RelationTuple(List(RConst("Rome"))),
+        RelationTuple(List(RConst("Madrid")))
+      ))
+      .withFacts("capital", Set(
+        RelationTuple(List(RConst("Paris"), RConst("France"))),
+        RelationTuple(List(RConst("Berlin"), RConst("Germany"))),
+        RelationTuple(List(RConst("Rome"), RConst("Italy"))),
+        RelationTuple(List(RConst("Madrid"), RConst("Spain")))
+      ))
+      .withFacts("large", Set(
+        RelationTuple(List(RConst("France"))),
+        RelationTuple(List(RConst("Germany"))),
+        RelationTuple(List(RConst("Italy")))
+      ))
+      .withFacts("has_pop", Set(
+        RelationTuple(List(RConst("France"), Num(67))),
+        RelationTuple(List(RConst("Germany"), Num(83))),
+        RelationTuple(List(RConst("Italy"), Num(60))),
+        RelationTuple(List(RConst("Spain"), Num(47))),
+        RelationTuple(List(RConst("Luxembourg"), Num(1)))
+      ))
+      .build()
   
   // Component/risk KB for numeric tests
   def componentKB: KnowledgeBase[RelationValue] =
-    val kb = KnowledgeBase[RelationValue](Map.empty, Map.empty)
-      .addRelation(Relation(RelationName("component"), 1))
-      .addRelation(Relation(RelationName("critical"), 1))
-      .addRelation(Relation(RelationName("has_severity"), 2))
-    
-    kb.addFacts(RelationName("component"), Set(
-      RelationTuple(List(RConst("C1"))),
-      RelationTuple(List(RConst("C2"))),
-      RelationTuple(List(RConst("C3"))),
-      RelationTuple(List(RConst("C4")))
-    ))
-    .addFacts(RelationName("critical"), Set(
-      RelationTuple(List(RConst("C1"))),
-      RelationTuple(List(RConst("C2")))
-    ))
-    .addFacts(RelationName("has_severity"), Set(
-      RelationTuple(List(RConst("C1"), Num(8))),
-      RelationTuple(List(RConst("C2"), Num(9))),
-      RelationTuple(List(RConst("C3"), Num(3))),
-      RelationTuple(List(RConst("C4"), Num(7)))
-    ))
+    KnowledgeBase.builder[RelationValue]
+      .withRelation(Relation(RelationName("component"), 1))
+      .withRelation(Relation(RelationName("critical"), 1))
+      .withRelation(Relation(RelationName("has_severity"), 2))
+      .withFacts("component", Set(
+        RelationTuple(List(RConst("C1"))),
+        RelationTuple(List(RConst("C2"))),
+        RelationTuple(List(RConst("C3"))),
+        RelationTuple(List(RConst("C4")))
+      ))
+      .withFacts("critical", Set(
+        RelationTuple(List(RConst("C1"))),
+        RelationTuple(List(RConst("C2")))
+      ))
+      .withFacts("has_severity", Set(
+        RelationTuple(List(RConst("C1"), Num(8))),
+        RelationTuple(List(RConst("C2"), Num(9))),
+        RelationTuple(List(RConst("C3"), Num(3))),
+        RelationTuple(List(RConst("C4"), Num(7)))
+      ))
+      .build()
   
   // ==================== Single Element Evaluation Tests ====================
   
@@ -201,10 +201,10 @@ class ScopeEvaluatorSpec extends FunSuite:
     val kb = geographyKB
     // Add relation: large countries
     val kb2 = kb.addRelation(Relation(RelationName("country_large"), 1))
-      .addFacts(RelationName("country_large"), Set(
+      .flatMap(_.addFacts(RelationName("country_large"), Set(
         RelationTuple(List(RConst("France"))),
         RelationTuple(List(RConst("Germany")))
-      ))
+      ))).toOption.get
     
     val model = KnowledgeBaseModel.toModel(kb2)
     
