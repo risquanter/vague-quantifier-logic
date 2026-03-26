@@ -329,48 +329,6 @@ def samplingVsExactDemo(): Unit =
   println(s"Query satisfied? $exactAccepts")
   println()
   
-  // SAMPLING - Multiple trials
-  println("=" * 40)
-  println("SAMPLING (random subsets)")
-  println("=" * 40)
-  println()
-  
-  // TODO: Replace with HDRSampler for consistency (scala.util.Random — demo code only)
-  val random = new scala.util.Random(42)  // Fixed seed for reproducibility
-  
-  // Try different sample sizes
-  val sampleSizes = List(5, 10, 15)
-  
-  sampleSizes.foreach { sampleSize =>
-    println(s"Sample size: $sampleSize cities (${sampleSize * 100 / 20}% of total)")
-    println()
-    
-    // Do 5 trials with different random samples
-    (1 to 5).foreach { trial =>
-      val sample = random.shuffle(fullRange.toList).take(sampleSize).toSet
-      val prop = ScopeEvaluator.calculateProportion(
-        sample, query.scope, query.variable, model
-      )
-      val accepts = Quantifier.accepts(query.quantifier, prop, 0.1)
-      val symbol = if accepts then "✓" else "✗"
-      
-      println(f"  Trial $trial: Prop = $prop%.3f (${prop * 100}%.0f%%) $symbol")
-    }
-    
-    println()
-  }
-  
-  println("Key observations:")
-  println(s"  • Exact proportion: ${exactProp * 100}%.1f%% (always the same)")
-  println("  • Sampled proportions: vary between trials")
-  println("  • Larger samples → less variation")
-  println("  • Small samples → higher sampling error")
-  println()
-  println("Why sampling?")
-  println("  • Large D_R: Exact evaluation too expensive")
-  println("  • Sampling: Get approximate answer faster")
-  println("  • Trade-off: Speed vs accuracy")
-  println()
 
 /** ============================================================================
   * SECTION 4: Different Quantifier Types
