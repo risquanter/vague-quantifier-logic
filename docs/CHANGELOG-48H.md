@@ -1,7 +1,7 @@
-# Changelog — 24–26 March 2026
+# Changelog — 24–27 March 2026
 
-All changes from `30359c4` to `d4c285e` (HEAD).
-67 files changed, +4333 / −2607 lines. 854 tests passing.
+All changes from `30359c4` to HEAD (`09815e7` committed; `fol.typed` package staged).
+~100 files changed. **868 JVM tests passing, 0 failures.**
 
 ---
 
@@ -47,8 +47,6 @@ Deleted the typed Query DSL (`Query.scala`, `VagueQueryPlayground.scala`,
 `UnresolvedQuerySpec.scala`). Added `ResolvedQuery.fromRelation` factory
 as the sole entry point for programmatic query construction.
 
-**New ADR:** ADR-011 (DSL Removal).
-
 **New docs:** `IMPLEMENTATION-PLAN-DSL-REMOVAL.md`,
 `PROMPT-CODE-QUALITY-REVIEW.md`, `TECHNICAL-DEBT.md`,
 `WORKING-INSTRUCTIONS.md`.
@@ -76,7 +74,93 @@ both at `0.2.0-SNAPSHOT`.
 
 ---
 
-## Version
+## 5. TD-001: Either Migration — `KnowledgeBase[D]` and `KnowledgeSource[D]`
 
-`0.2.0-SNAPSHOT` — up from `0.1.0-SNAPSHOT` (bumped during Phase 6
-due to breaking API changes from the generic datastore migration).
+**Commit:** `09815e7`
+
+Full `Either[QueryError, A]` migration for all state-dependent KB/KS
+methods, implementing ADR-012 Option A.
+
+- `KnowledgeBase`: `getDomain`, `addRelation`, `addFact`, `addFacts`,
+  `contains`, `query`, `count` — all return `Either[QueryError, A]`.
+- `KnowledgeSource` trait + `InMemoryKnowledgeSource`: `contains`,
+  `getDomain`, `query`, `count` — same.
+- `query` pre-validates pattern length against declared relation arity.
+- `DomainExtraction`: 5 methods converted to `Either`.
+- `RangeExtractor`: removed `hasRelation` guards; `extractRangeUnsafe`
+  unwraps at OCaml-style boundary (ADR-007).
+- `VagueSemantics.toResolved`: returns `Either`, trampoline
+  (`Left → throw → catch → Left`) eliminated.
+- New `PositionOutOfBoundsError` variant added to `QueryError`.
+- 8 test specs updated; 3 new `PositionOutOfBoundsError` tests added.
+
+**Test count after:** 857 (up from 854).
+
+## 6. Many-Sorted Type System — `fol.typed` Package
+
+**Status:** Implemented, staged (uncommitted).
+
+Adds a mandatory bind/typecheck phase and sorted runtime execution
+layer. Directly unblocks register's query-pane integration. See
+ADR-001 (many-sorted query binding) and ADR-013 (typed result
+projection).
+
+### New source files (`src/main/scala/fol/typed/`)
+
+| File | Purpose |
+|---|---|
+| `TypeDefs.scala` | `TypeId`, `SymbolName` opaque types; `TypeRepr[A]` trait |
+| `TypeCatalog.scala` | Sort catalog — private constructor, `apply` returns `Either`, `unsafe` for tests |
+| `BoundQuery.scala` | Typed IL: `BoundQuery`, `BoundVar`, `BoundTerm`, `BoundFormula` |
+| `QueryBinder.scala` | `ParsedQuery → Either[List[TypeCheckError], BoundQuery]` |
+| `TypeCheckError.scala` | Error ADT: `UnknownPredicate`, `UnknownFunction`, `ArityMismatch`, `UnknownConstantOrLiteral`, `TypeMismatch`, `UnboundAnswerVar`, `UnconstrainedVar`, `ConflictingTypes` |
+| `RuntimeModelError.scala` | Error ADT for dispatcher coverage failures: `MissingFunctionImplementation`, `MissingPredicateImplementation` |
+| `RuntimeModel.scala` | `Value(sort, raw)`, `RuntimeDispatcher`, `RuntimeModel`, `Value.as[A]` |
+| `TypedSemantics.scala` | Evaluator over `BoundQuery` + `RuntimeModel` |
+
+### Facade
+
+`VagueSemantics.bindTyped` and `VagueSemantics.evaluateTyped` — public
+entry points. `evaluateTyped` is the canonical sorted evaluation path:
+`parse → bind → TypedSemantics.evaluate`.
+
+### What this enables for register
+
+| register need | Provided by |
+|---|---|
+| `Loss (Long)` sort without Int overflow | `Value(sort = TypeId("Loss"), raw: Long)` backed by dispatcher |
+| `Probability (Double)` sort | `Value(sort = TypeId("Probability"), raw: Double)` backed by dispatcher |
+| Decimal literals (`0.05`) | Binder resolves by argument-position sort from `TypeCatalog` |
+| Sort-specific comparators (`gt_loss`, `gt_prob`) | `RuntimeDispatcher.evalPredicate` — native Long/Double comparison |
+| Startup type-safety | `RuntimeModel.validateAgainst(catalog)` — coverage + arity check |
+
+`RelationValue` and the existing `D`-parameterised pipeline are
+unchanged and continue to back all 868 existing tests.
+
+### New test files
+
+- `fol/typed/TypeCatalogSpec.scala`
+- `fol/typed/QueryBinderSpec.scala`
+- `fol/semantics/VagueSemanticsTypedSpec.scala`
+
+**Test count after:** 868 (up from 857).
+
+## 7. Documentation Cleanup
+
+**Commits:** `56aaad9` + this session (uncommitted).
+
+- Deleted stale implementation plans, draft proposals, and historical
+  prompt docs (−2606 lines).
+- Added ADR-012, Architecture.md ADR table, TECHNICAL-DEBT.md expansion.
+- ADR consolidation: ADR-001 replaced with many-sorted binding content;
+  ADR-013 added for typed result projection; ADR-006 (superseded) and
+  ADR-011 (DSL-removal changelog) deleted.
+- ADR-008 stripped of commit-hash changelog content; architecture
+  content retained.
+- Dangling ADR-006 / ADR-011 references removed from Architecture.md,
+  TECHNICAL-DEBT.md, MULTI-SORTED-TYPE-SYSTEM-V2.md,
+  CANONICAL-RUNTIME-COMPLIANCE-REPORT-2026-03-26.md, CHANGELOG-48H.md.
+
+---
+
+`0.3.0-SNAPSHOT` — up from `0.2.0-SNAPSHOT` (bumped for `fol.typed` many-sorted type system: `TypeCatalog`, `BoundQuery`, `QueryBinder`, `RuntimeModel`, `RuntimeModelError`, `TypedSemantics`, `TypeRepr[A]`, and `VagueSemantics.evaluateTyped` facade).

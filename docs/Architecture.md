@@ -159,17 +159,17 @@ See [ADR-002](ADR-002.md).
 
 | ADR | Topic |
 |---|---|
-| [ADR-001](ADR-001.md) | Evaluation Path Unification — shared IL, end-to-end trace |
+| [ADR-001](ADR-001.md) | Many-Sorted Query Binding — `BoundQuery` typed IL, catalog, binder, typed evaluator |
 | [ADR-002](ADR-002.md) | Parser-Combinator Style — CPS, single Either boundary |
 | [ADR-003](ADR-003.md) | HDR Deterministic Sampling — Fisher-Yates, reproducibility |
 | [ADR-004](ADR-004.md) | Tagless Initial Architecture — ADTs + operations, layering |
 | [ADR-005](ADR-005.md) | Model Augmentation — endomorphism monoid, numeric infra, extensibility |
-| [ADR-006](ADR-006.md) | Domain Type Erasure — superseded by ADR-008 (historical) |
 | [ADR-007](ADR-007.md) | Preserve OCaml-Ported Parser Combinator Core |
 | [ADR-008](ADR-008.md) | Domain Type Safety — generic `KnowledgeBase[D]` |
 | [ADR-009](ADR-009.md) | Symmetric Relation Support via Schema Metadata |
 | [ADR-010](ADR-010.md) | Typed Relation Names — `RelationName` Opaque Type |
-| [ADR-011](ADR-011.md) | DSL Removal — IL-Direct Construction |
+| [ADR-012](ADR-012.md) | Error Channel Policy — `require` vs `Either` |
+| [ADR-013](ADR-013.md) | Typed Result Projection — `TypeRepr[A]` for consumer domain extraction |
 
 ---
 

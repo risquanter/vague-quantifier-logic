@@ -148,7 +148,7 @@ Both modes use the same code path. `SamplingParams` controls precision:
 | Exact | `SamplingParams.exact` (ε = 1e-6) | n = N, deterministic, full domain |
 | Sampled | `SamplingParams.default` (ε = 0.1) | n < N, HDR Fisher-Yates, Wilson CI |
 
-See [ADR-003](ADR-003.md) for sampling design and [ADR-001](ADR-001.md) for mode unification rationale.
+See [ADR-003](ADR-003.md) for sampling design and [ADR-001](ADR-001.md) for query binding and evaluation pipeline.
 
 ---
 

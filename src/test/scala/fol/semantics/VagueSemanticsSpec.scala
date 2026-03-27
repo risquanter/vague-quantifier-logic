@@ -6,6 +6,7 @@ import fol.logic.{Quantifier, ParsedQuery}
 import fol.result.{EvaluationOutput, VagueQueryResult}
 import fol.error.QueryError
 import fol.sampling.SamplingParams
+import fol.typed.{TypeCatalog, TypeId, SymbolName, PredicateSig}
 
 class VagueSemanticsSpec extends munit.FunSuite:
 
@@ -484,3 +485,45 @@ class VagueSemanticsSpec extends munit.FunSuite:
     // Both paths see the same statistics
     assertEquals(evalOutput.result.proportion, holdsResult.proportion)
     assertEquals(evalOutput.result.satisfied, holdsResult.satisfied)
+
+  test("bindTyped returns bound query for well-typed input"):
+    val asset = TypeId("Asset")
+    val catalog = TypeCatalog.unsafe(
+      types = Set(asset),
+      predicates = Map(
+        SymbolName("leaf") -> PredicateSig(List(asset)),
+        SymbolName("coastal") -> PredicateSig(List(asset))
+      )
+    )
+
+    val query = ParsedQuery(
+      quantifier = Quantifier.About(1, 2, 0.1),
+      variable = "x",
+      range = FOL("leaf", List(Term.Var("x"))),
+      scope = Formula.Atom(FOL("coastal", List(Term.Var("x"))))
+    )
+
+    val result = VagueSemantics.bindTyped(query, catalog)
+    assert(result.isRight)
+
+  test("bindTyped maps type-check errors to ValidationError"):
+    val asset = TypeId("Asset")
+    val catalog = TypeCatalog.unsafe(
+      types = Set(asset),
+      predicates = Map(
+        SymbolName("leaf") -> PredicateSig(List(asset))
+      )
+    )
+
+    val query = ParsedQuery(
+      quantifier = Quantifier.About(1, 2, 0.1),
+      variable = "x",
+      range = FOL("leaf", List(Term.Var("x"))),
+      scope = Formula.Atom(FOL("missing_pred", List(Term.Var("x"))))
+    )
+
+    val result = VagueSemantics.bindTyped(query, catalog)
+    result match
+      case Left(_: QueryError.ValidationError) => assert(true)
+      case Left(other)                         => fail(s"Expected ValidationError, got $other")
+      case Right(_)                            => fail("Expected Left for invalid typed query")

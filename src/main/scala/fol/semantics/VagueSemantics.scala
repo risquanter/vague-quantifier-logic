@@ -8,6 +8,7 @@ import fol.query.ResolvedQuery
 import fol.result.{VagueQueryResult, EvaluationOutput}
 import fol.sampling.{SamplingParams, HDRConfig}
 import fol.error.{QueryError, QueryException}
+import fol.typed.{TypeCatalog, BoundQuery, QueryBinder, TypeCheckError, RuntimeModel, RuntimeModelError, Value, TypedSemantics}
 import semantics.ModelAugmenter
 import scala.util.control.NonFatal
 import scala.reflect.ClassTag
@@ -31,9 +32,76 @@ import scala.reflect.ClassTag
   * Public API returns `Either[QueryError, A]` — single boundary.
   *
   * Paper reference: Section 3, Definition 2
-  * See also: docs/EVALUATION-PATH-UNIFICATION.md (Decisions D4, D11)
+  * See also: [[fol.typed.TypedSemantics]] for the canonical typed evaluation path (ADR-001)
   */
 object VagueSemantics:
+
+  /** Bind a parsed query into the typed IL (type-checks variable sorts against the catalog).
+    *
+    * Phase-1 canonical entrypoint. Runtime evaluation follows in evaluateTyped.
+    */
+  def bindTyped(
+    query: ParsedQuery,
+    catalog: TypeCatalog
+  ): Either[QueryError, BoundQuery] =
+    QueryBinder
+      .bind(query, catalog)
+      .left
+      .map(errors =>
+        QueryError.ValidationError(
+          message = "Query type-checking failed",
+          field = "typed_query",
+          context = Map("errors" -> renderTypeErrors(errors))
+        )
+      )
+
+  private def renderTypeErrors(errors: List[TypeCheckError]): String =
+    errors.map {
+      case TypeCheckError.UnknownPredicate(name) => s"unknown predicate: $name"
+      case TypeCheckError.UnknownFunction(name) => s"unknown function: $name"
+      case TypeCheckError.ArityMismatch(symbol, expected, actual) =>
+        s"arity mismatch for '$symbol': expected $expected, actual $actual"
+      case TypeCheckError.UnknownConstantOrLiteral(name) => s"unknown constant or literal: $name"
+      case TypeCheckError.TypeMismatch(expected, actual, context) =>
+        s"type mismatch in $context: expected ${expected.value}, actual ${actual.value}"
+      case TypeCheckError.UnboundAnswerVar(name) => s"unbound answer variable: $name"
+      case TypeCheckError.UnconstrainedVar(name) => s"unconstrained quantifier variable: $name"
+      case TypeCheckError.ConflictingTypes(name, left, right) =>
+        s"conflicting inferred types for '$name': ${left.value} vs ${right.value}"
+    }.mkString("; ")
+
+  /** Evaluate a parsed query through the typed pipeline.
+    *
+    * Canonical flow: ParsedQuery -> bindTyped -> model validation -> TypedSemantics.evaluate
+    */
+  def evaluateTyped(
+    query: ParsedQuery,
+    catalog: TypeCatalog,
+    model: RuntimeModel,
+    answerTuple: Map[String, Value] = Map.empty,
+    samplingParams: SamplingParams = SamplingParams.exact,
+    hdrConfig: HDRConfig = HDRConfig.default
+  ): Either[QueryError, EvaluationOutput[Value]] =
+    for
+      bound <- bindTyped(query, catalog)
+      _ <- model.validateAgainst(catalog).left.map { errors =>
+        QueryError.ValidationError(
+          message = "Runtime model validation failed",
+          field = "typed_runtime_model",
+          context = Map("errors" -> errors.map {
+            case RuntimeModelError.MissingFunctionImplementation(n)  => s"missing function: ${n.value}"
+            case RuntimeModelError.MissingPredicateImplementation(n) => s"missing predicate: ${n.value}"
+          }.mkString("; "))
+        )
+      }
+      output <- TypedSemantics.evaluate(
+        query = bound,
+        model = model,
+        answerTuple = answerTuple,
+        samplingParams = samplingParams,
+        hdrConfig = hdrConfig
+      )
+    yield output
 
   /** Compile a string-parsed query into a [[ResolvedQuery]].
     *

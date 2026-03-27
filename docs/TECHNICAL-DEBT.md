@@ -243,9 +243,9 @@ implementations (SQL, RDF) where typed errors are essential.
 
 ## TD-002: ActiveDomain Has No Formal Counterpart — CLOSED
 
-**Closed by:** ADR-011 (DSL Removal)
+**Closed by:** DSL Removal (commit `3307423`)
 
 `DomainSpec.ActiveDomain` was deleted along with the typed DSL.
 The `KnowledgeSource.activeDomain` method remains for FOL evaluation
 (quantifier scope over full universe), but no programmatic entry point
-exposes it as a quantification domain.  See ADR-011 §3.
+exposes it as a quantification domain.
