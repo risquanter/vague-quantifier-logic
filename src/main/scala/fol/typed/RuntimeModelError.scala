@@ -19,3 +19,9 @@ enum RuntimeModelError:
     * `RuntimeDispatcher`.
     */
   case MissingPredicateImplementation(name: SymbolName)
+
+  /** An enumerable type declared in [[TypeCatalog.enumerableTypes]] has no
+    * registered domain (element set) in the `RuntimeModel`.
+    * See ADR-001 §4.
+    */
+  case MissingDomainForEnumerableType(typeName: TypeId)

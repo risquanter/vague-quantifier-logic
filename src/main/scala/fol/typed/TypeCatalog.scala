@@ -20,6 +20,12 @@ enum TypeCatalogError:
   */
 case class TypeCatalog private (
   types: Set[TypeId],
+  /** Types that require a registered domain in [[RuntimeModel]].
+    * Defaults to all declared types. Used by [[RuntimeModel.validateAgainst]]
+    * to enforce domain coverage and by [[fol.typed.QueryBinder]] to reject
+    * queries that quantify over non-domain types at bind time.
+    */
+  enumerableTypes: Set[TypeId],
   constants: Map[String, TypeId],
   functions: Map[SymbolName, FunctionSig],
   predicates: Map[SymbolName, PredicateSig],
@@ -36,10 +42,12 @@ object TypeCatalog:
     constants: Map[String, TypeId] = Map.empty,
     functions: Map[SymbolName, FunctionSig] = Map.empty,
     predicates: Map[SymbolName, PredicateSig] = Map.empty,
-    literalValidators: Map[TypeId, String => Boolean] = Map.empty
+    literalValidators: Map[TypeId, String => Boolean] = Map.empty,
+    enumerableTypes: Set[TypeId] = Set.empty
   ): Either[List[TypeCatalogError], TypeCatalog] =
-    val errors = collectErrors(types, constants, functions, predicates, literalValidators)
-    if errors.isEmpty then Right(new TypeCatalog(types, constants, functions, predicates, literalValidators))
+    val effective = if enumerableTypes.isEmpty then types else enumerableTypes
+    val errors = collectErrors(types, effective, constants, functions, predicates, literalValidators)
+    if errors.isEmpty then Right(new TypeCatalog(types, effective, constants, functions, predicates, literalValidators))
     else Left(errors)
 
   /** Construct without returning Either. Throws [[IllegalArgumentException]] if
@@ -51,9 +59,10 @@ object TypeCatalog:
     constants: Map[String, TypeId] = Map.empty,
     functions: Map[SymbolName, FunctionSig] = Map.empty,
     predicates: Map[SymbolName, PredicateSig] = Map.empty,
-    literalValidators: Map[TypeId, String => Boolean] = Map.empty
+    literalValidators: Map[TypeId, String => Boolean] = Map.empty,
+    enumerableTypes: Set[TypeId] = Set.empty
   ): TypeCatalog =
-    apply(types, constants, functions, predicates, literalValidators)
+    apply(types, constants, functions, predicates, literalValidators, enumerableTypes)
       .fold(
         errors => throw IllegalArgumentException(s"Invalid TypeCatalog: ${errors.map(_.toString).mkString(", ")}"),
         identity
@@ -61,12 +70,17 @@ object TypeCatalog:
 
   private def collectErrors(
     types: Set[TypeId],
+    enumerableTypes: Set[TypeId],
     constants: Map[String, TypeId],
     functions: Map[SymbolName, FunctionSig],
     predicates: Map[SymbolName, PredicateSig],
     literalValidators: Map[TypeId, String => Boolean]
   ): List[TypeCatalogError] =
     val unknownTypes = List.newBuilder[TypeCatalogError]
+
+    enumerableTypes.foreach { t =>
+      if !types.contains(t) then unknownTypes += TypeCatalogError.UnknownType(t.value)
+    }
 
     constants.values.foreach { s =>
       if !types.contains(s) then unknownTypes += TypeCatalogError.UnknownType(s.value)

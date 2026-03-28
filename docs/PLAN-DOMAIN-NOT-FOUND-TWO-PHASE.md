@@ -1,7 +1,7 @@
 # Implementation Plan: DomainNotFoundError — Two-Phase Delivery
 
 **Date:** 2026-03-27  
-**Status:** Approved for implementation  
+**Status:** Complete — Phase 1 (0.4.0-SNAPSHOT, 2026-03-28); Phase 2 (0.5.0-SNAPSHOT, 2026-03-28)  
 **Relates to:** PROMPT-FOL-ENGINE-DOMAIN-NOT-FOUND-ERROR.md, ADR-001
 
 ---

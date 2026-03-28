@@ -12,6 +12,8 @@ object QueryBinder:
       rangeResult <- bindAtom(query.range, Map.empty, catalog)
       (boundRange, envAfterRange) = rangeResult
       quantifiedVarSort <- envAfterRange.get(query.variable).toRight(List(TypeCheckError.UnconstrainedVar(query.variable)))
+      _ <- if catalog.enumerableTypes.contains(quantifiedVarSort) then Right(())
+           else Left(List(TypeCheckError.NonEnumerableType(quantifiedVarSort.value)))
       scopeResult <- bindFormula(query.scope, envAfterRange, catalog)
       (boundScope, envAfterScope) = scopeResult
       boundAnswers <- bindAnswerVars(query.answerVars, envAfterScope)
@@ -72,9 +74,12 @@ object QueryBinder:
       envAfterBody.get(name) match
         case None => Left(List(TypeCheckError.UnconstrainedVar(name)))
         case Some(sort) =>
-          val escaped = envAfterBody - name
-          val outerMerged = env ++ escaped
-          Right((mk(BoundVar(name, sort), boundBody), outerMerged))
+          if !catalog.enumerableTypes.contains(sort) then
+            Left(List(TypeCheckError.NonEnumerableType(sort.value)))
+          else
+            val escaped = envAfterBody - name
+            val outerMerged = env ++ escaped
+            Right((mk(BoundVar(name, sort), boundBody), outerMerged))
     }
 
   private def bindAtom(atom: FOL, env: Env, catalog: TypeCatalog): Either[List[TypeCheckError], (BoundAtom, Env)] =

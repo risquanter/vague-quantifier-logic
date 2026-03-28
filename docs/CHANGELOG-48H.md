@@ -1,7 +1,7 @@
 # Changelog — 24–28 March 2026
 
 All changes from `30359c4` to HEAD (`09815e7` committed; `fol.typed` package staged).
-~100 files changed. **873 JVM tests passing, 0 failures.**
+~100 files changed. **878 JVM tests passing, 0 failures.**
 
 ---
 
@@ -202,4 +202,37 @@ circular package constraint — same convention as `UninterpretedSymbolError`.
 
 ---
 
-`0.4.0-SNAPSHOT` — up from `0.3.0-SNAPSHOT` (bumped for structured error hierarchy: `BindError`, `ModelValidationError`, `DomainNotFoundError`).
+`0.5.0-SNAPSHOT` — up from `0.4.0-SNAPSHOT` (bumped for Phase 2: enumerability enforcement — `TypeCatalog.enumerableTypes`, `NonEnumerableType` bind-time rejection, `RuntimeModel.validateAgainst` domain coverage, `MissingDomainForEnumerableType`; `DomainNotFoundError` demoted to defensive fallback).
+
+---
+
+## 9. Enumerability Enforcement — Bind-Time and Model-Validation (Phase 2)
+
+**Session:** 2026-03-28 (this session).
+
+Added static enumerability constraints so that a query quantifying over a type
+with no registered domain is rejected as early as possible — at bind time if the
+catalog marks the type as non-enumerable, or at model-validation time if the
+model omits the required domain. `DomainNotFoundError` is now a defensive
+fallback unreachable through the normal pipeline.
+
+### New mechanisms
+
+| Component | Change |
+|---|---|
+| `TypeCatalog.enumerableTypes: Set[TypeId]` | Subset of `types`; defaults to all types. Types not in this set cannot be quantified over. |
+| `TypeCheckError.NonEnumerableType(name: String)` | Bind-time rejection when root or nested quantifier variable resolves to a non-enumerable type. |
+| `RuntimeModelError.MissingDomainForEnumerableType(typeName: TypeId)` | Model-validation error when an enumerable type has no registered domain in `RuntimeModel`. |
+| `RuntimeModel.validateAgainst` | Extended to check `enumerableTypes.diff(domains.keySet)`. |
+| `VagueSemantics.renderTypeErrors` | New `NonEnumerableType` arm. |
+| `VagueSemantics.renderModelErrors` | New `MissingDomainForEnumerableType` arm. |
+| `QueryError.DomainNotFoundError` scaladoc | Updated: now documented as defensive fallback. |
+| ADR-001 | Context §3–4 and Decision §4 clarified: dispatcher misconfiguration vs missing domain elements are distinct concerns. New Code Smell added. |
+
+### Tests added / updated
+
+- `TypeCatalogSpec`: +2 (enumerableTypes subset rejection; valid subset accepted)
+- `QueryBinderSpec`: +2 (NonEnumerableType root variable; nested Forall)
+- `VagueSemanticsTypedSpec`: 3 tests updated (DomainNotFoundError → ModelValidationError); +1 new (defensive fallback via direct `TypedSemantics.evaluate`)
+
+**Test count after:** 878 (up from 873).

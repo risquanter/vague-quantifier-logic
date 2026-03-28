@@ -75,3 +75,47 @@ class QueryBinderSpec extends FunSuite:
 
     val result = QueryBinder.bind(query, catalog)
     assert(result.isLeft)
+
+  // ==================== NonEnumerableType tests ====================
+
+  private val catalogAssetEnumOnly = TypeCatalog.unsafe(
+    types = Set(asset, loss),
+    functions = Map(
+      SymbolName("p95") -> FunctionSig(List(asset), loss)
+    ),
+    predicates = Map(
+      SymbolName("leaf")    -> PredicateSig(List(asset)),
+      SymbolName("gt_loss") -> PredicateSig(List(loss, loss))
+    ),
+    enumerableTypes = Set(asset)   // Loss is declared but NOT enumerable
+  )
+
+  test("bind fails with NonEnumerableType when root quantified variable is non-enumerable"):
+    val query = ParsedQuery(
+      quantifier = Quantifier.mkAtLeast(1, 2),
+      variable = "l",
+      range = FOL("gt_loss", List(Term.Var("l"), Term.Var("l"))),
+      scope = Formula.True,
+      answerVars = Nil
+    )
+    val result = QueryBinder.bind(query, catalogAssetEnumOnly)
+    result match
+      case Left(List(TypeCheckError.NonEnumerableType(name))) =>
+        assertEquals(name, "Loss")
+      case Left(other) => fail(s"Expected NonEnumerableType, got $other")
+      case Right(_)    => fail("Expected Left for non-enumerable root variable")
+
+  test("bind fails with NonEnumerableType for nested quantifier over non-enumerable type"):
+    val query = ParsedQuery(
+      quantifier = Quantifier.mkAtLeast(1, 2),
+      variable = "x",
+      range = FOL("leaf", List(Term.Var("x"))),
+      scope = Formula.Forall("l", Formula.Atom(FOL("gt_loss", List(Term.Var("l"), Term.Var("l"))))),
+      answerVars = Nil
+    )
+    val result = QueryBinder.bind(query, catalogAssetEnumOnly)
+    result match
+      case Left(List(TypeCheckError.NonEnumerableType(name))) =>
+        assertEquals(name, "Loss")
+      case Left(other) => fail(s"Expected NonEnumerableType, got $other")
+      case Right(_)    => fail("Expected Left for non-enumerable nested quantifier")

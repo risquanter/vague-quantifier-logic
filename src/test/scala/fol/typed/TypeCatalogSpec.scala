@@ -35,3 +35,30 @@ class TypeCatalogSpec extends FunSuite:
     )
 
     assert(result.isLeft)
+
+  test("validate fails when enumerableTypes references a type not in declared types"):
+    val asset = TypeId("Asset")
+    val ghost  = TypeId("Ghost")  // not in types
+
+    val result = TypeCatalog(
+      types = Set(asset),
+      predicates = Map(SymbolName("leaf") -> PredicateSig(List(asset))),
+      enumerableTypes = Set(asset, ghost)
+    )
+
+    assert(result.isLeft)
+
+  test("validate succeeds when enumerableTypes is a proper subset of declared types"):
+    val asset = TypeId("Asset")
+    val loss  = TypeId("Loss")
+
+    val result = TypeCatalog(
+      types = Set(asset, loss),
+      predicates = Map(
+        SymbolName("leaf")    -> PredicateSig(List(asset)),
+        SymbolName("hasloss") -> PredicateSig(List(loss))
+      ),
+      enumerableTypes = Set(asset)   // Loss present in types but not enumerable
+    )
+
+    assert(result.isRight)

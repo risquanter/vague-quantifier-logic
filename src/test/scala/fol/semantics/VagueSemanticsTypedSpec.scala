@@ -3,7 +3,7 @@ package fol.semantics
 import fol.error.QueryError
 import fol.logic.{ParsedQuery, Quantifier}
 import fol.sampling.SamplingParams
-import fol.typed.{PredicateSig, RuntimeDispatcher, RuntimeModel, TypeCatalog, TypeId, TypeRepr, SymbolName, Value}
+import fol.typed.{BoundAtom, BoundFormula, BoundQuery, BoundTerm, BoundVar, PredicateSig, RuntimeDispatcher, RuntimeModel, TypeCatalog, TypedSemantics, TypeId, TypeRepr, SymbolName, Value}
 import logic.{FOL, Formula, Term}
 import munit.FunSuite
 
@@ -174,7 +174,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
       case Left(other) => fail(s"Expected BindError, got $other")
       case Right(_)    => fail("Expected Left")
 
-  // ==================== DomainNotFoundError tests ====================
+  // ==================== ModelValidationError (missing domain) tests ====================
 
   private val loss = TypeId("Loss")
 
@@ -185,7 +185,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
       SymbolName("coastal") -> PredicateSig(List(asset)),
       SymbolName("hasloss") -> PredicateSig(List(loss))
     )
-  )
+  ) // enumerableTypes defaults to Set(asset, loss)
 
   private val losslessDispatcher = new RuntimeDispatcher:
     override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Value] =
@@ -200,7 +200,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
     override def predicateSymbols: Set[SymbolName] =
       Set(SymbolName("leaf"), SymbolName("coastal"), SymbolName("hasloss"))
 
-  test("DomainNotFoundError returned when root quantified variable type has no domain"):
+  test("ModelValidationError raised when enumerable type has no registered domain (root variable)"):
     val queryOverLoss = ParsedQuery(
       quantifier = Quantifier.About(1, 2, 0.01),
       variable = "l",
@@ -208,17 +208,16 @@ class VagueSemanticsTypedSpec extends FunSuite:
       scope = Formula.True,
       answerVars = Nil
     )
-    // model has no domain for Loss
+    // Loss is enumerable in catalogWithLoss; model omits Loss domain → validateAgainst fails
     val model = RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = losslessDispatcher)
     val result = VagueSemantics.evaluateTyped(queryOverLoss, catalogWithLoss, model, samplingParams = SamplingParams.exact)
     result match
-      case Left(e: QueryError.DomainNotFoundError) =>
-        assertEquals(e.typeName, "Loss")
-        assert(e.availableTypes.contains("Asset"))
-      case Left(other) => fail(s"Expected DomainNotFoundError, got $other")
+      case Left(e: QueryError.ModelValidationError) =>
+        assert(e.errors.exists(_.contains("Loss")))
+      case Left(other) => fail(s"Expected ModelValidationError, got $other")
       case Right(_)    => fail("Expected Left")
 
-  test("DomainNotFoundError returned in nested Forall over type with no domain"):
+  test("ModelValidationError raised when enumerable type has no registered domain (nested Forall)"):
     val queryWithInnerForall = ParsedQuery(
       quantifier = Quantifier.About(1, 2, 0.01),
       variable = "x",
@@ -229,12 +228,12 @@ class VagueSemanticsTypedSpec extends FunSuite:
     val model = RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = losslessDispatcher)
     val result = VagueSemantics.evaluateTyped(queryWithInnerForall, catalogWithLoss, model, samplingParams = SamplingParams.exact)
     result match
-      case Left(e: QueryError.DomainNotFoundError) =>
-        assertEquals(e.typeName, "Loss")
-      case Left(other) => fail(s"Expected DomainNotFoundError, got $other")
+      case Left(e: QueryError.ModelValidationError) =>
+        assert(e.errors.exists(_.contains("Loss")))
+      case Left(other) => fail(s"Expected ModelValidationError, got $other")
       case Right(_)    => fail("Expected Left")
 
-  test("DomainNotFoundError returned in nested Exists over type with no domain"):
+  test("ModelValidationError raised when enumerable type has no registered domain (nested Exists)"):
     val queryWithInnerExists = ParsedQuery(
       quantifier = Quantifier.About(1, 2, 0.01),
       variable = "x",
@@ -245,7 +244,40 @@ class VagueSemanticsTypedSpec extends FunSuite:
     val model = RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = losslessDispatcher)
     val result = VagueSemantics.evaluateTyped(queryWithInnerExists, catalogWithLoss, model, samplingParams = SamplingParams.exact)
     result match
+      case Left(e: QueryError.ModelValidationError) =>
+        assert(e.errors.exists(_.contains("Loss")))
+      case Left(other) => fail(s"Expected ModelValidationError, got $other")
+      case Right(_)    => fail("Expected Left")
+
+  // ==================== DomainNotFoundError defensive fallback ====================
+  // Reachable only by bypassing the normal pipeline (direct TypedSemantics.evaluate
+  // with a manually constructed BoundQuery). In a correctly wired system this path
+  // should never be taken.
+
+  test("DomainNotFoundError defensive fallback via direct TypedSemantics.evaluate"):
+    // A catalog where Loss is NOT enumerable (asset only) — validateAgainst only
+    // checks Asset domain coverage, so it passes.
+    val catalogAssetOnly = TypeCatalog.unsafe(
+      types = Set(asset, loss),
+      predicates = Map(
+        SymbolName("hasloss") -> PredicateSig(List(loss))
+      ),
+      enumerableTypes = Set(asset)  // Loss excluded → validateAgainst will not check Loss domain
+    )
+    // Manually construct a BoundQuery over Loss, bypassing QueryBinder.bind
+    val boundQuery = BoundQuery(
+      quantifier = Quantifier.About(1, 2, 0.01),
+      variable = BoundVar("l", loss),
+      range = BoundAtom(SymbolName("hasloss"), List(BoundTerm.VarRef(BoundVar("l", loss)))),
+      scope = BoundFormula.True,
+      answerVars = Nil
+    )
+    val model = RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = losslessDispatcher)
+    // validateAgainst passes (only checks enumerable types); TypedSemantics.evaluate hits the fallback
+    val result = TypedSemantics.evaluate(boundQuery, model, samplingParams = SamplingParams.exact)
+    result match
       case Left(e: QueryError.DomainNotFoundError) =>
         assertEquals(e.typeName, "Loss")
+        assert(e.availableTypes.contains("Asset"))
       case Left(other) => fail(s"Expected DomainNotFoundError, got $other")
       case Right(_)    => fail("Expected Left")

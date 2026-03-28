@@ -191,10 +191,12 @@ object QueryError:
       "symbol_name" -> symbolName
     ) ++ (if availableSymbols.nonEmpty then Map("available" -> availableSymbols.mkString(", ")) else Map.empty)
   
-  /** Raised when a query quantifies over a type that has no registered domain
-    * in the RuntimeModel. This indicates either a user error (quantifying over
-    * a non-domain type) or a wiring bug (domain not registered at startup).
-    * See also: [[fol.typed.TypedSemantics]] and ADR-001.
+  /** Defensive fallback raised when evaluation reaches a type with no registered
+    * domain, despite passing binding. In a correctly wired system this should
+    * not be reachable: [[fol.typed.QueryBinder]] rejects non-enumerable types
+    * at bind time (NonEnumerableType) and [[fol.typed.RuntimeModel.validateAgainst]]
+    * enforces domain coverage before queries are served.
+    * See also: [[fol.typed.TypedSemantics]]
     */
   case class DomainNotFoundError(
     typeName: String,
