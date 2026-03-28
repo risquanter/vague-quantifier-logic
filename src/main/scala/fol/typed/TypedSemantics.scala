@@ -20,9 +20,9 @@ object TypedSemantics:
     for
       baseEnv <- validateAnswerTuple(query, answerTuple)
       rootDomain <- model.domains.get(query.variable.sort)
-        .toRight(QueryError.EvaluationError(
-          message = s"No runtime domain found for type '${query.variable.sort.value}'",
-          phase = "typed_evaluate"
+        .toRight(QueryError.DomainNotFoundError(
+          typeName       = query.variable.sort.value,
+          availableTypes = model.domains.keySet.map(_.value)
         ))
       rangeElements <- collectRangeElements(query, model, baseEnv, rootDomain)
       output <- evaluateOverRange(query, model, baseEnv, rangeElements, quantifier, samplingParams, hdrConfig)
@@ -141,9 +141,9 @@ object TypedSemantics:
         yield left == right
       case BoundFormula.Forall(v, body) =>
         model.domains.get(v.sort) match
-          case None => Left(QueryError.EvaluationError(
-            message = s"No runtime domain found for quantified type '${v.sort.value}'",
-            phase = "typed_formula"
+          case None => Left(QueryError.DomainNotFoundError(
+            typeName       = v.sort.value,
+            availableTypes = model.domains.keySet.map(_.value)
           ))
           case Some(domain) =>
             domain.foldLeft[Either[QueryError, Boolean]](Right(true)) { (acc, value) =>
@@ -154,9 +154,9 @@ object TypedSemantics:
             }
       case BoundFormula.Exists(v, body) =>
         model.domains.get(v.sort) match
-          case None => Left(QueryError.EvaluationError(
-            message = s"No runtime domain found for quantified type '${v.sort.value}'",
-            phase = "typed_formula"
+          case None => Left(QueryError.DomainNotFoundError(
+            typeName       = v.sort.value,
+            availableTypes = model.domains.keySet.map(_.value)
           ))
           case Some(domain) =>
             domain.foldLeft[Either[QueryError, Boolean]](Right(false)) { (acc, value) =>

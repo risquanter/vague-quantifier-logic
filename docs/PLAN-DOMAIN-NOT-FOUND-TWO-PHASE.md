@@ -155,7 +155,7 @@ Add to the appropriate typed semantics spec:
 - `evaluateTyped` returns `BindError` (not `ValidationError`) for a malformed query
 - `evaluateTyped` returns `ModelValidationError` (not `ValidationError`) when model wiring is incomplete
 
-Net test count: +6 (from 868 → 874).
+Net test count: +5 new tests, 2 existing tests updated (868 → 873).
 
 ### Delivery
 
@@ -372,5 +372,5 @@ Dependency: com.risquanter:fol-engine_3:0.4.0-SNAPSHOT
 | **Register change** | Replace `field`-string checks with 3 typed match arms | None |
 | **Breaking** | No | No (default `enumerableTypes = types`) |
 | **Version** | `0.4.0-SNAPSHOT` | `0.5.0-SNAPSHOT` |
-| **Test delta** | +6 (868 → 874) | +5–7 |
+| **Test delta** | +5 new, 2 updated (868 → 873) | +5–7 |
 | **Invariant gained** | All typed-pipeline errors are matchable without string inspection | `validateAgainst` → `Right` ⟹ no `DomainNotFoundError` |

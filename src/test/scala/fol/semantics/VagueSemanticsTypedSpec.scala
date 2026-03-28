@@ -62,7 +62,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
     assertEquals(output.satisfyingElements.size, 1)
     assertEquals(output.result.proportion, 0.5)
 
-  test("evaluateTyped returns ValidationError when runtime model is missing declared predicate"):
+  test("evaluateTyped returns ModelValidationError when runtime model is missing declared predicate"):
     val dispatcher = new RuntimeDispatcher:
       override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Value] =
         Left(s"No function implementation for '${name.value}'")
@@ -88,8 +88,10 @@ class VagueSemanticsTypedSpec extends FunSuite:
     )
 
     result match
-      case Left(_: QueryError.ValidationError) => assert(true)
-      case Left(other) => fail(s"Expected ValidationError, got $other")
+      case Left(e: QueryError.ModelValidationError) =>
+        assert(e.errors.nonEmpty)
+        assert(e.errors.exists(_.contains("coastal")))
+      case Left(other) => fail(s"Expected ModelValidationError, got $other")
       case Right(_)    => fail("Expected Left for invalid runtime model")
 
   test("Value.as[A] projects satisfyingElements to consumer domain type via TypeRepr"):
@@ -130,3 +132,120 @@ class VagueSemanticsTypedSpec extends FunSuite:
     // A Value with a mismatched sort returns None, not a cast exception
     val wrongSortValue = Value(TypeId("Risk"), "something")
     assertEquals(wrongSortValue.as[String], None)
+  // ==================== BindError tests ====================
+
+  test("bindTyped returns BindError (not ValidationError) on type-check failure"):
+    val badQuery = ParsedQuery(
+      quantifier = Quantifier.About(1, 2, 0.01),
+      variable = "x",
+      range = FOL("nonexistent_predicate", List(Term.Var("x"))),
+      scope = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
+      answerVars = Nil
+    )
+    val result = VagueSemantics.bindTyped(badQuery, catalog)
+    result match
+      case Left(e: QueryError.BindError) =>
+        assert(e.errors.nonEmpty)
+        assert(e.errors.exists(_.contains("nonexistent_predicate")))
+      case Left(other) => fail(s"Expected BindError, got $other")
+      case Right(_)    => fail("Expected Left for unknown predicate")
+
+  test("evaluateTyped returns BindError (not ValidationError) for malformed query"):
+    val badQuery = ParsedQuery(
+      quantifier = Quantifier.About(1, 2, 0.01),
+      variable = "x",
+      range = FOL("nonexistent_predicate", List(Term.Var("x"))),
+      scope = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
+      answerVars = Nil
+    )
+    val dispatcher = new RuntimeDispatcher:
+      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Value] =
+        Left("no function")
+      override def evalPredicate(name: SymbolName, args: List[Value]): Either[String, Boolean] =
+        name.value match
+          case "leaf" => Right(true)
+          case other  => Left(s"no predicate: $other")
+      override def functionSymbols: Set[SymbolName] = Set.empty
+      override def predicateSymbols: Set[SymbolName] = Set(SymbolName("leaf"))
+    val model = RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = dispatcher)
+    val result = VagueSemantics.evaluateTyped(badQuery, catalog, model, samplingParams = SamplingParams.exact)
+    result match
+      case Left(_: QueryError.BindError) => assert(true)
+      case Left(other) => fail(s"Expected BindError, got $other")
+      case Right(_)    => fail("Expected Left")
+
+  // ==================== DomainNotFoundError tests ====================
+
+  private val loss = TypeId("Loss")
+
+  private val catalogWithLoss = TypeCatalog.unsafe(
+    types = Set(asset, loss),
+    predicates = Map(
+      SymbolName("leaf")    -> PredicateSig(List(asset)),
+      SymbolName("coastal") -> PredicateSig(List(asset)),
+      SymbolName("hasloss") -> PredicateSig(List(loss))
+    )
+  )
+
+  private val losslessDispatcher = new RuntimeDispatcher:
+    override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Value] =
+      Left("no function")
+    override def evalPredicate(name: SymbolName, args: List[Value]): Either[String, Boolean] =
+      name.value match
+        case "leaf"    => Right(true)
+        case "coastal" => Right(true)
+        case "hasloss" => Right(true)
+        case other     => Left(s"no predicate: $other")
+    override def functionSymbols: Set[SymbolName] = Set.empty
+    override def predicateSymbols: Set[SymbolName] =
+      Set(SymbolName("leaf"), SymbolName("coastal"), SymbolName("hasloss"))
+
+  test("DomainNotFoundError returned when root quantified variable type has no domain"):
+    val queryOverLoss = ParsedQuery(
+      quantifier = Quantifier.About(1, 2, 0.01),
+      variable = "l",
+      range = FOL("hasloss", List(Term.Var("l"))),
+      scope = Formula.True,
+      answerVars = Nil
+    )
+    // model has no domain for Loss
+    val model = RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = losslessDispatcher)
+    val result = VagueSemantics.evaluateTyped(queryOverLoss, catalogWithLoss, model, samplingParams = SamplingParams.exact)
+    result match
+      case Left(e: QueryError.DomainNotFoundError) =>
+        assertEquals(e.typeName, "Loss")
+        assert(e.availableTypes.contains("Asset"))
+      case Left(other) => fail(s"Expected DomainNotFoundError, got $other")
+      case Right(_)    => fail("Expected Left")
+
+  test("DomainNotFoundError returned in nested Forall over type with no domain"):
+    val queryWithInnerForall = ParsedQuery(
+      quantifier = Quantifier.About(1, 2, 0.01),
+      variable = "x",
+      range = FOL("leaf", List(Term.Var("x"))),
+      scope = Formula.Forall("l", Formula.Atom(FOL("hasloss", List(Term.Var("l"))))),
+      answerVars = Nil
+    )
+    val model = RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = losslessDispatcher)
+    val result = VagueSemantics.evaluateTyped(queryWithInnerForall, catalogWithLoss, model, samplingParams = SamplingParams.exact)
+    result match
+      case Left(e: QueryError.DomainNotFoundError) =>
+        assertEquals(e.typeName, "Loss")
+      case Left(other) => fail(s"Expected DomainNotFoundError, got $other")
+      case Right(_)    => fail("Expected Left")
+
+  test("DomainNotFoundError returned in nested Exists over type with no domain"):
+    val queryWithInnerExists = ParsedQuery(
+      quantifier = Quantifier.About(1, 2, 0.01),
+      variable = "x",
+      range = FOL("leaf", List(Term.Var("x"))),
+      scope = Formula.Exists("l", Formula.Atom(FOL("hasloss", List(Term.Var("l"))))),
+      answerVars = Nil
+    )
+    val model = RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = losslessDispatcher)
+    val result = VagueSemantics.evaluateTyped(queryWithInnerExists, catalogWithLoss, model, samplingParams = SamplingParams.exact)
+    result match
+      case Left(e: QueryError.DomainNotFoundError) =>
+        assertEquals(e.typeName, "Loss")
+      case Left(other) => fail(s"Expected DomainNotFoundError, got $other")
+      case Right(_)    => fail("Expected Left")

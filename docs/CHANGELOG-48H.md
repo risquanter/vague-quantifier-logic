@@ -1,7 +1,7 @@
-# Changelog — 24–27 March 2026
+# Changelog — 24–28 March 2026
 
 All changes from `30359c4` to HEAD (`09815e7` committed; `fol.typed` package staged).
-~100 files changed. **868 JVM tests passing, 0 failures.**
+~100 files changed. **873 JVM tests passing, 0 failures.**
 
 ---
 
@@ -163,4 +163,43 @@ unchanged and continue to back all 868 existing tests.
 
 ---
 
-`0.3.0-SNAPSHOT` — up from `0.2.0-SNAPSHOT` (bumped for `fol.typed` many-sorted type system: `TypeCatalog`, `BoundQuery`, `QueryBinder`, `RuntimeModel`, `RuntimeModelError`, `TypedSemantics`, `TypeRepr[A]`, and `VagueSemantics.evaluateTyped` facade).
+## 8. Structured Typed-Pipeline Error Hierarchy (Phase 1)
+
+**Session:** 2026-03-28 (this session, uncommitted).
+
+Replaced stringly-typed `ValidationError(field = ...)` wrappers in the typed
+pipeline with dedicated, matchable `QueryError` subtypes. Callers can now
+pattern-match error categories without inspecting string fields.
+
+### New error types in `fol/error/QueryError.scala`
+
+| Type | Semantics | HTTP status intent |
+|---|---|---|
+| `BindError(errors: List[String])` | Query failed typed bind phase | 400 user error |
+| `ModelValidationError(errors: List[String])` | `validateAgainst` failed — dispatcher/domain coverage gap | 500 infra error |
+| `DomainNotFoundError(typeName, availableTypes)` | Evaluation reached a type with no registered domain | 400/500 |
+
+Field types are `String`/`Set[String]` (not `TypeId`) due to `fol.error` → `fol.typed`
+circular package constraint — same convention as `UninterpretedSymbolError`.
+
+### Changed sites
+
+- `VagueSemantics.bindTyped` — `ValidationError(field = "typed_query")` → `BindError`
+- `VagueSemantics.evaluateTyped` — `ValidationError(field = "typed_runtime_model")` → `ModelValidationError`
+- `TypedSemantics.evaluate` (Site 1) — `EvaluationError("No runtime domain …")` → `DomainNotFoundError`
+- `TypedSemantics.evalFormula` Forall (Site 2) — same
+- `TypedSemantics.evalFormula` Exists (Site 3) — same
+- `VagueSemantics.renderTypeErrors` — return type `String` → `List[String]`
+- `VagueSemantics.renderModelErrors` — new private helper, extracted from inline map
+
+### Tests updated / added
+
+- `VagueSemanticsSpec`: updated "bindTyped maps type-check errors" to expect `BindError`
+- `VagueSemanticsTypedSpec`: updated "evaluateTyped returns error when model missing predicate" to expect `ModelValidationError`
+- `VagueSemanticsTypedSpec`: +5 new tests — `BindError` (bindTyped + evaluateTyped paths), `DomainNotFoundError` (root, Forall, Exists)
+
+**Test count after:** 873 (up from 868).
+
+---
+
+`0.4.0-SNAPSHOT` — up from `0.3.0-SNAPSHOT` (bumped for structured error hierarchy: `BindError`, `ModelValidationError`, `DomainNotFoundError`).

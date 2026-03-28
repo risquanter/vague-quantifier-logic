@@ -47,28 +47,25 @@ object VagueSemantics:
     QueryBinder
       .bind(query, catalog)
       .left
-      .map(errors =>
-        QueryError.ValidationError(
-          message = "Query type-checking failed",
-          field = "typed_query",
-          context = Map("errors" -> renderTypeErrors(errors))
-        )
-      )
+      .map(errors => QueryError.BindError(errors = renderTypeErrors(errors)))
 
-  private def renderTypeErrors(errors: List[TypeCheckError]): String =
+  private def renderTypeErrors(errors: List[TypeCheckError]): List[String] =
     errors.map {
-      case TypeCheckError.UnknownPredicate(name) => s"unknown predicate: $name"
-      case TypeCheckError.UnknownFunction(name) => s"unknown function: $name"
-      case TypeCheckError.ArityMismatch(symbol, expected, actual) =>
-        s"arity mismatch for '$symbol': expected $expected, actual $actual"
-      case TypeCheckError.UnknownConstantOrLiteral(name) => s"unknown constant or literal: $name"
-      case TypeCheckError.TypeMismatch(expected, actual, context) =>
-        s"type mismatch in $context: expected ${expected.value}, actual ${actual.value}"
-      case TypeCheckError.UnboundAnswerVar(name) => s"unbound answer variable: $name"
-      case TypeCheckError.UnconstrainedVar(name) => s"unconstrained quantifier variable: $name"
-      case TypeCheckError.ConflictingTypes(name, left, right) =>
-        s"conflicting inferred types for '$name': ${left.value} vs ${right.value}"
-    }.mkString("; ")
+      case TypeCheckError.UnknownPredicate(name)                   => s"unknown predicate: $name"
+      case TypeCheckError.UnknownFunction(name)                    => s"unknown function: $name"
+      case TypeCheckError.ArityMismatch(symbol, expected, actual)  => s"arity mismatch for '$symbol': expected $expected, actual $actual"
+      case TypeCheckError.UnknownConstantOrLiteral(name)           => s"unknown constant or literal: $name"
+      case TypeCheckError.TypeMismatch(expected, actual, context)  => s"type mismatch in $context: expected ${expected.value}, actual ${actual.value}"
+      case TypeCheckError.UnboundAnswerVar(name)                   => s"unbound answer variable: $name"
+      case TypeCheckError.UnconstrainedVar(name)                   => s"unconstrained quantifier variable: $name"
+      case TypeCheckError.ConflictingTypes(name, left, right)      => s"conflicting inferred types for '$name': ${left.value} vs ${right.value}"
+    }
+
+  private def renderModelErrors(errors: List[RuntimeModelError]): List[String] =
+    errors.map {
+      case RuntimeModelError.MissingFunctionImplementation(n)  => s"missing function: ${n.value}"
+      case RuntimeModelError.MissingPredicateImplementation(n) => s"missing predicate: ${n.value}"
+    }
 
   /** Evaluate a parsed query through the typed pipeline.
     *
@@ -85,14 +82,7 @@ object VagueSemantics:
     for
       bound <- bindTyped(query, catalog)
       _ <- model.validateAgainst(catalog).left.map { errors =>
-        QueryError.ValidationError(
-          message = "Runtime model validation failed",
-          field = "typed_runtime_model",
-          context = Map("errors" -> errors.map {
-            case RuntimeModelError.MissingFunctionImplementation(n)  => s"missing function: ${n.value}"
-            case RuntimeModelError.MissingPredicateImplementation(n) => s"missing predicate: ${n.value}"
-          }.mkString("; "))
-        )
+        QueryError.ModelValidationError(errors = renderModelErrors(errors))
       }
       output <- TypedSemantics.evaluate(
         query = bound,

@@ -1,7 +1,7 @@
 val scala3Version = "3.7.4"
 
 ThisBuild / organization := "com.risquanter"
-ThisBuild / version      := "0.3.0-SNAPSHOT"
+ThisBuild / version      := "0.4.0-SNAPSHOT"
 ThisBuild / scalaVersion := scala3Version
 
 lazy val root = project

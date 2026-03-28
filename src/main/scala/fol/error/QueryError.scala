@@ -191,6 +191,46 @@ object QueryError:
       "symbol_name" -> symbolName
     ) ++ (if availableSymbols.nonEmpty then Map("available" -> availableSymbols.mkString(", ")) else Map.empty)
   
+  /** Raised when a query quantifies over a type that has no registered domain
+    * in the RuntimeModel. This indicates either a user error (quantifying over
+    * a non-domain type) or a wiring bug (domain not registered at startup).
+    * See also: [[fol.typed.TypedSemantics]] and ADR-001.
+    */
+  case class DomainNotFoundError(
+    typeName: String,
+    availableTypes: Set[String]
+  ) extends QueryError:
+    def message = s"No domain found for type '$typeName'"
+    override val context = Map(
+      "type"      -> typeName,
+      "available" -> availableTypes.mkString(", ")
+    )
+    override def formatted: String =
+      s"No domain found for type '$typeName'. " +
+      s"Available types with domains: ${availableTypes.mkString(", ")}"
+
+  /** Raised when a query fails the typed bind phase (type-check errors).
+    * Indicates a user query error — all instances map to HTTP 400.
+    * Individual error messages are rendered strings; raw TypeCheckError
+    * detail is not carried here due to fol.error → fol.typed package constraint.
+    */
+  case class BindError(
+    errors: List[String]
+  ) extends QueryError:
+    def message = s"Query type-checking failed: ${errors.mkString("; ")}"
+    override val context = Map("errors" -> errors.mkString("; "))
+
+  /** Raised when RuntimeModel.validateAgainst fails (dispatcher or domain
+    * coverage gaps). Indicates a wiring/infra error — all instances map to HTTP 500.
+    * Individual error messages are rendered strings; raw RuntimeModelError
+    * detail is not carried here due to fol.error → fol.typed package constraint.
+    */
+  case class ModelValidationError(
+    errors: List[String]
+  ) extends QueryError:
+    def message = s"Runtime model validation failed: ${errors.mkString("; ")}"
+    override val context = Map("errors" -> errors.mkString("; "))
+
   /** Unbound variable in valuation */
   case class UnboundVariableError(
     variableName: String,

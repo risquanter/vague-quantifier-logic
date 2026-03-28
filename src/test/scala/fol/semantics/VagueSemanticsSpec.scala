@@ -506,7 +506,7 @@ class VagueSemanticsSpec extends munit.FunSuite:
     val result = VagueSemantics.bindTyped(query, catalog)
     assert(result.isRight)
 
-  test("bindTyped maps type-check errors to ValidationError"):
+  test("bindTyped maps type-check errors to BindError"):
     val asset = TypeId("Asset")
     val catalog = TypeCatalog.unsafe(
       types = Set(asset),
@@ -524,6 +524,6 @@ class VagueSemanticsSpec extends munit.FunSuite:
 
     val result = VagueSemantics.bindTyped(query, catalog)
     result match
-      case Left(_: QueryError.ValidationError) => assert(true)
-      case Left(other)                         => fail(s"Expected ValidationError, got $other")
-      case Right(_)                            => fail("Expected Left for invalid typed query")
+      case Left(_: QueryError.BindError) => assert(true)
+      case Left(other)                   => fail(s"Expected BindError, got $other")
+      case Right(_)                      => fail("Expected Left for invalid typed query")
