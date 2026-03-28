@@ -9,8 +9,9 @@ enum TypeCheckError:
   case UnboundAnswerVar(name: String)
   case UnconstrainedVar(name: String)
   case ConflictingTypes(name: String, left: TypeId, right: TypeId)
-  /** Variable or quantifier ranges over a type that is not in
-    * [[TypeCatalog.enumerableTypes]]. The sort is valid; the type simply
-    * has no registered domain and cannot be quantified over.
+  /** The quantified variable resolves to a type that is not in
+    * [[TypeCatalog.domainTypes]]. The type is structurally valid; it is
+    * a value type (scalar attribute) that cannot be iterated over.
+    * See ADR-014 §2.
     */
-  case NonEnumerableType(name: String)
+  case TypeNotQuantifiable(name: String)

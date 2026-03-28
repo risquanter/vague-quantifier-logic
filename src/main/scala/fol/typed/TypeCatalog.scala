@@ -20,12 +20,11 @@ enum TypeCatalogError:
   */
 case class TypeCatalog private (
   types: Set[TypeId],
-  /** Types that require a registered domain in [[RuntimeModel]].
-    * Defaults to all declared types. Used by [[RuntimeModel.validateAgainst]]
-    * to enforce domain coverage and by [[fol.typed.QueryBinder]] to reject
-    * queries that quantify over non-domain types at bind time.
+  /** Types that are first-class entities requiring a registered domain in [[RuntimeModel]].
+    * Defaults to all declared types. Validated by [[RuntimeModel.validateAgainst]]
+    * to enforce domain coverage.
     */
-  enumerableTypes: Set[TypeId],
+  domainTypes: Set[TypeId],
   constants: Map[String, TypeId],
   functions: Map[SymbolName, FunctionSig],
   predicates: Map[SymbolName, PredicateSig],
@@ -36,6 +35,12 @@ object TypeCatalog:
 
   /** Validate and construct. Returns Left if any type reference is undeclared
     * or any symbol name collides between functions and predicates.
+    *
+    * @param domainTypes The types that can be quantified over. `None` (the
+    *   default) means all declared types are domain types. Pass
+    *   `Some(subset)` to mark only a subset as quantifiable; value types
+    *   omitted from the set are rejected by [[fol.typed.QueryBinder]] if a
+    *   query tries to quantify over them. See ADR-014.
     */
   def apply(
     types: Set[TypeId],
@@ -43,9 +48,9 @@ object TypeCatalog:
     functions: Map[SymbolName, FunctionSig] = Map.empty,
     predicates: Map[SymbolName, PredicateSig] = Map.empty,
     literalValidators: Map[TypeId, String => Boolean] = Map.empty,
-    enumerableTypes: Set[TypeId] = Set.empty
+    domainTypes: Option[Set[TypeId]] = None
   ): Either[List[TypeCatalogError], TypeCatalog] =
-    val effective = if enumerableTypes.isEmpty then types else enumerableTypes
+    val effective = domainTypes.getOrElse(types)
     val errors = collectErrors(types, effective, constants, functions, predicates, literalValidators)
     if errors.isEmpty then Right(new TypeCatalog(types, effective, constants, functions, predicates, literalValidators))
     else Left(errors)
@@ -53,6 +58,8 @@ object TypeCatalog:
   /** Construct without returning Either. Throws [[IllegalArgumentException]] if
     * validation fails. Use only in tests or application startup where a
     * catalog inconsistency is a programming error, not a user error.
+    *
+    * @param domainTypes See [[apply]] for semantics. `None` = all types.
     */
   def unsafe(
     types: Set[TypeId],
@@ -60,9 +67,9 @@ object TypeCatalog:
     functions: Map[SymbolName, FunctionSig] = Map.empty,
     predicates: Map[SymbolName, PredicateSig] = Map.empty,
     literalValidators: Map[TypeId, String => Boolean] = Map.empty,
-    enumerableTypes: Set[TypeId] = Set.empty
+    domainTypes: Option[Set[TypeId]] = None
   ): TypeCatalog =
-    apply(types, constants, functions, predicates, literalValidators, enumerableTypes)
+    apply(types, constants, functions, predicates, literalValidators, domainTypes)
       .fold(
         errors => throw IllegalArgumentException(s"Invalid TypeCatalog: ${errors.map(_.toString).mkString(", ")}"),
         identity
@@ -70,7 +77,7 @@ object TypeCatalog:
 
   private def collectErrors(
     types: Set[TypeId],
-    enumerableTypes: Set[TypeId],
+    domainTypes: Set[TypeId],
     constants: Map[String, TypeId],
     functions: Map[SymbolName, FunctionSig],
     predicates: Map[SymbolName, PredicateSig],
@@ -78,7 +85,7 @@ object TypeCatalog:
   ): List[TypeCatalogError] =
     val unknownTypes = List.newBuilder[TypeCatalogError]
 
-    enumerableTypes.foreach { t =>
+    domainTypes.foreach { t =>
       if !types.contains(t) then unknownTypes += TypeCatalogError.UnknownType(t.value)
     }
 

@@ -185,7 +185,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
       SymbolName("coastal") -> PredicateSig(List(asset)),
       SymbolName("hasloss") -> PredicateSig(List(loss))
     )
-  ) // enumerableTypes defaults to Set(asset, loss)
+  ) // domainTypes defaults to Set(asset, loss) (all declared types)
 
   private val losslessDispatcher = new RuntimeDispatcher:
     override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Value] =
@@ -262,7 +262,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
       predicates = Map(
         SymbolName("hasloss") -> PredicateSig(List(loss))
       ),
-      enumerableTypes = Set(asset)  // Loss excluded → validateAgainst will not check Loss domain
+      domainTypes = Some(Set(asset))  // Loss excluded → validateAgainst will not check Loss domain
     )
     // Manually construct a BoundQuery over Loss, bypassing QueryBinder.bind
     val boundQuery = BoundQuery(

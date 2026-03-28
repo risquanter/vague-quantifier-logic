@@ -20,8 +20,9 @@ enum RuntimeModelError:
     */
   case MissingPredicateImplementation(name: SymbolName)
 
-  /** An enumerable type declared in [[TypeCatalog.enumerableTypes]] has no
-    * registered domain (element set) in the `RuntimeModel`.
-    * See ADR-001 §4.
+  /** A domain type declared in [[TypeCatalog.domainTypes]] has no
+    * registered element set in the `RuntimeModel`.
+    * See ADR-001 §4 — startup coverage validation covers both dispatcher symbols
+    * and domain-type registration.
     */
-  case MissingDomainForEnumerableType(typeName: TypeId)
+  case MissingDomainForType(typeName: TypeId)

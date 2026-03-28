@@ -76,9 +76,10 @@ class QueryBinderSpec extends FunSuite:
     val result = QueryBinder.bind(query, catalog)
     assert(result.isLeft)
 
-  // ==================== NonEnumerableType tests ====================
+  // ==================== TypeNotQuantifiable tests (ADR-014 §2) ====================
 
-  private val catalogAssetEnumOnly = TypeCatalog.unsafe(
+  // Asset is a domain type; Loss is a value type (scalar) — not quantifiable
+  private val catalogWithValueType = TypeCatalog.unsafe(
     types = Set(asset, loss),
     functions = Map(
       SymbolName("p95") -> FunctionSig(List(asset), loss)
@@ -87,10 +88,10 @@ class QueryBinderSpec extends FunSuite:
       SymbolName("leaf")    -> PredicateSig(List(asset)),
       SymbolName("gt_loss") -> PredicateSig(List(loss, loss))
     ),
-    enumerableTypes = Set(asset)   // Loss is declared but NOT enumerable
+    domainTypes = Some(Set(asset))   // Loss is a value type — cannot be quantified over
   )
 
-  test("bind fails with NonEnumerableType when root quantified variable is non-enumerable"):
+  test("bind fails with TypeNotQuantifiable when root variable resolves to a value type"):
     val query = ParsedQuery(
       quantifier = Quantifier.mkAtLeast(1, 2),
       variable = "l",
@@ -98,14 +99,13 @@ class QueryBinderSpec extends FunSuite:
       scope = Formula.True,
       answerVars = Nil
     )
-    val result = QueryBinder.bind(query, catalogAssetEnumOnly)
-    result match
-      case Left(List(TypeCheckError.NonEnumerableType(name))) =>
+    QueryBinder.bind(query, catalogWithValueType) match
+      case Left(List(TypeCheckError.TypeNotQuantifiable(name))) =>
         assertEquals(name, "Loss")
-      case Left(other) => fail(s"Expected NonEnumerableType, got $other")
-      case Right(_)    => fail("Expected Left for non-enumerable root variable")
+      case Left(other) => fail(s"Expected TypeNotQuantifiable, got $other")
+      case Right(_)    => fail("Expected Left for value-type root variable")
 
-  test("bind fails with NonEnumerableType for nested quantifier over non-enumerable type"):
+  test("bind fails with TypeNotQuantifiable for nested Forall over value type"):
     val query = ParsedQuery(
       quantifier = Quantifier.mkAtLeast(1, 2),
       variable = "x",
@@ -113,9 +113,32 @@ class QueryBinderSpec extends FunSuite:
       scope = Formula.Forall("l", Formula.Atom(FOL("gt_loss", List(Term.Var("l"), Term.Var("l"))))),
       answerVars = Nil
     )
-    val result = QueryBinder.bind(query, catalogAssetEnumOnly)
-    result match
-      case Left(List(TypeCheckError.NonEnumerableType(name))) =>
+    QueryBinder.bind(query, catalogWithValueType) match
+      case Left(List(TypeCheckError.TypeNotQuantifiable(name))) =>
         assertEquals(name, "Loss")
-      case Left(other) => fail(s"Expected NonEnumerableType, got $other")
-      case Right(_)    => fail("Expected Left for non-enumerable nested quantifier")
+      case Left(other) => fail(s"Expected TypeNotQuantifiable, got $other")
+      case Right(_)    => fail("Expected Left for value-type nested Forall")
+
+  test("bind fails with TypeNotQuantifiable for nested Exists over value type"):
+    val query = ParsedQuery(
+      quantifier = Quantifier.mkAtLeast(1, 2),
+      variable = "x",
+      range = FOL("leaf", List(Term.Var("x"))),
+      scope = Formula.Exists("l", Formula.Atom(FOL("gt_loss", List(Term.Var("l"), Term.Var("l"))))),
+      answerVars = Nil
+    )
+    QueryBinder.bind(query, catalogWithValueType) match
+      case Left(List(TypeCheckError.TypeNotQuantifiable(name))) =>
+        assertEquals(name, "Loss")
+      case Left(other) => fail(s"Expected TypeNotQuantifiable, got $other")
+      case Right(_)    => fail("Expected Left for value-type nested Exists")
+
+  test("bind succeeds when root variable resolves to a domain type"):
+    val query = ParsedQuery(
+      quantifier = Quantifier.mkAtLeast(1, 2),
+      variable = "x",
+      range = FOL("leaf", List(Term.Var("x"))),
+      scope = Formula.True,
+      answerVars = Nil
+    )
+    assert(QueryBinder.bind(query, catalogWithValueType).isRight)

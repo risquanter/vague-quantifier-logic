@@ -44,7 +44,7 @@ case class RuntimeModel(
       .map(RuntimeModelError.MissingFunctionImplementation(_))
     val missingPreds = catalog.predicates.keySet.diff(dispatcher.predicateSymbols).toList
       .map(RuntimeModelError.MissingPredicateImplementation(_))
-    val missingDomains = catalog.enumerableTypes.diff(domains.keySet).toList
-      .map(RuntimeModelError.MissingDomainForEnumerableType(_))
+    val missingDomains = catalog.domainTypes.diff(domains.keySet).toList
+      .map(RuntimeModelError.MissingDomainForType(_))
     val errors = missingFns ++ missingPreds ++ missingDomains
     if errors.isEmpty then Right(this) else Left(errors)

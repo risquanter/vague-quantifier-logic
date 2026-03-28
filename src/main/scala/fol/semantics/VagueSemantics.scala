@@ -59,14 +59,14 @@ object VagueSemantics:
       case TypeCheckError.UnboundAnswerVar(name)                   => s"unbound answer variable: $name"
       case TypeCheckError.UnconstrainedVar(name)                   => s"unconstrained quantifier variable: $name"
       case TypeCheckError.ConflictingTypes(name, left, right)      => s"conflicting inferred types for '$name': ${left.value} vs ${right.value}"
-      case TypeCheckError.NonEnumerableType(name)                  => s"non-enumerable type: $name"
+      case TypeCheckError.TypeNotQuantifiable(name)                 => s"type '$name' is not a domain type and cannot be quantified over"
     }
 
   private def renderModelErrors(errors: List[RuntimeModelError]): List[String] =
     errors.map {
       case RuntimeModelError.MissingFunctionImplementation(n)  => s"missing function: ${n.value}"
       case RuntimeModelError.MissingPredicateImplementation(n) => s"missing predicate: ${n.value}"
-      case RuntimeModelError.MissingDomainForEnumerableType(t) => s"missing domain for enumerable type: ${t.value}"
+      case RuntimeModelError.MissingDomainForType(t) => s"missing domain for type: ${t.value}"
     }
 
   /** Evaluate a parsed query through the typed pipeline.
