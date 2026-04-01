@@ -64,3 +64,35 @@ class TypeCatalogSpec extends FunSuite:
 
     assertEquals(catalog.domainTypes, Set(asset))
     assertEquals(catalog.typeIds, Set(asset, loss))
+
+  // ==================== S-3: UnknownType.location ====================
+
+  test("UnknownType carries location string for function return type"):
+    val asset = TypeId("Asset")
+    val ghost = TypeId("Ghost")
+
+    TypeCatalog(
+      types = Set(DomainType(asset)),
+      functions = Map(SymbolName("p95") -> FunctionSig(List(asset), ghost))
+    ) match
+      case Left(List(TypeCatalogError.UnknownType(name, location))) =>
+        assertEquals(name, "Ghost")
+        assert(location.contains("p95"),       s"location '$location' should mention 'p95'")
+        assert(location.contains("return type"), s"location '$location' should mention 'return type'")
+      case other => fail(s"expected exactly one UnknownType, got $other")
+
+  test("UnknownType emitted separately per site for same unknown type"):
+    val asset = TypeId("Asset")
+    val ghost = TypeId("Ghost")
+
+    TypeCatalog(
+      types      = Set(DomainType(asset)),
+      functions  = Map(SymbolName("f") -> FunctionSig(List(ghost), asset)),
+      predicates = Map(SymbolName("p") -> PredicateSig(List(ghost)))
+    ) match
+      case Left(errors) =>
+        val unknowns = errors.collect { case e: TypeCatalogError.UnknownType => e }
+        assertEquals(unknowns.length, 2, s"expected one error per site, not deduplicated: $unknowns")
+        assert(unknowns.exists(_.location.contains("function")), s"no function-site error in $unknowns")
+        assert(unknowns.exists(_.location.contains("predicate")), s"no predicate-site error in $unknowns")
+      case Right(_) => fail("expected Left")

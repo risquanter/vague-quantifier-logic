@@ -1,7 +1,7 @@
 val scala3Version = "3.7.4"
 
 ThisBuild / organization := "com.risquanter"
-ThisBuild / version      := "0.7.0-SNAPSHOT"
+ThisBuild / version      := "0.8.0-SNAPSHOT"
 ThisBuild / scalaVersion := scala3Version
 
 lazy val root = project
@@ -13,7 +13,7 @@ lazy val root = project
 
 lazy val folEngine = crossProject(JVMPlatform, JSPlatform)
   .crossType(CrossType.Pure)
-  .in(file("."))
+  .in(file("core"))
   .settings(
     name := "fol-engine",
     libraryDependencies ++= Seq(

@@ -31,13 +31,13 @@ object SymbolName:
   * in a `domainTypes` set. See ADR-014.
   */
 sealed trait TypeDecl:
-  def id: TypeId
+  def typeId: TypeId
 
 /** A first-class entity type that can be quantified over. */
-case class DomainType(id: TypeId) extends TypeDecl
+case class DomainType(typeId: TypeId) extends TypeDecl
 
 /** A scalar value type that cannot be quantified over. */
-case class ValueType(id: TypeId) extends TypeDecl
+case class ValueType(typeId: TypeId) extends TypeDecl
 
 /** Declares that consumer type `A` is the JVM carrier for a specific `TypeId`.
   *

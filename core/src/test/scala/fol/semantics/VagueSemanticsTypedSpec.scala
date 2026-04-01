@@ -280,3 +280,90 @@ class VagueSemanticsTypedSpec extends FunSuite:
         assert(e.availableTypes.contains("Asset"))
       case Left(other) => fail(s"Expected DomainNotFoundError, got $other")
       case Right(_)    => fail("Expected Left")
+
+  // ==================== S-1: And/Or/Imp short-circuit ====================
+  // Verifies that the right branch of connectives is never dispatched when
+  // the left branch already determines the truth value.
+
+  private def sentinelDispatcher(sentinel: SymbolName, onSentinelCalled: () => Unit): RuntimeDispatcher =
+    new RuntimeDispatcher:
+      override def evalPredicate(name: SymbolName, args: List[Value]): Either[String, Boolean] =
+        name.value match
+          case "leaf" => Right(true)
+          case s if s == sentinel.value =>
+            onSentinelCalled()
+            Left(s"SHOULD NOT BE DISPATCHED: $s")
+          case other => Left(s"unknown predicate: $other")
+      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Value] =
+        Left("no functions")
+      override def functionSymbols: Set[SymbolName] = Set.empty
+      override def predicateSymbols: Set[SymbolName] = Set(SymbolName("leaf"), sentinel)
+
+  test("And short-circuits: right branch not dispatched when left is False"):
+    val sentinel = SymbolName("and-sentinel")
+    var dispatched = false
+    val x = BoundVar("x", asset)
+    val scope = BoundFormula.And(
+      BoundFormula.False,
+      BoundFormula.Atom(BoundAtom(sentinel, List(BoundTerm.VarRef(x))))
+    )
+    val boundQuery = BoundQuery(
+      quantifier = Quantifier.About(1, 2, 0.01),
+      variable   = x,
+      range      = BoundAtom(SymbolName("leaf"), List(BoundTerm.VarRef(x))),
+      scope      = scope
+    )
+    val model = RuntimeModel(
+      domains    = Map(asset -> Set(vA, vB)),
+      dispatcher = sentinelDispatcher(sentinel, () => dispatched = true)
+    )
+    val result = TypedSemantics.evaluate(boundQuery, model, samplingParams = SamplingParams.exact)
+    assert(result.isRight, s"Expected Right, got $result")
+    assert(!dispatched, "And right branch was dispatched despite left being False")
+    assertEquals(result.toOption.get.satisfyingElements.size, 0)
+
+  test("Or short-circuits: right branch not dispatched when left is True"):
+    val sentinel = SymbolName("or-sentinel")
+    var dispatched = false
+    val x = BoundVar("x", asset)
+    val scope = BoundFormula.Or(
+      BoundFormula.True,
+      BoundFormula.Atom(BoundAtom(sentinel, List(BoundTerm.VarRef(x))))
+    )
+    val boundQuery = BoundQuery(
+      quantifier = Quantifier.About(1, 2, 0.01),
+      variable   = x,
+      range      = BoundAtom(SymbolName("leaf"), List(BoundTerm.VarRef(x))),
+      scope      = scope
+    )
+    val model = RuntimeModel(
+      domains    = Map(asset -> Set(vA, vB)),
+      dispatcher = sentinelDispatcher(sentinel, () => dispatched = true)
+    )
+    val result = TypedSemantics.evaluate(boundQuery, model, samplingParams = SamplingParams.exact)
+    assert(result.isRight, s"Expected Right, got $result")
+    assert(!dispatched, "Or right branch was dispatched despite left being True")
+    assertEquals(result.toOption.get.satisfyingElements.size, 2)  // Or(True, _) always satisfied
+
+  test("Imp short-circuits: consequent not dispatched when antecedent is False"):
+    val sentinel = SymbolName("imp-sentinel")
+    var dispatched = false
+    val x = BoundVar("x", asset)
+    val scope = BoundFormula.Imp(
+      BoundFormula.False,
+      BoundFormula.Atom(BoundAtom(sentinel, List(BoundTerm.VarRef(x))))
+    )
+    val boundQuery = BoundQuery(
+      quantifier = Quantifier.About(1, 2, 0.01),
+      variable   = x,
+      range      = BoundAtom(SymbolName("leaf"), List(BoundTerm.VarRef(x))),
+      scope      = scope
+    )
+    val model = RuntimeModel(
+      domains    = Map(asset -> Set(vA, vB)),
+      dispatcher = sentinelDispatcher(sentinel, () => dispatched = true)
+    )
+    val result = TypedSemantics.evaluate(boundQuery, model, samplingParams = SamplingParams.exact)
+    assert(result.isRight, s"Expected Right, got $result")
+    assert(!dispatched, "Imp consequent was dispatched despite antecedent being False")
+    assertEquals(result.toOption.get.satisfyingElements.size, 2)  // Imp(False, _) vacuously true

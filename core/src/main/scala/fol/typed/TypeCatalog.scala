@@ -5,7 +5,12 @@ case class FunctionSig(params: List[TypeId], returns: TypeId)
 case class PredicateSig(params: List[TypeId])
 
 enum TypeCatalogError:
-  case UnknownType(name: String)
+  /** A type referenced in a signature or validator is not declared in [[TypeCatalog.types]].
+    * `location` names the signature site, e.g. `"function 'p95' return type"` or
+    * `"predicate 'hasloss' parameter 0"`, following compiler-engineering convention
+    * that every diagnostic names its source site.
+    */
+  case UnknownType(name: String, location: String)
   case NameCollision(name: String)
 
 /** A validated type catalog.
@@ -26,14 +31,14 @@ case class TypeCatalog private (
   literalValidators: Map[TypeId, String => Boolean]
 ):
   /** All declared type IDs, regardless of role. */
-  def typeIds: Set[TypeId] = types.map(_.id)
+  def typeIds: Set[TypeId] = types.map(_.typeId)
 
   /** Types that are first-class entities requiring a registered domain in
     * [[RuntimeModel]]. Derived from the [[DomainType]] tags in [[types]].
     * Validated by [[RuntimeModel.validateAgainst]] to enforce domain coverage.
     * See ADR-014.
     */
-  def domainTypes: Set[TypeId] = types.collect { case DomainType(id) => id }
+  def domainTypes: Set[TypeId] = types.collect { case DomainType(typeId) => typeId }
 
 object TypeCatalog:
 
@@ -81,29 +86,33 @@ object TypeCatalog:
     predicates: Map[SymbolName, PredicateSig],
     literalValidators: Map[TypeId, String => Boolean]
   ): List[TypeCatalogError] =
-    val typeIds = types.map(_.id)
+    val typeIds = types.map(_.typeId)
     val unknownTypes = List.newBuilder[TypeCatalogError]
 
-    constants.values.foreach { s =>
-      if !typeIds.contains(s) then unknownTypes += TypeCatalogError.UnknownType(s.value)
+    constants.foreach { (key, s) =>
+      if !typeIds.contains(s) then
+        unknownTypes += TypeCatalogError.UnknownType(s.value, s"constant '$key'")
     }
 
-    functions.values.foreach { sig =>
-      sig.params.foreach { s =>
-        if !typeIds.contains(s) then unknownTypes += TypeCatalogError.UnknownType(s.value)
+    functions.foreach { (sym, sig) =>
+      sig.params.zipWithIndex.foreach { (s, i) =>
+        if !typeIds.contains(s) then
+          unknownTypes += TypeCatalogError.UnknownType(s.value, s"function '${sym.value}' parameter $i")
       }
       if !typeIds.contains(sig.returns) then
-        unknownTypes += TypeCatalogError.UnknownType(sig.returns.value)
+        unknownTypes += TypeCatalogError.UnknownType(sig.returns.value, s"function '${sym.value}' return type")
     }
 
-    predicates.values.foreach { sig =>
-      sig.params.foreach { s =>
-        if !typeIds.contains(s) then unknownTypes += TypeCatalogError.UnknownType(s.value)
+    predicates.foreach { (sym, sig) =>
+      sig.params.zipWithIndex.foreach { (s, i) =>
+        if !typeIds.contains(s) then
+          unknownTypes += TypeCatalogError.UnknownType(s.value, s"predicate '${sym.value}' parameter $i")
       }
     }
 
     literalValidators.keys.foreach { s =>
-      if !typeIds.contains(s) then unknownTypes += TypeCatalogError.UnknownType(s.value)
+      if !typeIds.contains(s) then
+        unknownTypes += TypeCatalogError.UnknownType(s.value, s"literal validator for '${s.value}'")
     }
 
     val collisions =

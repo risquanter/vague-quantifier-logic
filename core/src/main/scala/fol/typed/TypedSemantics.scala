@@ -120,20 +120,20 @@ object TypedSemantics:
       case BoundFormula.Atom(a) => evalAtom(a, env, model)
       case BoundFormula.Not(p) => evalFormula(p, env, model).map(v => !v)
       case BoundFormula.And(p, q) =>
-        for
-          left <- evalFormula(p, env, model)
-          right <- evalFormula(q, env, model)
-        yield left && right
+        evalFormula(p, env, model).flatMap {
+          case false => Right(false)
+          case true  => evalFormula(q, env, model)
+        }
       case BoundFormula.Or(p, q) =>
-        for
-          left <- evalFormula(p, env, model)
-          right <- evalFormula(q, env, model)
-        yield left || right
+        evalFormula(p, env, model).flatMap {
+          case true  => Right(true)
+          case false => evalFormula(q, env, model)
+        }
       case BoundFormula.Imp(p, q) =>
-        for
-          left <- evalFormula(p, env, model)
-          right <- evalFormula(q, env, model)
-        yield !left || right
+        evalFormula(p, env, model).flatMap {
+          case false => Right(true)   // false antecedent → implication vacuously true
+          case true  => evalFormula(q, env, model)
+        }
       case BoundFormula.Iff(p, q) =>
         for
           left <- evalFormula(p, env, model)
