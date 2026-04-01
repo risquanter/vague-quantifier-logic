@@ -20,6 +20,25 @@ object SymbolName:
   extension (s: SymbolName)
     def value: String = s
 
+/** Declares a type's role in the [[TypeCatalog]].
+  *
+  * - [[DomainType]] — first-class entities that can be quantified over; require
+  *   a registered domain in [[RuntimeModel]].
+  * - [[ValueType]] — scalar / computed values; cannot be quantified over.
+  *
+  * Both sub-types carry their [[TypeId]] so the declaration is self-contained:
+  * there is no need to list a type separately in a `types` set and then again
+  * in a `domainTypes` set. See ADR-014.
+  */
+sealed trait TypeDecl:
+  def id: TypeId
+
+/** A first-class entity type that can be quantified over. */
+case class DomainType(id: TypeId) extends TypeDecl
+
+/** A scalar value type that cannot be quantified over. */
+case class ValueType(id: TypeId) extends TypeDecl
+
 /** Declares that consumer type `A` is the JVM carrier for a specific `TypeId`.
   *
   * Provided by the consumer (e.g. register), not the library. One `given`

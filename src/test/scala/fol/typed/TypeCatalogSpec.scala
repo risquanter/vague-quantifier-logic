@@ -10,7 +10,7 @@ class TypeCatalogSpec extends FunSuite:
     val bool = TypeId("Bool")
 
     val result = TypeCatalog(
-      types = Set(asset, loss, bool),
+      types = Set(DomainType(asset), DomainType(loss), DomainType(bool)),
       constants = Map("rootAsset" -> asset),
       functions = Map(
         SymbolName("p95") -> FunctionSig(List(asset), loss)
@@ -28,7 +28,7 @@ class TypeCatalogSpec extends FunSuite:
     val loss = TypeId("Loss")
 
     val result = TypeCatalog(
-      types = Set(asset, loss),
+      types = Set(DomainType(asset), DomainType(loss)),
       constants = Map.empty,
       functions = Map(SymbolName("foo") -> FunctionSig(List(asset), loss)),
       predicates = Map(SymbolName("foo") -> PredicateSig(List(loss)))
@@ -36,29 +36,31 @@ class TypeCatalogSpec extends FunSuite:
 
     assert(result.isLeft)
 
-  test("validate fails when domainTypes references a type not in declared types"):
-    val asset = TypeId("Asset")
-    val ghost  = TypeId("Ghost")  // not in types
-
-    val result = TypeCatalog(
-      types = Set(asset),
-      predicates = Map(SymbolName("leaf") -> PredicateSig(List(asset))),
-      domainTypes = Some(Set(asset, ghost))
-    )
-
-    assert(result.isLeft)
-
-  test("validate succeeds when domainTypes is a proper subset of declared types"):
+  test("validate succeeds when loss is declared as a ValueType (not quantifiable)"):
     val asset = TypeId("Asset")
     val loss  = TypeId("Loss")
 
     val result = TypeCatalog(
-      types = Set(asset, loss),
+      types = Set(DomainType(asset), ValueType(loss)),  // Loss present but not quantifiable
       predicates = Map(
         SymbolName("leaf")    -> PredicateSig(List(asset)),
         SymbolName("hasloss") -> PredicateSig(List(loss))
-      ),
-      domainTypes = Some(Set(asset))   // Loss present in types but not a domain type
+      )
     )
 
     assert(result.isRight)
+
+  test("domainTypes returns only DomainType ids"):
+    val asset = TypeId("Asset")
+    val loss  = TypeId("Loss")
+
+    val catalog = TypeCatalog(
+      types = Set(DomainType(asset), ValueType(loss)),
+      predicates = Map(
+        SymbolName("leaf")    -> PredicateSig(List(asset)),
+        SymbolName("hasloss") -> PredicateSig(List(loss))
+      )
+    ).getOrElse(fail("catalog must be valid"))
+
+    assertEquals(catalog.domainTypes, Set(asset))
+    assertEquals(catalog.typeIds, Set(asset, loss))

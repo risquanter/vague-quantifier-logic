@@ -6,7 +6,7 @@ import fol.logic.{Quantifier, ParsedQuery}
 import fol.result.{EvaluationOutput, VagueQueryResult}
 import fol.error.QueryError
 import fol.sampling.SamplingParams
-import fol.typed.{TypeCatalog, TypeId, SymbolName, PredicateSig}
+import fol.typed.{DomainType, TypeCatalog, TypeId, SymbolName, PredicateSig}
 
 class VagueSemanticsSpec extends munit.FunSuite:
 
@@ -489,7 +489,7 @@ class VagueSemanticsSpec extends munit.FunSuite:
   test("bindTyped returns bound query for well-typed input"):
     val asset = TypeId("Asset")
     val catalog = TypeCatalog.unsafe(
-      types = Set(asset),
+      types = Set(DomainType(asset)),
       predicates = Map(
         SymbolName("leaf") -> PredicateSig(List(asset)),
         SymbolName("coastal") -> PredicateSig(List(asset))
@@ -509,7 +509,7 @@ class VagueSemanticsSpec extends munit.FunSuite:
   test("bindTyped maps type-check errors to BindError"):
     val asset = TypeId("Asset")
     val catalog = TypeCatalog.unsafe(
-      types = Set(asset),
+      types = Set(DomainType(asset)),
       predicates = Map(
         SymbolName("leaf") -> PredicateSig(List(asset))
       )

@@ -3,7 +3,7 @@ package fol.semantics
 import fol.error.QueryError
 import fol.logic.{ParsedQuery, Quantifier}
 import fol.sampling.SamplingParams
-import fol.typed.{BoundAtom, BoundFormula, BoundQuery, BoundTerm, BoundVar, PredicateSig, RuntimeDispatcher, RuntimeModel, TypeCatalog, TypedSemantics, TypeId, TypeRepr, SymbolName, Value}
+import fol.typed.{BoundAtom, BoundFormula, BoundQuery, BoundTerm, BoundVar, DomainType, PredicateSig, RuntimeDispatcher, RuntimeModel, TypeCatalog, TypedSemantics, TypeId, TypeRepr, SymbolName, Value, ValueType}
 import logic.{FOL, Formula, Term}
 import munit.FunSuite
 
@@ -12,7 +12,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
   private val asset = TypeId("Asset")
 
   private val catalog = TypeCatalog.unsafe(
-    types = Set(asset),
+    types = Set(DomainType(asset)),
     predicates = Map(
       SymbolName("leaf") -> PredicateSig(List(asset)),
       SymbolName("coastal") -> PredicateSig(List(asset))
@@ -179,13 +179,13 @@ class VagueSemanticsTypedSpec extends FunSuite:
   private val loss = TypeId("Loss")
 
   private val catalogWithLoss = TypeCatalog.unsafe(
-    types = Set(asset, loss),
+    types = Set(DomainType(asset), DomainType(loss)),  // both are domain types — Loss can be quantified over
     predicates = Map(
       SymbolName("leaf")    -> PredicateSig(List(asset)),
       SymbolName("coastal") -> PredicateSig(List(asset)),
       SymbolName("hasloss") -> PredicateSig(List(loss))
     )
-  ) // domainTypes defaults to Set(asset, loss) (all declared types)
+  )
 
   private val losslessDispatcher = new RuntimeDispatcher:
     override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Value] =
@@ -258,11 +258,10 @@ class VagueSemanticsTypedSpec extends FunSuite:
     // A catalog where Loss is NOT enumerable (asset only) — validateAgainst only
     // checks Asset domain coverage, so it passes.
     val catalogAssetOnly = TypeCatalog.unsafe(
-      types = Set(asset, loss),
+      types = Set(DomainType(asset), ValueType(loss)),  // Loss is a value type — validateAgainst will not check Loss domain
       predicates = Map(
         SymbolName("hasloss") -> PredicateSig(List(loss))
-      ),
-      domainTypes = Some(Set(asset))  // Loss excluded → validateAgainst will not check Loss domain
+      )
     )
     // Manually construct a BoundQuery over Loss, bypassing QueryBinder.bind
     val boundQuery = BoundQuery(

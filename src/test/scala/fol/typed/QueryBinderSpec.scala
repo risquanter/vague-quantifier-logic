@@ -12,7 +12,7 @@ class QueryBinderSpec extends FunSuite:
   private val bool = TypeId("Bool")
 
   private val catalog = TypeCatalog.unsafe(
-    types = Set(asset, loss, prob, bool),
+    types = Set(DomainType(asset), ValueType(loss), ValueType(prob), ValueType(bool)),
     functions = Map(
       SymbolName("p95") -> FunctionSig(List(asset), loss),
       SymbolName("lec") -> FunctionSig(List(asset, loss), prob)
@@ -80,15 +80,14 @@ class QueryBinderSpec extends FunSuite:
 
   // Asset is a domain type; Loss is a value type (scalar) — not quantifiable
   private val catalogWithValueType = TypeCatalog.unsafe(
-    types = Set(asset, loss),
+    types = Set(DomainType(asset), ValueType(loss)),  // Loss is a value type — cannot be quantified over
     functions = Map(
       SymbolName("p95") -> FunctionSig(List(asset), loss)
     ),
     predicates = Map(
       SymbolName("leaf")    -> PredicateSig(List(asset)),
       SymbolName("gt_loss") -> PredicateSig(List(loss, loss))
-    ),
-    domainTypes = Some(Set(asset))   // Loss is a value type — cannot be quantified over
+    )
   )
 
   test("bind fails with TypeNotQuantifiable when root variable resolves to a value type"):
