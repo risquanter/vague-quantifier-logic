@@ -129,13 +129,15 @@ object QueryBinder:
       case Term.Const(name) =>
         catalog.constants.get(name) match
           case Some(actual) if actual == expected =>
-            Right((BoundTerm.ConstRef(name, expected), env))
+            // Named constant: no LiteralValue — stored as TextLiteral of source text.
+            // See TODOS.md T-002 for the open design question on named constants.
+            Right((BoundTerm.ConstRef(name, expected, TextLiteral(name)), env))
           case Some(actual) =>
             Left(List(TypeCheckError.TypeMismatch(expected, actual, s"constant '$name'")))
           case None =>
-            val validated = catalog.literalValidators.get(expected).exists(v => v(name))
-            if validated then Right((BoundTerm.ConstRef(name, expected), env))
-            else Left(List(TypeCheckError.UnknownConstantOrLiteral(name)))
+            catalog.literalValidators.get(expected).flatMap(v => v(name)) match
+              case Some(literal) => Right((BoundTerm.ConstRef(name, expected, literal), env))
+              case None          => Left(List(TypeCheckError.UnknownConstantOrLiteral(name)))
 
       case Term.Fn(name, args) =>
         val symbol = SymbolName(name)

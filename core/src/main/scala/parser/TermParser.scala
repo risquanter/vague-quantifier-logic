@@ -24,13 +24,15 @@ object TermParser:
     *   let is_const_name s = forall numeric (explode s) or s = "nil"
     * 
     * A constant is either:
-    * - All numeric digits (e.g., "42", "0")
+    * - All numeric digits (e.g., "42", "0", "10000000")
     * - The special name "nil"
-    * 
-    * Constants are represented as Fn with empty argument list.
+    * - A decimal literal (e.g., "0.05", "3.14") — intentional deviation from
+    *   Harrison OCaml (OCaml tokeniser keeps "." symbolic so decimals never
+    *   appear as single tokens there; this library's B-lexer merges them upstream
+    *   so TermParser must recognise the merged form as a constant).
     */
   def isConstName(s: String): Boolean =
-    s.forall(numeric) || s == "nil"
+    s.forall(numeric) || s == "nil" || s.matches("""\\d+\\.\\d+""")
   
   /** Parse atomic term (highest precedence / base case)
     * 
@@ -85,9 +87,13 @@ object TermParser:
       
       case a :: rest =>
         // Variable or constant
-        // It's a constant if: all numeric OR "nil" AND not in bound variables
+        // It's a constant if: all numeric OR "nil" AND not in bound variables.
+        // NOTE: intentional deviation from Harrison OCaml — OCaml emits Fn(a,[]) for
+        // zero-arity constants because its `term` type has no Const variant. This
+        // Scala port adds Term.Const precisely so QueryBinder can distinguish inline
+        // literals from zero-arity function applications at the bind phase.
         if isConstName(a) && !vs.contains(a) then
-          (Fn(a, List()), rest)
+          (Term.Const(a), rest)
         else
           (Var(a), rest)
   

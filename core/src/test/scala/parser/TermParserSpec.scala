@@ -14,12 +14,12 @@ class TermParserSpec extends FunSuite:
   
   test("parse constant (numeric)") {
     val result = parseFromString("42")
-    assertEquals(result, Fn("42", List()))
+    assertEquals(result, Const("42"))
   }
   
   test("parse constant (nil)") {
     val result = parseFromString("nil")
-    assertEquals(result, Fn("nil", List()))
+    assertEquals(result, Const("nil"))
   }
   
   test("parse function with no args") {
@@ -49,7 +49,7 @@ class TermParserSpec extends FunSuite:
   
   test("parse unary minus with constant") {
     val result = parseFromString("- 5")
-    assertEquals(result, Fn("-", List(Fn("5", List()))))
+    assertEquals(result, Fn("-", List(Const("5"))))
   }
   
   test("parse addition (infix)") {
@@ -183,11 +183,11 @@ class TermParserSpec extends FunSuite:
     assertEquals(
       result,
       Fn("-", List(
-        Fn("1", List()),
+        Const("1"),
         Fn("cos", List(
           Fn("power", List(
             Fn("+", List(Var("x"), Var("y"))),
-            Fn("2", List())
+            Const("2")
           ))
         ))
       ))
@@ -222,8 +222,8 @@ class TermParserSpec extends FunSuite:
     assertEquals(
       result,
       Fn("+", List(
-        Fn("*", List(Fn("2", List()), Var("x"))),
-        Fn("3", List())
+        Fn("*", List(Const("2"), Var("x"))),
+        Const("3")
       ))
     )
   }
@@ -234,10 +234,10 @@ class TermParserSpec extends FunSuite:
     assertEquals(
       result,
       Fn("::", List(
-        Fn("1", List()),
+        Const("1"),
         Fn("::", List(
-          Fn("2", List()),
-          Fn("nil", List())
+          Const("2"),
+          Const("nil")
         ))
       ))
     )
@@ -289,7 +289,7 @@ class TermParserSpec extends FunSuite:
               Var("w"),
               Fn("/", List(
                 Var("u"),
-                Fn("^", List(Var("v"), Fn("2", List())))
+                Fn("^", List(Var("v"), Const("2")))
               ))
             ))
           ))

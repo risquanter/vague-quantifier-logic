@@ -6,13 +6,22 @@ case class BoundVar(name: String, sort: TypeId)
 
 enum BoundTerm:
   case VarRef(v: BoundVar)
-  case ConstRef(name: String, override val sort: TypeId)
+  /** A resolved inline literal from the query text.
+    *
+    * @param sourceText The original source token (e.g. "10000000", "0.05").
+    * @param sort       The sort the literal was validated against.
+    * @param raw        The parsed literal value produced by the sort's validator.
+    *                   This becomes `Value.raw` at evaluation time, so dispatcher
+    *                   lambdas receive a `LiteralValue` (not a String) for any
+    *                   argument that came from an inline literal. See ADR-015.
+    */
+  case ConstRef(sourceText: String, override val sort: TypeId, raw: LiteralValue)
   case FnApp(name: SymbolName, args: List[BoundTerm], resultSort: TypeId)
 
   def sort: TypeId = this match
-    case VarRef(v) => v.sort
-    case ConstRef(_, s) => s
-    case FnApp(_, _, s) => s
+    case VarRef(v)          => v.sort
+    case ConstRef(_, s, _)  => s
+    case FnApp(_, _, s)     => s
 
 case class BoundAtom(name: SymbolName, args: List[BoundTerm])
 

@@ -131,7 +131,7 @@ class FOLAtomParserSpec extends FunSuite:
     val result = parseFromString("forall x . x < 2")
     assertEquals(
       result,
-      Forall("x", Atom(FOL("<", List(Var("x"), Fn("2", List())))))
+      Forall("x", Atom(FOL("<", List(Var("x"), Const("2")))))
     )
   }
   
@@ -181,8 +181,8 @@ class FOLAtomParserSpec extends FunSuite:
       result,
       Atom(FOL("=", List(
         Fn("+", List(
-          Fn("*", List(Fn("2", List()), Var("x"))),
-          Fn("1", List())
+          Fn("*", List(Const("2"), Var("x"))),
+          Const("1")
         )),
         Var("y")
       )))
@@ -286,10 +286,10 @@ class FOLAtomParserSpec extends FunSuite:
       result,
       Atom(FOL("<", List(
         Fn("+", List(
-          Fn("*", List(Fn("2", List()), Var("x"))),
-          Fn("3", List())
+          Fn("*", List(Const("2"), Var("x"))),
+          Const("3")
         )),
-        Fn("-", List(Var("y"), Fn("1", List())))
+        Fn("-", List(Var("y"), Const("1")))
       )))
     )
   }

@@ -198,8 +198,11 @@ object TypedSemantics:
           ))
         }
 
-      case BoundTerm.ConstRef(name, sort) =>
-        Right(Value(sort, name))
+      case BoundTerm.ConstRef(_, sort, raw) =>
+        // raw is a LiteralValue (IntLiteral, FloatLiteral, or TextLiteral).
+        // Dispatcher lambdas receive this as Value.raw; use a sealed match
+        // to handle each case without asInstanceOf. See ADR-015.
+        Right(Value(sort, raw))
 
       case BoundTerm.FnApp(name, args, resultSort) =>
         for

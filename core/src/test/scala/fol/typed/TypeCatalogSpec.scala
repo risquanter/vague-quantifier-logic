@@ -18,7 +18,7 @@ class TypeCatalogSpec extends FunSuite:
       predicates = Map(
         SymbolName("gt_loss") -> PredicateSig(List(loss, loss))
       ),
-      literalValidators = Map(loss -> (_.forall(_.isDigit)))
+      literalValidators = Map(loss -> (s => s.toLongOption.map(IntLiteral(_))))
     )
 
     assert(result.isRight)

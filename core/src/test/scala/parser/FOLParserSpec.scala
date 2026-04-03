@@ -51,8 +51,8 @@ class FOLParserSpec extends FunSuite:
       formula,
       Atom(FOL("=", List(
         Fn("+", List(
-          Fn("*", List(Fn("2", List()), Var("x"))),
-          Fn("3", List())
+          Fn("*", List(Const("2"), Var("x"))),
+          Const("3")
         )),
         Var("y")
       )))

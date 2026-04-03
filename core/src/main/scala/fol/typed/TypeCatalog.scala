@@ -28,7 +28,7 @@ case class TypeCatalog private (
   constants: Map[String, TypeId],
   functions: Map[SymbolName, FunctionSig],
   predicates: Map[SymbolName, PredicateSig],
-  literalValidators: Map[TypeId, String => Boolean]
+  literalValidators: Map[TypeId, String => Option[LiteralValue]]
 ):
   /** All declared type IDs, regardless of role. */
   def typeIds: Set[TypeId] = types.map(_.typeId)
@@ -54,7 +54,7 @@ object TypeCatalog:
     constants: Map[String, TypeId] = Map.empty,
     functions: Map[SymbolName, FunctionSig] = Map.empty,
     predicates: Map[SymbolName, PredicateSig] = Map.empty,
-    literalValidators: Map[TypeId, String => Boolean] = Map.empty
+    literalValidators: Map[TypeId, String => Option[LiteralValue]] = Map.empty
   ): Either[List[TypeCatalogError], TypeCatalog] =
     val errors = collectErrors(types, constants, functions, predicates, literalValidators)
     if errors.isEmpty then Right(new TypeCatalog(types, constants, functions, predicates, literalValidators))
@@ -71,7 +71,7 @@ object TypeCatalog:
     constants: Map[String, TypeId] = Map.empty,
     functions: Map[SymbolName, FunctionSig] = Map.empty,
     predicates: Map[SymbolName, PredicateSig] = Map.empty,
-    literalValidators: Map[TypeId, String => Boolean] = Map.empty
+    literalValidators: Map[TypeId, String => Option[LiteralValue]] = Map.empty
   ): TypeCatalog =
     apply(types, constants, functions, predicates, literalValidators)
       .fold(
@@ -84,7 +84,7 @@ object TypeCatalog:
     constants: Map[String, TypeId],
     functions: Map[SymbolName, FunctionSig],
     predicates: Map[SymbolName, PredicateSig],
-    literalValidators: Map[TypeId, String => Boolean]
+    literalValidators: Map[TypeId, String => Option[LiteralValue]]
   ): List[TypeCatalogError] =
     val typeIds = types.map(_.typeId)
     val unknownTypes = List.newBuilder[TypeCatalogError]

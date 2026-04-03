@@ -51,3 +51,23 @@ case class ValueType(typeId: TypeId) extends TypeDecl
   */
 trait TypeRepr[A]:
   def typeId: TypeId
+
+/** A parsed inline literal value produced by a `literalValidators` entry in
+  * [[TypeCatalog]].
+  *
+  * Sealed so the library controls the finite set of possible raw forms.
+  * Dispatcher lambdas receive `LiteralValue` inside `Value.raw` for any
+  * argument that came from an inline query literal (as opposed to a domain
+  * element or a function return value). Pattern-match exhaustively — no
+  * `asInstanceOf` required. See ADR-015.
+  */
+sealed trait LiteralValue
+
+/** An integer literal (source text was a decimal integer, parsed as `Long`). */
+case class IntLiteral(value: Long) extends LiteralValue
+
+/** A floating-point literal (source text was a decimal fraction, parsed as `Double`). */
+case class FloatLiteral(value: Double) extends LiteralValue
+
+/** A text literal (any string that the consumer's validator accepts as-is). */
+case class TextLiteral(value: String) extends LiteralValue

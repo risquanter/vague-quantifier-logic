@@ -204,8 +204,8 @@ class MapDispatcherSpec extends FunSuite:
   //   gt_prob : Probability × Probability → Boolean
   //
   // Asset raw type: String (asset identifier)
-  // Loss  raw type: String (literal token produced by ConstRef — see note below)
-  // Probability raw type: Double
+  // Loss  raw type: LiteralValue (IntLiteral for inline integer literals like "10000000")
+  // Probability raw type: LiteralValue (FloatLiteral for inline decimals like "0.05")
 
   private val catalog = TypeCatalog.unsafe(
     types = Set(
@@ -222,10 +222,12 @@ class MapDispatcherSpec extends FunSuite:
       symP95 -> FunctionSig(List(tAsset), tLoss)
     ),
     // Numeric literals appearing as Loss or Probability tokens in queries are
-    // validated by these predicates at bind time.
+    // validated by these validators at bind time.  The validator produces the
+    // parsed LiteralValue that flows through ConstRef.raw → Value.raw into
+    // dispatcher lambdas.  See ADR-015.
     literalValidators = Map(
-      tLoss -> (s => s.toLongOption.isDefined),
-      tProb -> (s => s.toDoubleOption.isDefined)
+      tLoss -> (s => s.toLongOption.map(IntLiteral(_))),
+      tProb -> (s => s.toDoubleOption.map(FloatLiteral(_)))
     )
   )
 
@@ -242,26 +244,30 @@ class MapDispatcherSpec extends FunSuite:
   //      put into Value(sort, raw) when constructing RuntimeModel.domains.
   //      In this test, Asset domain elements are Value(tAsset, "A"), so raw is String.
   //
-  //   2. Literals from query text — ConstRef("10000000", Loss) evaluates to
-  //      Value(Loss, "10000000") — raw is ALWAYS String, regardless of sort.
-  //      The lambda must parse it: args(n).raw.asInstanceOf[String].toLong etc.
+  //   2. Literals from query text — ConstRef.raw is a LiteralValue produced by the
+  //      sort's literalValidator.  In this test:
+  //        - "10000000" (Loss)  → IntLiteral(10000000L)
+  //        - "0.05" (Prob)     → FloatLiteral(0.05)
+  //      Use a sealed match — no asInstanceOf in the good path (ADR-015).
   //
   //   3. Function return values — raw is whatever the lambda puts into Value.raw.
   //      In this test lec returns Value(tProb, 0.07: Double), so downstream
-  //      consumers of lec's result see Double.
+  //      consumers of lec's result see a native Double — not a LiteralValue.
+  //      This is intentional: the lec lambda is responsible for its own raw type.
   //
   // Consequence: a lambda receiving a Value from a predicate/function argument
   // may see different raw types depending on whether the argument came from a
   // domain element, a literal, or a prior function application.
   // The consumer owns this contract on both sides of the boundary.
-  // A raw-type mismatch will throw ClassCastException — see the test below.
 
-  // Helper used in comparison lambdas: extract numeric value regardless of
-  // whether raw is already a Double (from function result) or a String (from literal).
+  // Helper used in comparison lambdas: extract Double regardless of whether raw
+  // is a native Double (from a function return value) or a LiteralValue variant
+  // (from an inline query literal).  Uses a sealed match — no asInstanceOf.
   private def rawToDouble(v: Value): Double = v.raw match
-    case d: Double => d
-    case s: String => s.toDouble
-    case other     => throw ClassCastException(s"Expected Double or String for sort ${v.sort.value}, got ${other.getClass.getSimpleName}")
+    case d: Double        => d
+    case FloatLiteral(d)  => d
+    case IntLiteral(n)    => n.toDouble
+    case other => throw ClassCastException(s"Expected Double or LiteralValue for sort ${v.sort.value}, got ${other.getClass.getSimpleName}")
 
   private val dispatcher = MapDispatcher(
     predicates = Map(
@@ -270,9 +276,9 @@ class MapDispatcherSpec extends FunSuite:
         Right(true)
       },
       symGtProb -> { args =>
-        // args(0): result of lec(x, ...) — raw is Double (produced by lec lambda below)
-        // args(1): literal "0.05"       — raw is String (ConstRef convention)
-        // rawToDouble handles both cases.
+        // args(0): result of lec(x, ...) — raw is Double (native, from lec lambda)
+        // args(1): literal "0.05"        — raw is FloatLiteral(0.05) (from literalValidator)
+        // rawToDouble handles both cases via a sealed match (no asInstanceOf).
         val a = rawToDouble(args(0))
         val b = rawToDouble(args(1))
         Right(a > b)
@@ -281,14 +287,14 @@ class MapDispatcherSpec extends FunSuite:
     functions = Map(
       symLec -> { args =>
         // args(0): domain element Value(tAsset, "A") — raw is String
-        // args(1): literal "10000000"               — raw is String (ConstRef convention)
+        // args(1): literal "10000000" — raw is IntLiteral(10000000L) (from literalValidator)
         val assetId   = args(0).raw.asInstanceOf[String]
-        val threshold = args(1).raw.asInstanceOf[String].toLong
+        val threshold = args(1).raw.asInstanceOf[IntLiteral].value
         // [ILLUSTRATIVE computation]: A has lec=0.07, B has lec=0.02
         val lec = assetId match
           case "A" => 0.07
           case _   => 0.02
-        Right(Value(tProb, lec))  // raw is Double — downstream lambdas must handle Double
+        Right(Value(tProb, lec))  // raw is Double — downstream lambdas must use rawToDouble
       },
       symP95 -> { args =>
         // args(0): domain element — raw is String

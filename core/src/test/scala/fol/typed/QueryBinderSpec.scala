@@ -23,8 +23,8 @@ class QueryBinderSpec extends FunSuite:
       SymbolName("gt_prob") -> PredicateSig(List(prob, prob))
     ),
     literalValidators = Map(
-      loss -> (_.forall(_.isDigit)),
-      prob -> (s => s.matches("[0-9]+(\\.[0-9]+)?"))
+      loss -> (s => s.toLongOption.map(IntLiteral(_))),
+      prob -> (s => s.toDoubleOption.map(FloatLiteral(_)))
     )
   )
 

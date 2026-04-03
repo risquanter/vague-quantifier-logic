@@ -45,7 +45,7 @@ object VagueQueryParser:
     */
   def parse(s: String): Either[QueryError, ParsedQuery] =
     try
-      val tokens = Lexer.lex(explode(s))
+      val tokens = mergeDecimalTokens(Lexer.lex(explode(s)))
       val (query, remaining) = parseTokens(tokens)
       if remaining.nonEmpty then
         Left(QueryError.ParseError(
@@ -118,12 +118,13 @@ object VagueQueryParser:
         val afterBrace = expect("}", afterN, "tolerance or end")
 
         // Optional tolerance [ε]
+        // mergeDecimalTokens (applied in parse()) ensures that a decimal like
+        // 0.05 arrives here as a single token "0.05", so only the first branch
+        // is needed.  The former three-token branch "[" intPart "." fracPart "]"
+        // was dead code after mergeDecimalTokens was introduced and is removed.
         val (tolerance, afterTol) = afterBrace match
           case "[" :: tolStr :: "]" :: rest2 if isNumeric(tolStr) =>
             (tolStr.toDouble, rest2)
-          case "[" :: intPart :: "." :: fracPart :: "]" :: rest2
-            if intPart.forall(_.isDigit) && fracPart.forall(_.isDigit) =>
-            (s"$intPart.$fracPart".toDouble, rest2)
           case _ =>
             (0.1, afterBrace) // Default tolerance
 
@@ -271,3 +272,22 @@ object VagueQueryParser:
   /** Check if string is numeric (integer or decimal). */
   private def isNumeric(s: String): Boolean =
     s.nonEmpty && (s.forall(_.isDigit) || s.matches("""\d+\.\d+"""))
+
+  /** Merge consecutive digit "." digit token triples into a single decimal token.
+    *
+    * The OCaml-ported lexer classifies "." as a symbolic character, so the input
+    * "0.05" tokenises to ["0", ".", "05"] — three tokens.  This post-processor
+    * merges them back to ["0.05"] before parsing begins.  Applied to the full
+    * token stream so decimal literals in predicate/function arguments (scope
+    * formula) are handled as well as in the tolerance bracket.
+    *
+    * Only digit-dot-digit triples are merged; other token sequences are
+    * unchanged.
+    */
+  private def mergeDecimalTokens(tokens: List[String]): List[String] =
+    tokens match
+      case a :: "." :: b :: rest
+        if a.nonEmpty && a.forall(_.isDigit) && b.nonEmpty && b.forall(_.isDigit) =>
+        s"$a.$b" :: mergeDecimalTokens(rest)
+      case t :: rest => t :: mergeDecimalTokens(rest)
+      case Nil       => Nil
