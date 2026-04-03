@@ -3,7 +3,8 @@ package fol.semantics
 import fol.error.QueryError
 import fol.logic.{ParsedQuery, Quantifier}
 import fol.sampling.SamplingParams
-import fol.typed.{BoundAtom, BoundFormula, BoundQuery, BoundTerm, BoundVar, DomainType, PredicateSig, RuntimeDispatcher, RuntimeModel, TypeCatalog, TypedSemantics, TypeId, TypeRepr, SymbolName, Value, ValueType}
+import fol.typed.{BoundAtom, BoundFormula, BoundQuery, BoundTerm, BoundVar, PredicateSig, RuntimeDispatcher, RuntimeModel, TypeCatalog, TypedSemantics, TypeId, TypeRepr, SymbolName, Value}
+import fol.typed.TypeDecl.{DomainType, ValueType}
 import logic.{FOL, Formula, Term}
 import munit.FunSuite
 

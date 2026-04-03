@@ -3,18 +3,22 @@ package parser
 import logic.Term
 import logic.Term.*
 import parser.Combinators.*
+import util.StringUtil
 import util.StringUtil.*
 
 /** Term parser from fol.ml
   * 
   * This implements parsing of first-order logic terms with:
   * - Variables: x, y, z
-  * - Constants: 42, nil (represented as Fn with empty args)
+  * - Constants: 42, nil (emitted as `Term.Const`; see [[isConstName]])
   * - Functions: f(x, y), +(x, y)
   * - 6 levels of infix operators with different associativity
   * 
   * OCaml implementation shows sophisticated precedence handling:
   *   parse_term chains 6 levels of operators from lowest to highest precedence
+  *
+  * Intentional deviations from Harrison OCaml are documented in [[isConstName]]
+  * and [[parseAtomicTerm]].
   */
 object TermParser:
   
@@ -31,8 +35,8 @@ object TermParser:
     *   appear as single tokens there; this library's B-lexer merges them upstream
     *   so TermParser must recognise the merged form as a constant).
     */
-  def isConstName(s: String): Boolean =
-    s.forall(numeric) || s == "nil" || s.matches("""\\d+\\.\\d+""")
+  private def isConstName(s: String): Boolean =
+    s.forall(numeric) || s == "nil" || StringUtil.isDecimalLiteral(s)
   
   /** Parse atomic term (highest precedence / base case)
     * 

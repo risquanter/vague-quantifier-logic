@@ -21,6 +21,15 @@ class TermParserSpec extends FunSuite:
     val result = parseFromString("nil")
     assertEquals(result, Const("nil"))
   }
+
+  test("parse constant (decimal, pre-merged token)") {
+    // VagueQueryParser.mergeDecimalTokens pre-merges ["0", ".", "05"] → ["0.05"].
+    // TermParser receives the merged token; isConstName must recognise it via
+    // StringUtil.isDecimalLiteral so QueryBinder gets Term.Const("0.05") not Var("0.05").
+    val (result, rest) = parse(List("0.05"))
+    assertEquals(result, Const("0.05"))
+    assertEquals(rest, Nil)
+  }
   
   test("parse function with no args") {
     val result = parseFromString("f()")

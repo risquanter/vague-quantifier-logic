@@ -1,5 +1,7 @@
 package fol.typed
 
+import TypeDecl.*
+import LiteralValue.*
 import fol.error.QueryError
 import fol.logic.{ParsedQuery, Quantifier}
 import fol.sampling.SamplingParams
@@ -289,7 +291,9 @@ class MapDispatcherSpec extends FunSuite:
         // args(0): domain element Value(tAsset, "A") — raw is String
         // args(1): literal "10000000" — raw is IntLiteral(10000000L) (from literalValidator)
         val assetId   = args(0).raw.asInstanceOf[String]
-        val threshold = args(1).raw.asInstanceOf[IntLiteral].value
+        val threshold = args(1).raw match
+          case IntLiteral(n) => n
+          case other => throw IllegalArgumentException(s"expected IntLiteral for lec threshold, got $other")
         // [ILLUSTRATIVE computation]: A has lec=0.07, B has lec=0.02
         val lec = assetId match
           case "A" => 0.07

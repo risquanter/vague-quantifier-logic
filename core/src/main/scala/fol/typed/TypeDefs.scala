@@ -22,22 +22,21 @@ object SymbolName:
 
 /** Declares a type's role in the [[TypeCatalog]].
   *
-  * - [[DomainType]] — first-class entities that can be quantified over; require
-  *   a registered domain in [[RuntimeModel]].
-  * - [[ValueType]] — scalar / computed values; cannot be quantified over.
+  * - [[TypeDecl.DomainType]] — first-class entities that can be quantified over;
+  *   require a registered domain in [[RuntimeModel]].
+  * - [[TypeDecl.ValueType]] — scalar / computed values; cannot be quantified over.
   *
-  * Both sub-types carry their [[TypeId]] so the declaration is self-contained:
-  * there is no need to list a type separately in a `types` set and then again
-  * in a `domainTypes` set. See ADR-014.
+  * Both variants carry their [[TypeId]] so the declaration is self-contained.
+  * See ADR-006 (enum encoding) and ADR-014 (quantifiability semantics).
   */
-sealed trait TypeDecl:
-  def typeId: TypeId
+enum TypeDecl:
+  case DomainType(id: TypeId)
+  case ValueType(id: TypeId)
 
-/** A first-class entity type that can be quantified over. */
-case class DomainType(typeId: TypeId) extends TypeDecl
-
-/** A scalar value type that cannot be quantified over. */
-case class ValueType(typeId: TypeId) extends TypeDecl
+  /** The type identifier carried by this declaration. */
+  def typeId: TypeId = this match
+    case DomainType(id) => id
+    case ValueType(id)  => id
 
 /** Declares that consumer type `A` is the JVM carrier for a specific `TypeId`.
   *
@@ -55,19 +54,22 @@ trait TypeRepr[A]:
 /** A parsed inline literal value produced by a `literalValidators` entry in
   * [[TypeCatalog]].
   *
-  * Sealed so the library controls the finite set of possible raw forms.
+  * Enum so the library controls the finite set of possible raw forms.
   * Dispatcher lambdas receive `LiteralValue` inside `Value.raw` for any
   * argument that came from an inline query literal (as opposed to a domain
   * element or a function return value). Pattern-match exhaustively — no
-  * `asInstanceOf` required. See ADR-015.
+  * `asInstanceOf` required. See ADR-006 (enum encoding) and ADR-015 (injection boundary).
   */
-sealed trait LiteralValue
+enum LiteralValue:
+  /** An integer literal (source text was a decimal integer, parsed as `Long`). */
+  case IntLiteral(value: Long)
 
-/** An integer literal (source text was a decimal integer, parsed as `Long`). */
-case class IntLiteral(value: Long) extends LiteralValue
+  /** A floating-point literal (source text was a decimal fraction, parsed as `Double`). */
+  case FloatLiteral(value: Double)
 
-/** A floating-point literal (source text was a decimal fraction, parsed as `Double`). */
-case class FloatLiteral(value: Double) extends LiteralValue
-
-/** A text literal (any string that the consumer's validator accepts as-is). */
-case class TextLiteral(value: String) extends LiteralValue
+  /** A text/opaque literal. Currently used as a stopgap for named constants
+    * (see TODOS.md T-002) — the `value` is the raw source token, not a
+    * consumer-typed value. Do not use for new literal types; prefer `IntLiteral`
+    * or `FloatLiteral` where the type is known.
+    */
+  case TextLiteral(value: String)

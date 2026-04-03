@@ -1,5 +1,7 @@
 package fol.typed
 
+import TypeDecl.*
+import LiteralValue.*
 import munit.FunSuite
 
 class TypeCatalogSpec extends FunSuite:

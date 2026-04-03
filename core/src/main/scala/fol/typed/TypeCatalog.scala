@@ -1,5 +1,8 @@
 package fol.typed
 
+import TypeDecl.*
+import LiteralValue.*
+
 case class FunctionSig(params: List[TypeId], returns: TypeId)
 
 case class PredicateSig(params: List[TypeId])

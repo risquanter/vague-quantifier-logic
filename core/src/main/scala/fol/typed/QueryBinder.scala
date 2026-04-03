@@ -2,6 +2,7 @@ package fol.typed
 
 import fol.logic.ParsedQuery
 import logic.{FOL, Formula, Term}
+import LiteralValue.*
 
 object QueryBinder:
 

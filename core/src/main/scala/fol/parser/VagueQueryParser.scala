@@ -271,7 +271,7 @@ object VagueQueryParser:
 
   /** Check if string is numeric (integer or decimal). */
   private def isNumeric(s: String): Boolean =
-    s.nonEmpty && (s.forall(_.isDigit) || s.matches("""\d+\.\d+"""))
+    util.StringUtil.isNumeric(s) || util.StringUtil.isDecimalLiteral(s)
 
   /** Merge consecutive digit "." digit token triples into a single decimal token.
     *

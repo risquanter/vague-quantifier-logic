@@ -1,5 +1,7 @@
 package fol.typed
 
+import TypeDecl.*
+import LiteralValue.*
 import munit.FunSuite
 import fol.logic.{ParsedQuery, Quantifier}
 import logic.{FOL, Formula, Term}

@@ -6,7 +6,8 @@ import fol.logic.{Quantifier, ParsedQuery}
 import fol.result.{EvaluationOutput, VagueQueryResult}
 import fol.error.QueryError
 import fol.sampling.SamplingParams
-import fol.typed.{DomainType, TypeCatalog, TypeId, SymbolName, PredicateSig}
+import fol.typed.{TypeCatalog, TypeId, SymbolName, PredicateSig}
+import fol.typed.TypeDecl.DomainType
 
 class VagueSemanticsSpec extends munit.FunSuite:
 
