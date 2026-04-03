@@ -1,6 +1,6 @@
 # Multi-Sorted Type System for fol-engine — V2 (Constraint-Aligned)
 
-**Status:** Proposal (supersedes nothing; V1 kept intact)  
+**Status:** Implemented (0.8.0-SNAPSHOT) — all D1-D6 decisions locked and in production  
 **Date:** 2026-03-26  
 **Scope:** fol-engine design for register query-pane integration  
 
