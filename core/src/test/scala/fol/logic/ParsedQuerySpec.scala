@@ -3,6 +3,7 @@ package fol.logic
 import munit.FunSuite
 import logic.{FOL, Formula, Term}
 import fol.error.QueryException
+import fol.quantifier.Quantifier
 
 class ParsedQuerySpec extends FunSuite:
   import ParsedQuery.*, Quantifier.*, Formula.*, Term.*

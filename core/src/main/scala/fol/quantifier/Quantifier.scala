@@ -1,4 +1,4 @@
-package fol.logic
+package fol.quantifier
 
 /** Vague quantifier types from paper Section 5.2
   * 

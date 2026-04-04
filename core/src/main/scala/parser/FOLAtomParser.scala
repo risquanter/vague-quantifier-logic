@@ -3,6 +3,7 @@ package parser
 import logic.{FOL, Term, Formula}
 import logic.Formula.*
 import parser.Combinators.*
+import parser.Combinators.ParseFailure
 import parser.TermParser.*
 import parser.FormulaParser.AtomParser
 import util.StringUtil.*
@@ -54,7 +55,7 @@ object FOLAtomParser:
       // Parse second term
       papply((tm2: Term) => FOL(op, List(tm, tm2)))(parseTerm(vs)(rest.tail))
     else
-      throw new Exception("Not an infix atom")
+      throw ParseFailure("Not an infix atom")
   
   /** Parse general atom (predicate)
     * 
@@ -84,7 +85,7 @@ object FOLAtomParser:
     try
       parseInfixAtom(vs, inp)
     catch
-      case _: Exception =>
+      case _: ParseFailure =>
         // Not infix, try predicate forms
         inp match
           case Nil =>

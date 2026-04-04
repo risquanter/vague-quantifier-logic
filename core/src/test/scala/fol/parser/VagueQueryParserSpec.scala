@@ -1,6 +1,7 @@
 package fol.parser
 
-import fol.logic.{ParsedQuery, Quantifier}
+import fol.logic.ParsedQuery
+import fol.quantifier.Quantifier
 import logic.{FOL, Formula, Term}
 
 class VagueQueryParserSpec extends munit.FunSuite:

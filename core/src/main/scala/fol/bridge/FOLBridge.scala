@@ -1,8 +1,8 @@
 package fol.bridge
 
 import logic.{FOL, Formula}
-import semantics.EvaluationContext
-import semantics.holdsWithBinding
+import fol.semantics.EvaluationContext
+import fol.semantics.holdsWithBinding
 import fol.datastore.{KnowledgeSource, DomainElement, DomainCodec}
 import semantics.ModelAugmenter
 

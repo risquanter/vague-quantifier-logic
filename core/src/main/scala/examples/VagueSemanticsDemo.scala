@@ -2,7 +2,8 @@ package examples
 
 import logic.{FOL, Formula, Term}
 import semantics.{Model, Valuation}
-import fol.logic.{ParsedQuery, Quantifier}
+import fol.logic.ParsedQuery
+import fol.quantifier.Quantifier
 import fol.semantics.{RangeExtractor, ScopeEvaluator}
 import fol.datastore.{KnowledgeBase, KnowledgeSource, RelationTuple, RelationValue, RelationName}
 import fol.bridge.KnowledgeBaseModel

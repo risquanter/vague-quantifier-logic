@@ -3,7 +3,8 @@ package fol.typed
 import TypeDecl.*
 import LiteralValue.*
 import munit.FunSuite
-import fol.logic.{ParsedQuery, Quantifier}
+import fol.logic.ParsedQuery
+import fol.quantifier.Quantifier
 import logic.{FOL, Formula, Term}
 
 class QueryBinderSpec extends FunSuite:

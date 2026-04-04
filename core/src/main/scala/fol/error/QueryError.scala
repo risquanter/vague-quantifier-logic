@@ -3,13 +3,19 @@ package fol.error
 import fol.datastore.RelationName
 
 /** Structured error types for vague quantifier evaluation.
-  * 
+  *
+  * Encoded as a `sealed trait` with `case class` variants (not an `enum`) because
+  * each variant overrides `formatted` and/or `context` with distinct body logic.
+  * An `enum` would require a central match dispatch for those methods, which is less
+  * maintainable when the override bodies differ structurally. Uniform variants
+  * (TypeCheckError, RuntimeModelError, TypeCatalogError) use `enum` per ADR-006.
+  *
   * This error hierarchy provides:
   * - Type-safe error handling without exceptions
   * - Composable error messages
   * - Effect-system agnostic (works with Either, Try, ZIO, cats-effect)
   * - No external dependencies (pure Scala 3)
-  * 
+  *
   * Usage with Either:
   * {{{
   * def parse(input: String): Either[QueryError, ParsedQuery] = ???

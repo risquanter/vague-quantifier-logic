@@ -6,7 +6,17 @@ package parser
   * This is the foundation of the entire parsing approach.
   */
 object Combinators:
-  
+
+  /** Signals a parser backtracking failure — the direct analogue of OCaml's `Failure _`.
+    *
+    * Thrown internally by `parseInfixAtom` when the next token is not a relational
+    * operator, and caught by `parseAtom` / `parseAtomicFormula` to try the next
+    * branch. Must NEVER be caught in a broad `case _: Exception` clause — always
+    * name this type explicitly so real programming errors (NPE, StackOverflow, etc.)
+    * are not silently swallowed as parse failures. See ADR-007 C2.
+    */
+  class ParseFailure(msg: String) extends Exception(msg)
+
   /** Parse result type: (parsed_value, remaining_tokens)
     * 
     * OCaml uses tuples directly: 'a * string list
@@ -174,7 +184,7 @@ object Combinators:
     if nextin(rest, cbra) then
       (ast, rest.tail)
     else
-      throw new Exception(s"Closing bracket '$cbra' expected, but got: ${rest.headOption.getOrElse("end of input")}")
+      throw new ParseFailure(s"Closing bracket '$cbra' expected, but got: ${rest.headOption.getOrElse("end of input")}")
   
   /** Helper to check if token list is empty */
   def isEmpty(inp: List[String]): Boolean = inp.isEmpty

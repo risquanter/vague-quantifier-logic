@@ -3,6 +3,7 @@ package parser
 import logic.Formula
 import logic.Formula.*
 import parser.Combinators.*
+import parser.Combinators.ParseFailure
 
 /** Generic formula parser from formulas.ml
   * 
@@ -84,7 +85,7 @@ object FormulaParser:
         try
           papply((a: A) => Atom(a))(ifn(vs, inp))
         catch
-          case _: Exception =>
+          case _: ParseFailure =>
             parseBracketed(parseFormula(ifn, afn)(vs), ")")(rest)
       
       case "~" :: rest =>

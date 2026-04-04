@@ -16,20 +16,20 @@ enum Term:
   case Const(name: String) 
 
 object Term:
-    // Helper (doesn't change the type structure)
-    def const(name: String): Term = Fn(name, Nil)
-  
-    /** Example from fol.ml:
-    * sqrt(1 - cos(power(x + y, 2)))
-    */
+    /** Example from fol.ml: sqrt(1 - cos(power(x + y, 2)))
+      *
+      * Uses [[Term.Const]] for the numeric literals 1 and 2 — the idiomatic
+      * representation since `Term.Const` was added (deviation from Harrison OCaml)
+      * to distinguish inline literals from zero-arity function applications.
+      */
     def example: Term =
         Fn("sqrt", List(
             Fn("-", List(
-                const("1"),  // or Fn("1", Nil) directly
+                Const("1"),
                 Fn("cos", List(
                     Fn("power", List(
                         Fn("+", List(Var("x"), Var("y"))),
-                        const("2")
+                        Const("2")
                     ))
                 ))
             ))

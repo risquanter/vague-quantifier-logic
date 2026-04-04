@@ -1,8 +1,7 @@
 package fol.result
 
-import fol.quantifier.VagueQuantifier
+import fol.quantifier.{VagueQuantifier, Quantifier}
 import fol.sampling.ProportionEstimate
-import fol.logic.{Quantifier => LogicQuantifier}
 
 /** Unified result type for all vague quantifier evaluations.
   * 
@@ -47,7 +46,7 @@ case class VagueQueryResult(
     * the CI is degenerate so this always returns true.
     */
   def isSignificant: Boolean =
-    val (qLower, qUpper) = LogicQuantifier.acceptanceRange(quantifier.toQuantifier)
+    val (qLower, qUpper) = Quantifier.acceptanceRange(quantifier.toQuantifier)
     val (lower, upper) = confidenceInterval
     
     if satisfied then

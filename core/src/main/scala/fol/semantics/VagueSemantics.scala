@@ -1,7 +1,8 @@
 package fol.semantics
 
 import fol.datastore.{KnowledgeSource, DomainElement, DomainCodec}
-import fol.logic.{Quantifier, ParsedQuery}
+import fol.logic.ParsedQuery
+import fol.quantifier.Quantifier
 import fol.quantifier.VagueQuantifier
 import fol.bridge.FOLBridge
 import fol.query.ResolvedQuery

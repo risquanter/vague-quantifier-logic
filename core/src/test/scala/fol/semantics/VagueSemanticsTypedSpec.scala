@@ -1,7 +1,8 @@
 package fol.semantics
 
 import fol.error.QueryError
-import fol.logic.{ParsedQuery, Quantifier}
+import fol.logic.ParsedQuery
+import fol.quantifier.Quantifier
 import fol.sampling.SamplingParams
 import fol.typed.{BoundAtom, BoundFormula, BoundQuery, BoundTerm, BoundVar, FolModel, LiteralValue, PredicateSig, RuntimeDispatcher, RuntimeModel, TypeCatalog, TypedSemantics, TypeId, TypeRepr, SymbolName, Value}
 import fol.typed.TypeDecl.{DomainType, ValueType}

@@ -1,6 +1,7 @@
 package fol.quantifier
 
-import fol.logic.{Quantifier => LogicQuantifier}
+// Quantifier is in the same package (fol.quantifier) after being moved from fol.logic.
+// No import or alias needed.
 import fol.result.VagueQueryResult
 
 /** Vague quantifier for proportional reasoning over populations.
@@ -19,23 +20,23 @@ import fol.result.VagueQueryResult
   * - AtMost (Q[≤]): proportion ≤ threshold (e.g., "few", "hardly any")
   * 
   * This is the ergonomic Scala API (percentage-based). Internally,
-  * acceptance checking delegates to [[fol.logic.Quantifier.accepts]]
+  * acceptance checking delegates to [[fol.quantifier.Quantifier.accepts]]
   * which implements the paper's Definition 2 with ratio-based notation.
   * Use [[toQuantifier]] to convert to the canonical ratio form.
   */
 sealed trait VagueQuantifier:
   
-  /** Convert to the canonical ratio-based [[fol.logic.Quantifier]].
+  /** Convert to the canonical ratio-based [[fol.quantifier.Quantifier]].
     * 
     * The ratio form (k/n) is what the parser produces and what the paper
     * uses. This conversion enables the typed DSL and the string-parsed
     * path to share a single acceptance-checking implementation.
     */
-  def toQuantifier: LogicQuantifier
+  def toQuantifier: Quantifier
   
   /** Evaluate whether the proportion satisfies this quantifier.
     * 
-    * Delegates to [[fol.logic.Quantifier.accepts]] using the
+    * Delegates to [[fol.quantifier.Quantifier.accepts]] using the
     * quantifier's own tolerance as epsilon.
     * 
     * @param proportion Estimated proportion in [0, 1]
@@ -43,7 +44,7 @@ sealed trait VagueQuantifier:
     */
   def evaluate(proportion: Double): Boolean =
     val q = toQuantifier
-    LogicQuantifier.accepts(q, proportion, LogicQuantifier.tolerance(q))
+    Quantifier.accepts(q, proportion, Quantifier.tolerance(q))
   
   /** Human-readable description of this quantifier. */
   def describe: String
@@ -64,10 +65,10 @@ case class Approximately(target: Double, tolerance: Double = 0.1) extends VagueQ
   val lowerBound: Double = math.max(0.0, target - tolerance)
   val upperBound: Double = math.min(1.0, target + tolerance)
   
-  def toQuantifier: LogicQuantifier =
+  def toQuantifier: Quantifier =
     // Convert percentage target to ratio k/n with denominator 1000 for precision
     val k = math.round(target * 1000).toInt
-    LogicQuantifier.About(k, 1000, tolerance)
+    Quantifier.About(k, 1000, tolerance)
   
   def describe: String = 
     s"approximately ${(target * 100).toInt}% (±${(tolerance * 100).toInt}%)"
@@ -83,9 +84,9 @@ case class AtLeast(threshold: Double, tolerance: Double = 0.0) extends VagueQuan
   require(threshold >= 0.0 && threshold <= 1.0, s"Threshold must be in [0, 1], got $threshold")
   require(tolerance >= 0.0 && tolerance <= 1.0, s"Tolerance must be in [0, 1], got $tolerance")
   
-  def toQuantifier: LogicQuantifier =
+  def toQuantifier: Quantifier =
     val k = math.round(threshold * 1000).toInt
-    LogicQuantifier.AtLeast(k, 1000, tolerance)
+    Quantifier.AtLeast(k, 1000, tolerance)
   
   def describe: String = 
     if tolerance > 0 then s"at least about ${(threshold * 100).toInt}%"
@@ -102,9 +103,9 @@ case class AtMost(threshold: Double, tolerance: Double = 0.0) extends VagueQuant
   require(threshold >= 0.0 && threshold <= 1.0, s"Threshold must be in [0, 1], got $threshold")
   require(tolerance >= 0.0 && tolerance <= 1.0, s"Tolerance must be in [0, 1], got $tolerance")
   
-  def toQuantifier: LogicQuantifier =
+  def toQuantifier: Quantifier =
     val k = math.round(threshold * 1000).toInt
-    LogicQuantifier.AtMost(k, 1000, tolerance)
+    Quantifier.AtMost(k, 1000, tolerance)
   
   def describe: String = 
     if tolerance > 0 then s"at most about ${(threshold * 100).toInt}%"
@@ -113,19 +114,19 @@ case class AtMost(threshold: Double, tolerance: Double = 0.0) extends VagueQuant
 /** Common vague quantifiers with sensible defaults. */
 object VagueQuantifier:
   
-  /** Convert from the canonical ratio-based [[fol.logic.Quantifier]]
+  /** Convert from the canonical ratio-based [[fol.quantifier.Quantifier]]
     * to the ergonomic percentage-based [[VagueQuantifier]].
     * 
     * This is the inverse of [[VagueQuantifier.toQuantifier]].
     * Used by the bridge layer when string-parsed queries need to
     * flow through the typed-DSL evaluation pipeline.
     */
-  def fromQuantifier(q: LogicQuantifier): VagueQuantifier = q match
-    case LogicQuantifier.About(k, n, tol) =>
+  def fromQuantifier(q: Quantifier): VagueQuantifier = q match
+    case Quantifier.About(k, n, tol) =>
       Approximately(k.toDouble / n.toDouble, tol)
-    case LogicQuantifier.AtLeast(k, n, tol) =>
+    case Quantifier.AtLeast(k, n, tol) =>
       AtLeast(k.toDouble / n.toDouble, tol)
-    case LogicQuantifier.AtMost(k, n, tol) =>
+    case Quantifier.AtMost(k, n, tol) =>
       AtMost(k.toDouble / n.toDouble, tol)
   
   // Approximately quantifiers (Q[~#])

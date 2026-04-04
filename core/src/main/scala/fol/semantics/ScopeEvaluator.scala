@@ -1,8 +1,8 @@
 package fol.semantics
 
 import logic.{FOL, Formula}
-import semantics.{Model, Valuation, FOLSemantics, EvaluationContext}
-import semantics.holdsWithBinding  // Generic extension method
+import semantics.{Model, Valuation, FOLSemantics}
+// EvaluationContext and holdsWithBinding are in the same package (fol.semantics)
 
 /** Evaluate scope formula using FOL semantics (paper Definition 2).
   * 

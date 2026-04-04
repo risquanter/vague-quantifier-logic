@@ -1,6 +1,7 @@
 package fol.logic
 
 import fol.error.QueryError
+import fol.quantifier.Quantifier
 import logic.{FOL, Formula, Term, FOLUtil}
 
 /** Vague quantifier query from paper Definition 1 (Section 5.2)

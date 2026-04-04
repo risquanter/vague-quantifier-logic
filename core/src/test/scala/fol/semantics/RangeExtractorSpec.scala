@@ -4,7 +4,8 @@ import munit.FunSuite
 import scala.language.implicitConversions
 import fol.error.{QueryError, QueryException}
 import logic.{FOL, Formula, Term}
-import fol.logic.{ParsedQuery, Quantifier}
+import fol.logic.ParsedQuery
+import fol.quantifier.Quantifier
 import fol.datastore.{KnowledgeBase, KnowledgeSource, Relation, RelationName, RelationTuple, RelationValue}
 
 class RangeExtractorSpec extends FunSuite:

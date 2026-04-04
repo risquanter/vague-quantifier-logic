@@ -3,7 +3,8 @@ package fol.typed
 import TypeDecl.*
 import LiteralValue.*
 import fol.error.QueryError
-import fol.logic.{ParsedQuery, Quantifier}
+import fol.logic.ParsedQuery
+import fol.quantifier.Quantifier
 import fol.sampling.SamplingParams
 import fol.semantics.VagueSemantics
 import fol.typed.FolModel

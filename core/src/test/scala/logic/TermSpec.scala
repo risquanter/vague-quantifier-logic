@@ -12,13 +12,22 @@ class TermSpec extends FunSuite:
       case _ => fail("Should be Var")
   }
   
-  test("create constant (function with no args)") {
-    val zero = Fn("0", Nil)
-    zero match
+  test("create inline literal constant") {
+    val c = Const("0")
+    c match
+      case Const(name) => assertEquals(name, "0")
+      case _           => fail("Should be Const")
+  }
+
+  test("create zero-arity function application (pre-Const OCaml style)") {
+    // Fn(name, Nil) is the OCaml-port representation for zero-arity symbols
+    // (e.g. 'nil' list constant). Numeric literals now use Term.Const instead.
+    val nilFn = Fn("nil", Nil)
+    nilFn match
       case Fn(name, args) =>
-        assertEquals(name, "0")
+        assertEquals(name, "nil")
         assertEquals(args, Nil)
-      case _ => fail("Should be Fn")
+      case _ => fail("Should be Fn with empty args")
   }
   
   test("create function application") {
@@ -41,11 +50,13 @@ class TermSpec extends FunSuite:
       case _ => fail("Pattern match failed")
   }
   
-  test("complex example from OCaml") {
+  test("complex example from OCaml uses Const for numeric literals") {
     val example = Term.example
+    // Top level: Fn("sqrt", ...)
+    // Numeric literals inside: Const("1"), Const("2") — not Fn("1", Nil)
     example match
-      case Fn("sqrt", _) => () // success
-      case _ => fail("Should be sqrt function")
+      case Fn("sqrt", List(Fn("-", List(Const("1"), _)))) => () // success
+      case _ => fail("Expected sqrt(1 - ...) with Const(\"1\") literal")
   }
   
   test("arithmetic expression: 2 * x + 3") {

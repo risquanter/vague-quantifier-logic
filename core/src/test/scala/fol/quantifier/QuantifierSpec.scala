@@ -1,4 +1,4 @@
-package fol.logic
+package fol.quantifier
 
 import munit.FunSuite
 

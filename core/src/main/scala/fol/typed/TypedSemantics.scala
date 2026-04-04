@@ -146,12 +146,16 @@ object TypedSemantics:
             availableTypes = model.domains.keySet.map(_.value)
           ))
           case Some(domain) =>
-            domain.foldLeft[Either[QueryError, Boolean]](Right(true)) { (acc, value) =>
-              for
-                allSoFar <- acc
-                current <- if !allSoFar then Right(false) else evalFormula(body, env + (v.name -> value), model)
-              yield allSoFar && current
-            }
+            @scala.annotation.tailrec
+            def allOf(remaining: List[Value]): Either[QueryError, Boolean] =
+              remaining match
+                case Nil => Right(true)
+                case value :: rest =>
+                  evalFormula(body, env + (v.name -> value), model) match
+                    case Right(false) => Right(false)
+                    case Right(true)  => allOf(rest)
+                    case left         => left
+            allOf(domain.toList)
       case BoundFormula.Exists(v, body) =>
         model.domains.get(v.sort) match
           case None => Left(QueryError.DomainNotFoundError(
@@ -159,12 +163,16 @@ object TypedSemantics:
             availableTypes = model.domains.keySet.map(_.value)
           ))
           case Some(domain) =>
-            domain.foldLeft[Either[QueryError, Boolean]](Right(false)) { (acc, value) =>
-              for
-                anySoFar <- acc
-                current <- if anySoFar then Right(true) else evalFormula(body, env + (v.name -> value), model)
-              yield anySoFar || current
-            }
+            @scala.annotation.tailrec
+            def anyOf(remaining: List[Value]): Either[QueryError, Boolean] =
+              remaining match
+                case Nil => Right(false)
+                case value :: rest =>
+                  evalFormula(body, env + (v.name -> value), model) match
+                    case Right(true)  => Right(true)
+                    case Right(false) => anyOf(rest)
+                    case left         => left
+            anyOf(domain.toList)
 
   private def evalAtom(atom: BoundAtom, env: Env, model: RuntimeModel): Either[QueryError, Boolean] =
     for

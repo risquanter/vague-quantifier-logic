@@ -2,6 +2,7 @@ package fol.examples
 
 import fol.datastore.*
 import fol.logic.*
+import fol.quantifier.Quantifier
 import fol.parser.VagueQueryParser
 import fol.semantics.VagueSemantics
 

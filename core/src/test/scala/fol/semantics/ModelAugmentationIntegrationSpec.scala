@@ -3,7 +3,8 @@ package fol.semantics
 import munit.FunSuite
 import logic.{FOL, Formula, Term}
 import fol.datastore.{KnowledgeBase, KnowledgeSource, Relation, RelationName, RelationValue, RelationTuple}
-import fol.logic.{Quantifier, ParsedQuery}
+import fol.quantifier.Quantifier
+import fol.logic.ParsedQuery
 import fol.bridge.{FOLBridge, NumericAugmenter}
 import fol.error.QueryError
 import semantics.{Domain, Interpretation, Model, ModelAugmenter}
