@@ -39,3 +39,38 @@ A `TypedFunctionImpl.of` combinator pattern was sketched where the consumer lamb
 - The `LiteralValue` foundation is now in place (ADR-015, T-002 unresolved), so this can proceed once T-002 and `FolModel` are settled.
 
 **Context:** ADR-015 §1 and Code Smells §4, `MapDispatcherSpec` `rawToDouble` helper (shows the two raw shapes), conversation history 2026-04-03.
+---
+
+## T-004 — Domain-returning functions and entity identity representation
+
+**Status:** DEFERRED pending use case (2026-04-04).
+
+The function return normalisation plan (T-003 / `PLAN-function-return-normalisation.md`)
+scopes `evalFunction` return type to `Either[String, LiteralValue]`. This implicitly
+constrains all functions to return `ValueType` sorts — a function declared with a
+`DomainType` return (e.g. `ownerOf: Asset → Company`) cannot be expressed as a
+`LiteralValue` without re-introducing `Any` or adopting an explicit entity identity
+type.
+
+**The core tension:** a `LiteralValue` variant for entity references (`EntityRef(key)`)
+would need a key type. Options examined:
+
+- `EntityRef(key: String)` — defeats the purpose; `String` is too permissive and
+  reintroduces the untyped-raw smell at a different level
+- `EntityRef(key: Int)` — avoids string ambiguity but raises questions about whether
+  integer keys are sufficient (security, composites, natural keys from external systems)
+- `EntityRef(key: Any)` — directly re-introduces `Any`; rejected
+
+**Why deferred:** no current use case requires a domain-returning function. The
+`ownerOf: Asset → Company` pattern does not appear in any planned query model.
+The right answer depends on whether integer keys suffice for all anticipated domains,
+which requires a concrete use case to evaluate.
+
+**Prerequisite for T-003 implementation:** T-003 must add a catalog-validation guard
+(`TypeCatalogError.FunctionReturnIsDomainType`) that rejects domain-returning function
+declarations at construction time, making the current scope limitation explicit and
+surfacing it as an error rather than silent misbehaviour. This guard is removed when
+T-004 is resolved.
+
+**Context:** `PLAN-function-return-normalisation.md` §Q2, `fol/typed/TypeCatalog.scala`
+`collectErrors`, conversation history 2026-04-04.

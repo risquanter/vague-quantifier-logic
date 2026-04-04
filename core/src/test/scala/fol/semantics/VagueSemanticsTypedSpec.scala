@@ -3,7 +3,7 @@ package fol.semantics
 import fol.error.QueryError
 import fol.logic.{ParsedQuery, Quantifier}
 import fol.sampling.SamplingParams
-import fol.typed.{BoundAtom, BoundFormula, BoundQuery, BoundTerm, BoundVar, FolModel, PredicateSig, RuntimeDispatcher, RuntimeModel, TypeCatalog, TypedSemantics, TypeId, TypeRepr, SymbolName, Value}
+import fol.typed.{BoundAtom, BoundFormula, BoundQuery, BoundTerm, BoundVar, FolModel, LiteralValue, PredicateSig, RuntimeDispatcher, RuntimeModel, TypeCatalog, TypedSemantics, TypeId, TypeRepr, SymbolName, Value}
 import fol.typed.TypeDecl.{DomainType, ValueType}
 import logic.{FOL, Formula, Term}
 import munit.FunSuite
@@ -33,7 +33,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
 
   test("evaluateTyped returns expected proportion for simple unary predicates"):
     val dispatcher = new RuntimeDispatcher:
-      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Value] =
+      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, LiteralValue] =
         Left(s"No function implementation for '${name.value}'")
 
       override def evalPredicate(name: SymbolName, args: List[Value]): Either[String, Boolean] =
@@ -65,7 +65,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
 
   test("evaluateTyped returns ModelValidationError when runtime model is missing declared predicate"):
     val dispatcher = new RuntimeDispatcher:
-      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Value] =
+      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, LiteralValue] =
         Left(s"No function implementation for '${name.value}'")
 
       override def evalPredicate(name: SymbolName, args: List[Value]): Either[String, Boolean] =
@@ -99,7 +99,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
       val typeId = asset
 
     val dispatcher = new RuntimeDispatcher:
-      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Value] =
+      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, LiteralValue] =
         Left(s"No function implementation for '${name.value}'")
       override def evalPredicate(name: SymbolName, args: List[Value]): Either[String, Boolean] =
         name.value match
@@ -155,7 +155,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
       answerVars = Nil
     )
     val dispatcher = new RuntimeDispatcher:
-      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Value] =
+      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, LiteralValue] =
         Left("no function")
       override def evalPredicate(name: SymbolName, args: List[Value]): Either[String, Boolean] =
         name.value match
@@ -186,7 +186,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
   )
 
   private val losslessDispatcher = new RuntimeDispatcher:
-    override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Value] =
+    override def evalFunction(name: SymbolName, args: List[Value]): Either[String, LiteralValue] =
       Left("no function")
     override def evalPredicate(name: SymbolName, args: List[Value]): Either[String, Boolean] =
       name.value match
@@ -292,7 +292,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
             onSentinelCalled()
             Left(s"SHOULD NOT BE DISPATCHED: $s")
           case other => Left(s"unknown predicate: $other")
-      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Value] =
+      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, LiteralValue] =
         Left("no functions")
       override def functionSymbols: Set[SymbolName] = Set.empty
       override def predicateSymbols: Set[SymbolName] = Set(SymbolName("leaf"), sentinel)

@@ -62,7 +62,7 @@ package fol.typed
   */
 case class MapDispatcher(
   predicates: Map[SymbolName, List[Value] => Either[String, Boolean]],
-  functions:  Map[SymbolName, List[Value] => Either[String, Value]] = Map.empty
+  functions:  Map[SymbolName, List[Value] => Either[String, LiteralValue]] = Map.empty
 ) extends RuntimeDispatcher:
 
   /** Derived from `functions.keySet` — cannot diverge from the implementation map. */
@@ -71,7 +71,7 @@ case class MapDispatcher(
   /** Derived from `predicates.keySet` — cannot diverge from the implementation map. */
   override val predicateSymbols: Set[SymbolName] = predicates.keySet
 
-  override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Value] =
+  override def evalFunction(name: SymbolName, args: List[Value]): Either[String, LiteralValue] =
     functions.get(name)
       .map(_(args))
       .getOrElse(Left(s"MapDispatcher: no function implementation for '${name.value}'"))

@@ -15,6 +15,12 @@ enum TypeCatalogError:
     */
   case UnknownType(name: String, location: String)
   case NameCollision(name: String)
+  /** A function declares a [[DomainType]] sort as its return type, which is
+    * unsupported. Functions must return [[ValueType]] sorts — the framework
+    * wraps the return in `Value(resultSort, literalResult: LiteralValue)` and
+    * `LiteralValue` cannot represent domain entities. See ADR-015 §1 and T-004.
+    */
+  case FunctionReturnIsDomainType(functionName: String, returnType: String)
 
 /** A validated type catalog.
   *
@@ -97,6 +103,8 @@ object TypeCatalog:
         unknownTypes += TypeCatalogError.UnknownType(s.value, s"constant '$key'")
     }
 
+    val domainTypeIds = types.collect { case DomainType(typeId) => typeId }
+
     functions.foreach { (sym, sig) =>
       sig.params.zipWithIndex.foreach { (s, i) =>
         if !typeIds.contains(s) then
@@ -104,6 +112,8 @@ object TypeCatalog:
       }
       if !typeIds.contains(sig.returns) then
         unknownTypes += TypeCatalogError.UnknownType(sig.returns.value, s"function '${sym.value}' return type")
+      else if domainTypeIds.contains(sig.returns) then
+        unknownTypes += TypeCatalogError.FunctionReturnIsDomainType(sym.value, sig.returns.value)
     }
 
     predicates.foreach { (sym, sig) =>

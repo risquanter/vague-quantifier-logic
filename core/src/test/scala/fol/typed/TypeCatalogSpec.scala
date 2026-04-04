@@ -12,7 +12,7 @@ class TypeCatalogSpec extends FunSuite:
     val bool = TypeId("Bool")
 
     val result = TypeCatalog(
-      types = Set(DomainType(asset), DomainType(loss), DomainType(bool)),
+      types = Set(DomainType(asset), ValueType(loss), DomainType(bool)),
       constants = Map("rootAsset" -> asset),
       functions = Map(
         SymbolName("p95") -> FunctionSig(List(asset), loss)
@@ -98,3 +98,28 @@ class TypeCatalogSpec extends FunSuite:
         assert(unknowns.exists(_.location.contains("function")), s"no function-site error in $unknowns")
         assert(unknowns.exists(_.location.contains("predicate")), s"no predicate-site error in $unknowns")
       case Right(_) => fail("expected Left")
+
+  test("FunctionReturnIsDomainType emitted when function return sort is a DomainType"):
+    val asset = TypeId("Asset")
+    val loss  = TypeId("Loss")
+
+    TypeCatalog(
+      types     = Set(DomainType(asset), DomainType(loss)),
+      functions = Map(SymbolName("p95") -> FunctionSig(List(asset), loss))
+    ) match
+      case Left(errors) =>
+        val domainReturns = errors.collect { case e: TypeCatalogError.FunctionReturnIsDomainType => e }
+        assertEquals(domainReturns.length, 1, s"expected one FunctionReturnIsDomainType error: $errors")
+        assertEquals(domainReturns.head.functionName, "p95")
+        assertEquals(domainReturns.head.returnType, "Loss")
+      case Right(_) => fail("expected Left for function returning DomainType")
+
+  test("FunctionReturnIsDomainType not emitted when function return sort is a ValueType"):
+    val asset = TypeId("Asset")
+    val loss  = TypeId("Loss")
+
+    val result = TypeCatalog(
+      types     = Set(DomainType(asset), ValueType(loss)),
+      functions = Map(SymbolName("p95") -> FunctionSig(List(asset), loss))
+    )
+    assert(result.isRight, s"ValueType return should be accepted, got $result")

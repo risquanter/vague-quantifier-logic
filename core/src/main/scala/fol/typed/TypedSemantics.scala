@@ -206,19 +206,14 @@ object TypedSemantics:
 
       case BoundTerm.FnApp(name, args, resultSort) =>
         for
-          argValues <- evalTerms(args, env, model)
-          value <- model.dispatcher.evalFunction(name, argValues).left.map(msg =>
+          argValues    <- evalTerms(args, env, model)
+          literalResult <- model.dispatcher.evalFunction(name, argValues).left.map(msg =>
             QueryError.EvaluationError(
               message = msg,
               phase = s"function:${name.value}"
             )
           )
-          _ <- if value.sort == resultSort then Right(())
-               else Left(QueryError.EvaluationError(
-                 message = s"Function '${name.value}' returned type ${value.sort.value}, expected ${resultSort.value}",
-                 phase = "typed_term"
-               ))
-        yield value
+        yield Value(resultSort, literalResult)
 
   private def emptyResult(quantifier: VagueQuantifier): VagueQueryResult =
     VagueQueryResult(

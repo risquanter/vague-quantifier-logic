@@ -42,8 +42,8 @@ class MapDispatcherSpec extends FunSuite:
   test("functionSymbols derived from functions map keys"):
     val d = MapDispatcher(
       predicates = Map(symLeaf -> (_ => Right(true))),
-      functions  = Map(symLec -> (_ => Right(Value(tProb, 0.1))),
-                       symP95 -> (_ => Right(Value(tLoss, 42L))))
+      functions  = Map(symLec -> (_ => Right(FloatLiteral(0.1))),
+                       symP95 -> (_ => Right(IntLiteral(42L))))
     )
     assertEquals(d.functionSymbols, Set(symLec, symP95))
 
@@ -96,18 +96,18 @@ class MapDispatcherSpec extends FunSuite:
     val d = MapDispatcher(
       predicates = Map.empty,
       functions  = Map(
-        symLec -> { _ => lecCalled = true; Right(Value(tProb, 0.07)) },
-        symP95 -> { _ => Right(Value(tLoss, 100L)) }
+        symLec -> { _ => lecCalled = true; Right(FloatLiteral(0.07)) },
+        symP95 -> { _ => Right(IntLiteral(100L)) }
       )
     )
     val r = d.evalFunction(symLec, List(Value(tAsset, 1), Value(tLoss, 10000000L)))
-    assertEquals(r, Right(Value(tProb, 0.07)))
+    assertEquals(r, Right(FloatLiteral(0.07)))
     assert(lecCalled, "lec lambda was not called")
 
   test("evalFunction returns Left for unknown symbol"):
     val d = MapDispatcher(
       predicates = Map.empty,
-      functions  = Map(symP95 -> (_ => Right(Value(tLoss, 0L))))
+      functions  = Map(symP95 -> (_ => Right(IntLiteral(0L))))
     )
     val r = d.evalFunction(symLec, Nil)
     assert(r.isLeft)
@@ -136,7 +136,7 @@ class MapDispatcherSpec extends FunSuite:
     var received: List[Value] = Nil
     val d = MapDispatcher(
       predicates = Map.empty,
-      functions  = Map(symLec -> { args => received = args; Right(Value(tProb, 0.0)) })
+      functions  = Map(symLec -> { args => received = args; Right(FloatLiteral(0.0)) })
     )
     d.evalFunction(symLec, List(vAsset, vLoss))
     assertEquals(received, List(vAsset, vLoss))
@@ -155,7 +155,7 @@ class MapDispatcherSpec extends FunSuite:
     val d = MapDispatcher(
       predicates = Map(symLeaf   -> (_ => Right(true)),
                        symGtProb -> (_ => Right(true))),
-      functions  = Map(symLec    -> (_ => Right(Value(tProb, 0.0))))
+      functions  = Map(symLec    -> (_ => Right(FloatLiteral(0.0))))
     )
     val model = RuntimeModel(domains = Map(tAsset -> Set(Value(tAsset, "A"))), dispatcher = d)
     assert(model.validateAgainst(catalog).isRight)
@@ -253,24 +253,15 @@ class MapDispatcherSpec extends FunSuite:
   //        - "0.05" (Prob)     → FloatLiteral(0.05)
   //      Use a sealed match — no asInstanceOf in the good path (ADR-015).
   //
-  //   3. Function return values — raw is whatever the lambda puts into Value.raw.
-  //      In this test lec returns Value(tProb, 0.07: Double), so downstream
-  //      consumers of lec's result see a native Double — not a LiteralValue.
-  //      This is intentional: the lec lambda is responsible for its own raw type.
+  //   3. Function return values — the framework wraps the lambda's LiteralValue
+  //      return as Value(resultSort, literalResult).  In this test lec returns
+  //      FloatLiteral(0.07), so downstream consumers of lec's result also see a
+  //      LiteralValue — the same shape as an inline literal.  No rawToDouble
+  //      helper is needed; a single FloatLiteral match suffices.  See ADR-015 §1.
   //
-  // Consequence: a lambda receiving a Value from a predicate/function argument
-  // may see different raw types depending on whether the argument came from a
-  // domain element, a literal, or a prior function application.
-  // The consumer owns this contract on both sides of the boundary.
-
-  // Helper used in comparison lambdas: extract Double regardless of whether raw
-  // is a native Double (from a function return value) or a LiteralValue variant
-  // (from an inline query literal).  Uses a sealed match — no asInstanceOf.
-  private def rawToDouble(v: Value): Double = v.raw match
-    case d: Double        => d
-    case FloatLiteral(d)  => d
-    case IntLiteral(n)    => n.toDouble
-    case other => throw ClassCastException(s"Expected Double or LiteralValue for sort ${v.sort.value}, got ${other.getClass.getSimpleName}")
+  // Consequence: lambdas receiving ValueType arguments always see LiteralValue
+  // as raw.  Only DomainType arguments (domain elements) carry consumer-owned
+  // raw types.  The consumer owns the DomainType raw contract on both sides.
 
   private val dispatcher = MapDispatcher(
     predicates = Map(
@@ -279,12 +270,12 @@ class MapDispatcherSpec extends FunSuite:
         Right(true)
       },
       symGtProb -> { args =>
-        // args(0): result of lec(x, ...) — raw is Double (native, from lec lambda)
+        // args(0): result of lec(x, ...) — raw is FloatLiteral (wrapped by framework)
         // args(1): literal "0.05"        — raw is FloatLiteral(0.05) (from literalValidator)
-        // rawToDouble handles both cases via a sealed match (no asInstanceOf).
-        val a = rawToDouble(args(0))
-        val b = rawToDouble(args(1))
-        Right(a > b)
+        // Both are LiteralValue; a single sealed match covers both.
+        (args(0).raw, args(1).raw) match
+          case (FloatLiteral(a), FloatLiteral(b)) => Right(a > b)
+          case other => Left(s"gt_prob: unexpected arg types: $other")
       }
     ),
     functions = Map(
@@ -299,7 +290,7 @@ class MapDispatcherSpec extends FunSuite:
         val lec = assetId match
           case "A" => 0.07
           case _   => 0.02
-        Right(Value(tProb, lec))  // raw is Double — downstream lambdas must use rawToDouble
+        Right(FloatLiteral(lec))  // framework wraps as Value(tProb, FloatLiteral(lec))
       },
       symP95 -> { args =>
         // args(0): domain element — raw is String
@@ -307,7 +298,7 @@ class MapDispatcherSpec extends FunSuite:
         val p95 = assetId match
           case "A" => 5000000L
           case _   => 1000000L
-        Right(Value(tLoss, p95))  // raw is Long — lambdas consuming p95 result must handle Long
+        Right(IntLiteral(p95))  // framework wraps as Value(tLoss, IntLiteral(p95))
       }
     )
   )
@@ -353,8 +344,8 @@ class MapDispatcherSpec extends FunSuite:
         symGtProb -> (_ => Left("deliberate predicate failure"))
       ),
       functions = Map(
-        symLec -> (_ => Right(Value(tProb, 0.07))),
-        symP95 -> (_ => Right(Value(tLoss, 5000000L)))
+        symLec -> (_ => Right(FloatLiteral(0.07))),
+        symP95 -> (_ => Right(IntLiteral(5000000L)))
       )
     )
     val failingModel = RuntimeModel(
@@ -374,8 +365,8 @@ class MapDispatcherSpec extends FunSuite:
     val incompleteDispatcher = MapDispatcher(
       predicates = Map(symLeaf -> (_ => Right(true))), // gt_prob absent
       functions  = Map(
-        symLec -> (_ => Right(Value(tProb, 0.07))),
-        symP95 -> (_ => Right(Value(tLoss, 5000000L)))
+        symLec -> (_ => Right(FloatLiteral(0.07))),
+        symP95 -> (_ => Right(IntLiteral(5000000L)))
       )
     )
     val incompleteModel = RuntimeModel(
@@ -403,7 +394,7 @@ class MapDispatcherSpec extends FunSuite:
       predicates = Map(
         symLeaf   -> (_ => Right(true)),
         symGtProb -> { args =>
-          // Deliberate wrong cast: lec returns Double, but this casts to Int.
+          // Deliberate wrong cast: lec returns FloatLiteral, but this casts to Int.
           // The evaluateTyped return type is Either but no try/catch wraps lambdas,
           // so ClassCastException propagates uncaught through the Either boundary.
           val _ = args(0).raw.asInstanceOf[Int]  // will throw ClassCastException
@@ -411,8 +402,8 @@ class MapDispatcherSpec extends FunSuite:
         }
       ),
       functions = Map(
-        symLec -> (_ => Right(Value(tProb, 0.07))),  // raw is Double
-        symP95 -> (_ => Right(Value(tLoss, 5000000L)))
+        symLec -> (_ => Right(FloatLiteral(0.07))),
+        symP95 -> (_ => Right(IntLiteral(5000000L)))
       )
     )
     val badModel = RuntimeModel(
