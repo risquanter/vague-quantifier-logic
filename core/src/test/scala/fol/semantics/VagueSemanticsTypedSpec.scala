@@ -3,7 +3,7 @@ package fol.semantics
 import fol.error.QueryError
 import fol.logic.{ParsedQuery, Quantifier}
 import fol.sampling.SamplingParams
-import fol.typed.{BoundAtom, BoundFormula, BoundQuery, BoundTerm, BoundVar, PredicateSig, RuntimeDispatcher, RuntimeModel, TypeCatalog, TypedSemantics, TypeId, TypeRepr, SymbolName, Value}
+import fol.typed.{BoundAtom, BoundFormula, BoundQuery, BoundTerm, BoundVar, FolModel, PredicateSig, RuntimeDispatcher, RuntimeModel, TypeCatalog, TypedSemantics, TypeId, TypeRepr, SymbolName, Value}
 import fol.typed.TypeDecl.{DomainType, ValueType}
 import logic.{FOL, Formula, Term}
 import munit.FunSuite
@@ -50,10 +50,10 @@ class VagueSemanticsTypedSpec extends FunSuite:
       dispatcher = dispatcher
     )
 
+    val fm = FolModel(catalog, model).fold(e => fail(s"FolModel construction failed: $e"), identity)
     val result = VagueSemantics.evaluateTyped(
       query = query,
-      catalog = catalog,
-      model = model,
+      folModel = fm,
       samplingParams = SamplingParams.exact
     )
 
@@ -81,12 +81,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
       dispatcher = dispatcher
     )
 
-    val result = VagueSemantics.evaluateTyped(
-      query = query,
-      catalog = catalog,
-      model = invalidModel,
-      samplingParams = SamplingParams.exact
-    )
+    val result = FolModel(catalog, invalidModel)
 
     result match
       case Left(e: QueryError.ModelValidationError) =>
@@ -119,10 +114,10 @@ class VagueSemanticsTypedSpec extends FunSuite:
       dispatcher = dispatcher
     )
 
+    val fm = FolModel(catalog, model).fold(e => fail(s"FolModel construction failed: $e"), identity)
     val output = VagueSemantics.evaluateTyped(
       query = query,
-      catalog = catalog,
-      model = model,
+      folModel = fm,
       samplingParams = SamplingParams.exact
     ).toOption.get
 
@@ -164,12 +159,14 @@ class VagueSemanticsTypedSpec extends FunSuite:
         Left("no function")
       override def evalPredicate(name: SymbolName, args: List[Value]): Either[String, Boolean] =
         name.value match
-          case "leaf" => Right(true)
-          case other  => Left(s"no predicate: $other")
+          case "leaf"    => Right(true)
+          case "coastal" => Right(false)
+          case other     => Left(s"no predicate: $other")
       override def functionSymbols: Set[SymbolName] = Set.empty
-      override def predicateSymbols: Set[SymbolName] = Set(SymbolName("leaf"))
+      override def predicateSymbols: Set[SymbolName] = Set(SymbolName("leaf"), SymbolName("coastal"))
     val model = RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = dispatcher)
-    val result = VagueSemantics.evaluateTyped(badQuery, catalog, model, samplingParams = SamplingParams.exact)
+    val fm = FolModel(catalog, model).fold(e => fail(s"FolModel construction failed: $e"), identity)
+    val result = VagueSemantics.evaluateTyped(badQuery, fm, samplingParams = SamplingParams.exact)
     result match
       case Left(_: QueryError.BindError) => assert(true)
       case Left(other) => fail(s"Expected BindError, got $other")
@@ -209,9 +206,9 @@ class VagueSemanticsTypedSpec extends FunSuite:
       scope = Formula.True,
       answerVars = Nil
     )
-    // Loss is enumerable in catalogWithLoss; model omits Loss domain → validateAgainst fails
+    // Loss is enumerable in catalogWithLoss; model omits Loss domain → FolModel construction fails
     val model = RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = losslessDispatcher)
-    val result = VagueSemantics.evaluateTyped(queryOverLoss, catalogWithLoss, model, samplingParams = SamplingParams.exact)
+    val result = FolModel(catalogWithLoss, model)
     result match
       case Left(e: QueryError.ModelValidationError) =>
         assert(e.errors.exists(_.contains("Loss")))
@@ -227,7 +224,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
       answerVars = Nil
     )
     val model = RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = losslessDispatcher)
-    val result = VagueSemantics.evaluateTyped(queryWithInnerForall, catalogWithLoss, model, samplingParams = SamplingParams.exact)
+    val result = FolModel(catalogWithLoss, model)
     result match
       case Left(e: QueryError.ModelValidationError) =>
         assert(e.errors.exists(_.contains("Loss")))
@@ -243,7 +240,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
       answerVars = Nil
     )
     val model = RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = losslessDispatcher)
-    val result = VagueSemantics.evaluateTyped(queryWithInnerExists, catalogWithLoss, model, samplingParams = SamplingParams.exact)
+    val result = FolModel(catalogWithLoss, model)
     result match
       case Left(e: QueryError.ModelValidationError) =>
         assert(e.errors.exists(_.contains("Loss")))

@@ -6,6 +6,7 @@ import fol.error.QueryError
 import fol.logic.{ParsedQuery, Quantifier}
 import fol.sampling.SamplingParams
 import fol.semantics.VagueSemantics
+import fol.typed.FolModel
 import logic.{FOL, Formula, Term}
 import munit.FunSuite
 
@@ -330,12 +331,8 @@ class MapDispatcherSpec extends FunSuite:
   )
 
   test("evaluateTyped with MapDispatcher: full pipeline over non-empty domain"):
-    val result = VagueSemantics.evaluateTyped(
-      query         = lecQuery,
-      catalog       = catalog,
-      model         = model,
-      samplingParams = SamplingParams.exact
-    )
+    val fm = FolModel(catalog, model).fold(e => fail(s"FolModel construction failed: $e"), identity)
+    val result = VagueSemantics.evaluateTyped(query = lecQuery, folModel = fm, samplingParams = SamplingParams.exact)
     assert(result.isRight, s"Expected Right, got $result")
     val output = result.toOption.get
     assertEquals(output.rangeElements.size, 2, "both assets should be in range")
@@ -344,12 +341,8 @@ class MapDispatcherSpec extends FunSuite:
     assert(!output.satisfyingElements.contains(domainB))
 
   test("evaluateTyped with MapDispatcher: proportion reflects satisfying count"):
-    val result = VagueSemantics.evaluateTyped(
-      query          = lecQuery,
-      catalog        = catalog,
-      model          = model,
-      samplingParams = SamplingParams.exact
-    )
+    val fm = FolModel(catalog, model).fold(e => fail(s"FolModel construction failed: $e"), identity)
+    val result = VagueSemantics.evaluateTyped(query = lecQuery, folModel = fm, samplingParams = SamplingParams.exact)
     val output = result.toOption.get
     assertEquals(output.result.proportion, 0.5)
 
@@ -368,12 +361,8 @@ class MapDispatcherSpec extends FunSuite:
       domains    = Map(tAsset -> Set(domainA, domainB)),
       dispatcher = failingDispatcher
     )
-    val result = VagueSemantics.evaluateTyped(
-      query          = lecQuery,
-      catalog        = catalog,
-      model          = failingModel,
-      samplingParams = SamplingParams.exact
-    )
+    val fm = FolModel(catalog, failingModel).fold(e => fail(s"FolModel construction failed: $e"), identity)
+    val result = VagueSemantics.evaluateTyped(query = lecQuery, folModel = fm, samplingParams = SamplingParams.exact)
     result match
       case Left(e: QueryError.EvaluationError) =>
         assert(e.message.contains("deliberate predicate failure"))
@@ -393,12 +382,7 @@ class MapDispatcherSpec extends FunSuite:
       domains    = Map(tAsset -> Set(domainA, domainB)),
       dispatcher = incompleteDispatcher
     )
-    val result = VagueSemantics.evaluateTyped(
-      query          = lecQuery,
-      catalog        = catalog,
-      model          = incompleteModel,
-      samplingParams = SamplingParams.exact
-    )
+    val result = FolModel(catalog, incompleteModel)
     result match
       case Left(e: QueryError.ModelValidationError) =>
         assert(e.errors.exists(_.contains("gt_prob")))
@@ -439,14 +423,10 @@ class MapDispatcherSpec extends FunSuite:
     // On ScalaJS the same cast failure surfaces as UndefinedBehaviorError (extends Error).
     // The key property being tested — that the exception escapes the Either boundary
     // rather than being caught as Left — holds on both platforms.
+    val fm = FolModel(catalog, badModel).fold(e => fail(s"FolModel construction failed: $e"), identity)
     var threw = false
     try
-      VagueSemantics.evaluateTyped(
-        query          = lecQuery,
-        catalog        = catalog,
-        model          = badModel,
-        samplingParams = SamplingParams.exact
-      )
+      VagueSemantics.evaluateTyped(query = lecQuery, folModel = fm, samplingParams = SamplingParams.exact)
       ()
     catch
       case _: Throwable => threw = true

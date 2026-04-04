@@ -8,7 +8,7 @@ import fol.query.ResolvedQuery
 import fol.result.{VagueQueryResult, EvaluationOutput}
 import fol.sampling.{SamplingParams, HDRConfig}
 import fol.error.{QueryError, QueryException}
-import fol.typed.{TypeCatalog, BoundQuery, QueryBinder, TypeCheckError, RuntimeModel, RuntimeModelError, Value, TypedSemantics}
+import fol.typed.{FolModel, TypeCatalog, BoundQuery, QueryBinder, TypeCheckError, RuntimeModel, RuntimeModelError, Value, TypedSemantics}
 import semantics.ModelAugmenter
 import scala.util.control.NonFatal
 import scala.reflect.ClassTag
@@ -63,35 +63,29 @@ object VagueSemantics:
     }
 
   private def renderModelErrors(errors: List[RuntimeModelError]): List[String] =
-    errors.map {
-      case RuntimeModelError.MissingFunctionImplementation(n)  => s"missing function: ${n.value}"
-      case RuntimeModelError.MissingPredicateImplementation(n) => s"missing predicate: ${n.value}"
-      case RuntimeModelError.MissingDomainForType(t) => s"missing domain for type: ${t.value}"
-    }
+    errors.map(_.message)
 
-  /** Evaluate a parsed query through the typed pipeline.
+  /** Evaluate a parsed query through the typed pipeline using a pre-validated [[FolModel]].
     *
-    * Canonical flow: ParsedQuery -> bindTyped -> model validation -> TypedSemantics.evaluate
+    * Model validation (dispatcher coverage + domain registration) is guaranteed by
+    * [[FolModel]] construction — this overload skips per-query re-validation.
+    * Canonical flow: ParsedQuery → bindTyped → TypedSemantics.evaluate
     */
   def evaluateTyped(
     query: ParsedQuery,
-    catalog: TypeCatalog,
-    model: RuntimeModel,
+    folModel: FolModel,
     answerTuple: Map[String, Value] = Map.empty,
     samplingParams: SamplingParams = SamplingParams.exact,
     hdrConfig: HDRConfig = HDRConfig.default
   ): Either[QueryError, EvaluationOutput[Value]] =
     for
-      bound <- bindTyped(query, catalog)
-      _ <- model.validateAgainst(catalog).left.map { errors =>
-        QueryError.ModelValidationError(errors = renderModelErrors(errors))
-      }
+      bound  <- bindTyped(query, folModel.catalog)
       output <- TypedSemantics.evaluate(
-        query = bound,
-        model = model,
-        answerTuple = answerTuple,
+        query        = bound,
+        model        = folModel.model,
+        answerTuple  = answerTuple,
         samplingParams = samplingParams,
-        hdrConfig = hdrConfig
+        hdrConfig    = hdrConfig
       )
     yield output
 
