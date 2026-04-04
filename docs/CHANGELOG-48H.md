@@ -1,7 +1,7 @@
-# Changelog — 24–28 March 2026
+# Changelog — 24 March – 4 April 2026
 
-All changes from `30359c4` to HEAD (`09815e7` committed; `fol.typed` package staged).
-~100 files changed. **878 JVM tests passing, 0 failures.**
+All changes from `30359c4` to HEAD (`979bdd2`).
+~150 files changed. **914 JVM+JS tests passing, 0 failures.**
 
 ---
 
@@ -236,3 +236,192 @@ fallback unreachable through the normal pipeline.
 - `VagueSemanticsTypedSpec`: 3 tests updated (DomainNotFoundError → ModelValidationError); +1 new (defensive fallback via direct `TypedSemantics.evaluate`)
 
 **Test count after:** 878 (up from 873).
+
+---
+
+## 10. `TypeDecl` ADT — Single-Declaration Domain Type API
+
+**Commit:** `9413297` · **Version:** `0.7.0-SNAPSHOT`
+
+Replaced the dual-parameter `TypeCatalog` construction (`types: Set[TypeId]` + `domainTypes: Option[Set[TypeId]]`) with a single `Set[TypeDecl]`. Each entry is now tagged at the declaration site.
+
+- `TypeDefs.scala`: `sealed trait TypeDecl`; `case class DomainType(typeId: TypeId)`, `case class ValueType(typeId: TypeId)`.
+- `TypeCatalog`: `domainTypes` and `typeIds` become derived methods; the `domainTypes ⊆ types` subset check is structurally impossible and removed.
+- All `TypeCatalog.unsafe`/`.apply` call sites updated.
+- `TypeCatalogSpec`: structurally-impossible test deleted; `domainTypes` derivation test added.
+- `ADR-014` updated throughout.
+
+**Test count after:** 880 (up from 878).
+
+---
+
+## 11. `core/` Layout Migration + Quality Fixes
+
+**Commit:** `e094edf` · **Version:** `0.8.0-SNAPSHOT`
+
+Migrated all sources from `src/` to `core/src/` to match the `CrossType.Pure` / `crossProject` convention and eliminate root-aggregate compile-scope collisions.
+
+### Quality fixes (S-1 / S-2 / S-3)
+
+- **S-1 (And/Or/Imp short-circuit):** `TypedSemantics` `And`/`Or`/`Imp` cases now short-circuit on truth value, not only on error — consistent with `Forall`/`Exists`. Unnecessary dispatcher calls eliminated for `And(false,_)`, `Or(true,_)`, `Imp(false,_)`.
+- **S-2 (`TypeDecl.id → typeId`):** Renamed throughout for consistency with `TypeRepr[A].typeId`.
+- **S-3 (`UnknownType` location field):** `TypeCatalogError.UnknownType` gains `location: String`; every diagnostic names its signature site. One error emitted per site — no cross-site deduplication.
+
+**New tests:** 5 (`TypeCatalogSpec`: location format + per-site emission; `VagueSemanticsTypedSpec`: And/Or/Imp short-circuit via sentinel dispatcher).
+
+**Test count after:** 885 (up from 880).
+
+---
+
+## 12. `MapDispatcher` + ADR-015: Value Type Boundaries
+
+**Commit:** `45ef687`
+
+Introduced a concrete `RuntimeDispatcher` implementation built from plain `Map` keys, closing the intra-dispatcher symbol-set coherence gap.
+
+- `MapDispatcher(predicates, functions)` — map-keyed dispatcher; `evalPredicate`/`evalFunction` delegate to map entries.
+- `MapDispatcherSpec` — 20 tests documenting the three `Value.raw` populations and full integration pipeline.
+- **ADR-015** (new): _Value Type Boundaries_ — establishes the `LiteralValue` injection boundary (function/literal args) and the `TypeRepr[A]` extraction boundary (query results).
+- Removed 5 superseded planning/prompt documents (−1 604 lines).
+
+**Test count after:** 905 (up from 885).
+
+---
+
+## 13. `LiteralValue` Injection Pipeline (ADR-015 §1)
+
+**Commit:** `c1643bb`
+
+Closed the first half of the ADR-015 injection boundary: inline query literals now travel as `LiteralValue` all the way to dispatcher lambdas.
+
+### Parser (P1)
+
+- `TermParser` emits `Term.Const` for all constant tokens (Fix A — intentional deviation from Harrison OCaml).
+- `isConstName` extended to accept decimal literals (e.g. `0.05`).
+- `VagueQueryParser` adds `mergeDecimalTokens` post-processor so `0.05` arrives as one token in all formula positions; dead three-token tolerance clause removed.
+
+### Typed pipeline (P2)
+
+- `TypeDefs`: `sealed trait LiteralValue` / `IntLiteral` / `FloatLiteral` / `TextLiteral`.
+- `TypeCatalog`: `literalValidators: Map[TypeId, String => Option[LiteralValue]]` — sort-keyed literal parsers registered at catalog construction.
+- `BoundQuery.ConstRef`: `name` renamed `sourceText`; `raw: LiteralValue` field added.
+- `QueryBinder`: extracts `LiteralValue` from the validator; stores in `ConstRef.raw`.
+- `TypedSemantics`: passes `ConstRef.raw` directly as `Value.raw`.
+- `TypeCatalogSpec`, `QueryBinderSpec`, `MapDispatcherSpec`: updated to `Option[LiteralValue]` validator pattern.
+- Parser specs (`TermParserSpec`, `FOLAtomParserSpec`, `FOLParserSpec`): numeric literal expectations updated from `Fn(n, Nil)` to `Const(n)`.
+
+### Documentation (P3)
+
+- `ADR-001`: `BoundTerm.ConstRef` IL shape updated; cross-reference to ADR-015 added.
+- `TODOS.md`: T-002 (named constants design gap) and T-003 (typed literal pipeline normaliser) added.
+
+**Test count after:** 905 (unchanged — new tests offset removed dead ones).
+
+---
+
+## 14. ADR-006 Enum Encoding + Parser Bug Fixes
+
+**Commit:** `9643648`
+
+Applied the ADR-006 ADT encoding convention (`enum` for pure-data sum types; `sealed trait` for behavioural hierarchies) to the newly introduced types, and fixed a latent parser regex bug.
+
+### Enum conversions
+
+- `TypeDecl`: `sealed trait` + top-level case classes → `enum TypeDecl` with derived `def typeId`.
+- `LiteralValue`: `sealed trait` + top-level cases → `enum LiteralValue`.
+- `import TypeDecl.*` / `import LiteralValue.*` added to all affected sources and tests.
+- `ADR-014` and `ADR-015` implementation tables updated to reflect `enum` encoding.
+
+### Parser fixes
+
+- `isConstName` regex was `\d+\.\d+` (literal backslashes — never matched decimals). Fixed by delegating to new `StringUtil.isDecimalLiteral` with correct `\d+\.\d+` pattern.
+- `StringUtil.isDecimalLiteral` extracted and shared by `TermParser` and `VagueQueryParser`, eliminating the divergence that caused the bug.
+- `isConstName` made `private` (no external callers).
+- `TextLiteral` scaladoc documents its T-002 stopgap nature.
+- `asInstanceOf[IntLiteral]` in `MapDispatcherSpec` replaced with a sealed match.
+
+**New test:** `TermParserSpec` — parse constant (decimal, pre-merged token).
+
+**Test count after:** 906 (up from 905).
+
+---
+
+## 15. `FolModel` — Validated Catalog/Model Pairing
+
+**Commit:** `3f7ed4d`
+
+Introduced `FolModel` as a smart constructor that validates dispatcher coverage and domain registration once at construction time, eliminating per-query re-validation inside `evaluateTyped`.
+
+- `FolModel.scala`: `apply` only — runs `RuntimeModel.validateAgainst(catalog)`; returns `Either[QueryError, FolModel]`.
+- `RuntimeModelError.message`: rendering logic moved into the error type.
+- `VagueSemantics.evaluateTyped`: new `FolModel` overload is the canonical signature; `(catalog, model)` pair overload removed.
+- `VagueSemanticsTypedSpec` and `MapDispatcherSpec`: all call sites adapted to `FolModel`; bad-path tests assert on `FolModel` construction directly.
+
+**Test count after:** 906 (unchanged — refactor only).
+
+---
+
+## 16. Function Return Normalisation
+
+**Commits:** `f19c881` (feature) · `c5774f2` (post-impl review)
+
+Closed the second half of the ADR-015 injection boundary: function return values now arrive at downstream dispatcher lambdas as `LiteralValue`, not as consumer-constructed `Value` with opaque `raw` types.
+
+### Interface change
+
+- `RuntimeDispatcher.evalFunction`: `Either[String, Value]` → `Either[String, LiteralValue]`.
+- `TypedSemantics.evalTerm` `FnApp` branch: framework constructs `Value(resultSort, literalResult)` — sort correctness check on return value removed (enforced statically by the `FunctionReturnIsDomainType` catalog guard).
+
+### New components
+
+- `TypedFunctionImpl.of[A]`: ergonomic combinator — consumer declares `impl: List[Value] => Either[String, A]` and `wrap: A => LiteralValue`; framework handles `LiteralValue` construction at every call site.
+- `TypeCatalog.FunctionReturnIsDomainType`: new `collectErrors` guard rejects functions declared with a `DomainType` return sort at construction time (T-004 tracks the `EntityRef`/domain-returning-function deferred gap).
+- `MapDispatcher.functions` field type updated to `List[Value] => Either[String, LiteralValue]`.
+
+### Cleanup
+
+- `rawToDouble` helper in `MapDispatcherSpec` deleted; `gt_prob` lambda simplified to a direct `FloatLiteral` match (both args uniformly `FloatLiteral` after pipeline normalisation).
+- `VagueSemanticsTypedSpec`: all anonymous `RuntimeDispatcher` `evalFunction` overrides updated.
+- `ADR-015`: implementation table updated; new code smell for raw `Value` construction inside dispatcher lambdas.
+- `TypedFunctionImplSpec`: 5 tests (Right path for Double/Long/String; Left short-circuit; args forwarding).
+
+**New tests:** 8 (`f19c881`: +2 `FunctionReturnIsDomainType`; `c5774f2`: +5 `TypedFunctionImplSpec`, +1 restored `ADR-015` code smell section).
+
+**Test count after:** 913 (up from 906).
+
+---
+
+## 17. Parser/Interpreter Review Refactors
+
+**Commit:** `979bdd2`
+
+Address findings from a targeted parser/interpreter code review. All changes are non-functional refactors and package reorganisations.
+
+### M-1 — `BoundTerm.sort` dead branch eliminated (Option A)
+
+`ConstRef`'s second parameter was named `sort`, auto-generating a `val sort` that shadowed the parent `def sort` match body — leaving the `ConstRef` branch dead. Fixed by renaming: `ConstRef(sourceText, typeId, raw)` and `FnApp(name, args, resultSort)`. `def sort` now has three live branches. Zero call-site impact (all positional).
+
+### M-2 — `ParseFailure` sentinel
+
+Added `class ParseFailure(msg: String) extends Exception(msg)` to `Combinators` as the OCaml `Failure _` analogue. All parser throw sites that signal a recoverable parse miss now throw `ParseFailure`; catch sites narrowed from `_: Exception` to `_: ParseFailure`. `Combinators.bracketed` and the `FormulaParserSpec.parseNoInfix` test stub both updated.
+
+### S-2 — `@tailrec` Forall/Exists
+
+`TypedSemantics.evalFormula` `Forall`/`Exists` branches replaced with `@tailrec` `allOf`/`anyOf` helpers for true short-circuit without stack accumulation.
+
+### S-5 — `Term.const` removed
+
+`Term.const` (an alias for `Fn(name, Nil)`) deleted; `Term.example` migrated to `Term.Const`; `TermSpec` updated with two distinct tests: inline literal constant and zero-arity function application.
+
+### C-1 / C-2 — Package moves
+
+- `EvaluationContext` moved from `semantics` to `fol.semantics` package; old file deleted.
+- `Quantifier` moved from `fol.logic` to `fol.quantifier` package; old file deleted.
+- `VagueQuantifier` de-aliased (`LogicQuantifier` alias removed).
+- All import sites updated (~15 files).
+
+### C-4 — `QueryError` comment
+
+Explicit scaladoc on `QueryError` sealed trait explaining why `sealed trait` is used over `enum` (per-variant `formatted`/`context` body logic).
+
+**Test count after:** 914 (up from 913).
