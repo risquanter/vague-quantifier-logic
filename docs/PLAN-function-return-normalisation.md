@@ -1,6 +1,6 @@
 # Implementation Plan: Function Return Normalisation at the Dispatcher Boundary
 
-**Status:** Awaiting approval  
+**Status:** Implemented (committed 2026-04-04)  
 **Date:** 2026-04-04  
 **Related ADRs:** ADR-015, ADR-001, ADR-006, ADR-014  
 **Related TODOs:** T-003 (typed literal pipeline normaliser)
@@ -264,5 +264,6 @@ The prerequisite catalog validation guard (T-003) is tracked separately.
 
 - [x] Q1 resolved: Option A — trait-level interface change approved
 - [x] Q2 resolved: deferred via T-004; `FunctionReturnIsDomainType` catalog guard added
-- [ ] Plan approved — proceed to implementation
+- [x] Plan approved — proceed to implementation
+- [x] Implementation complete — 908/908 tests pass
 
