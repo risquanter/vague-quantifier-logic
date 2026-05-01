@@ -1,5 +1,40 @@
 # TODOs
 
+## T-000 — Scala-package rename `fol.*` → `vql.*` (post-Phase 6 follow-up)
+
+**Status:** PENDING — sequence as a separate single-purpose commit
+*after* `PLAN-symmetric-value-boundaries.md` Phase 6 lands the artifact
+rename (`fol-engine` → `vql-engine`, version unchanged at
+`0.10.0-SNAPSHOT`).
+
+**Scope:**
+- Rename Scala packages across `core/src/**`:
+  `fol.typed` → `vql.typed`,
+  `fol.parser` → `vql.parser`,
+  `fol.semantics` → `vql.semantics`,
+  `fol.error` → `vql.error`,
+  and any other top-level `fol.*` package surface.
+- Update all `import` statements within VQL.
+- Update register's `import fol.*` references accordingly
+  (`register/modules/server/src/main/scala/com/risquanter/register/foladapter/**`
+  imports `fol.typed.{Value, TypeId, TypeRepr, ...}` today — see e.g.
+  `QueryResponseBuilder.scala`).
+
+**Why deferred:** Mechanical but breaking — both the artifact rename
+(Phase 6) and the package rename in the same commit would conflate
+two concerns. Sequencing as a separate commit keeps the diff
+reviewable and lets the artifact rename ship cleanly first.
+
+**Why not bumped to a major version:** `0.10.0-SNAPSHOT` is a
+pre-1.0 SNAPSHOT; we are explicitly not stabilising the public API
+yet (per user direction; see register `PLAN-QUERY-NODE-NAME-LITERALS.md`
+§9 F-R4 and ADR-020).
+
+**Reference:** `docs/PLAN-symmetric-value-boundaries.md` §1 (Out of
+scope) and §8 Phase 6 (Step 6.1).
+
+---
+
 ## ~~T-001 — Tagged type constructors for domain vs value type in the programmatic `TypeCatalog` API~~ ✅ Implemented in `0.7.0-SNAPSHOT`
 
 **Status:** DONE. `DomainType(id)` / `ValueType(id)` ADT implemented in `fol/typed/TypeDefs.scala`.
