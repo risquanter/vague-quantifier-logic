@@ -99,14 +99,16 @@ class FOLParserSpec extends FunSuite:
   }
   
   test("parseTokens returns remaining tokens") {
-    val tokens = List("P", "(", "x", ")", "extra")
+    import lexer.Token.*
+    val tokens = List(Word("P"), LParen, Word("x"), RParen, Word("extra"))
     val (formula, rest) = FOLParser.parseTokens(tokens)
     assertEquals(formula, Atom(FOL("P", List(Var("x")))))
-    assertEquals(rest, List("extra"))
+    assertEquals(rest, List(Word("extra")))
   }
   
   test("parseTokens with empty remaining") {
-    val tokens = List("P", "(", "x", ")")
+    import lexer.Token.*
+    val tokens = List(Word("P"), LParen, Word("x"), RParen)
     val (formula, rest) = FOLParser.parseTokens(tokens)
     assertEquals(formula, Atom(FOL("P", List(Var("x")))))
     assertEquals(rest, List())

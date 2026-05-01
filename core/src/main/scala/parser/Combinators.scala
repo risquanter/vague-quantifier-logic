@@ -1,9 +1,16 @@
 package parser
 
+import lexer.Token
+
 /** Parser combinator infrastructure following OCaml style from formulas.ml
-  * 
+  *
   * Key concept: Parsers consume token lists and return (result, remaining_tokens).
   * This is the foundation of the entire parsing approach.
+  *
+  * Element-type refinement note (ADR-007 C13): the OCaml original uses
+  * `string list`; this Scala port uses `List[Token]` (see [[lexer.Token]]).
+  * The combinator *shape* — tuple threading, exception backtracking, mutual
+  * recursion — is preserved unchanged.
   */
 object Combinators:
 
@@ -18,176 +25,118 @@ object Combinators:
   class ParseFailure(msg: String) extends Exception(msg)
 
   /** Parse result type: (parsed_value, remaining_tokens)
-    * 
-    * OCaml uses tuples directly: 'a * string list
-    * Scala: we make it explicit with a type alias
+    *
+    * OCaml uses tuples directly: `'a * string list`.
+    * Scala (post-ADR-007 C13): `(A, List[Token])`.
     */
-  type ParseResult[A] = (A, List[String])
-  
+  type ParseResult[A] = (A, List[Token])
+
   /** Generic iterated infix parser (OCaml: parse_ginfix)
-    * 
-    * THIS IS THE HEART OF THE OCAML PARSING APPROACH!
-    * 
+    *
     * OCaml implementation:
     *   let rec parse_ginfix opsym opupdate sof subparser inp =
     *     let e1,inp1 = subparser inp in
     *     if inp1 <> [] & hd inp1 = opsym then
     *        parse_ginfix opsym opupdate (opupdate sof e1) subparser (tl inp1)
     *     else sof e1,inp1
-    * 
-    * What it does:
-    * - Parses a sequence of expressions separated by an operator
-    * - Uses an accumulator function to build the result
-    * - Handles both left and right associativity through opupdate
-    * 
-    * Parameters:
-    * @param opsym - The operator symbol to look for (e.g., "+", "/\\")
-    * @param opupdate - Function to update accumulator: (accumulator, new_elem, next_elem) => new_accumulator
-    * @param sof - "Start of function" - initial accumulator
-    * @param subparser - Parser for individual elements
-    * @param inp - Input token stream
-    * 
-    * Example for left-associative addition (1 + 2 + 3):
-    *   opupdate = (f, e1, e2) => (x => Add(f(x), e2))
-    *   Initial: identity
-    *   After "1 +": f = (x => x), e1 = 1 => new f = (x => Add(x, ...))
-    *   After "2 +": accumulates left-to-right
-    *   Result: Add(Add(1, 2), 3)
-    * 
-    * The genius: opupdate controls associativity WITHOUT changing the algorithm!
+    *
+    * @param opsym Token signalling the operator (e.g. `Token.OpSym("+")`)
     */
   def parseGinfix[A](
-    opsym: String,
+    opsym: Token,
     opupdate: (A => A, A) => (A => A),
     sof: A => A,
-    subparser: List[String] => ParseResult[A]
-  )(inp: List[String]): ParseResult[A] =
+    subparser: List[Token] => ParseResult[A]
+  )(inp: List[Token]): ParseResult[A] =
     val (e1, inp1) = subparser(inp)
-    
     if inp1.nonEmpty && inp1.head == opsym then
-      // Found the operator - recurse
       parseGinfix(opsym, opupdate, opupdate(sof, e1), subparser)(inp1.tail)
     else
-      // No more operators - apply accumulated function
       (sof(e1), inp1)
-  
-  /** Parse left-associative infix operator (OCaml: parse_left_infix)
-    * 
-    * OCaml implementation:
-    *   let parse_left_infix opsym opcon =
-    *     parse_ginfix opsym (fun f e1 e2 -> opcon(f e1,e2)) (fun x -> x)
-    * 
-    * For expressions like: e1 op e2 op e3
-    * Result: opcon(opcon(e1, e2), e3) - left-associative
-    * 
-    * Example: 1 - 2 - 3 = (1 - 2) - 3 = -4
-    */
+
+  /** Parse left-associative infix operator (OCaml: parse_left_infix) */
   def parseLeftInfix[A](
-    opsym: String,
+    opsym: Token,
     opcon: (A, A) => A
-  )(subparser: List[String] => ParseResult[A])(inp: List[String]): ParseResult[A] =
+  )(subparser: List[Token] => ParseResult[A])(inp: List[Token]): ParseResult[A] =
     parseGinfix(
       opsym,
       (f: A => A, e1: A) => ((x: A) => opcon(f(e1), x)),
       identity[A],
       subparser
     )(inp)
-  
-  /** Parse right-associative infix operator (OCaml: parse_right_infix)
-    * 
-    * OCaml implementation:
-    *   let parse_right_infix opsym opcon =
-    *     parse_ginfix opsym (fun f e1 e2 -> f(opcon(e1,e2))) (fun x -> x)
-    * 
-    * For expressions like: e1 op e2 op e3
-    * Result: opcon(e1, opcon(e2, e3)) - right-associative
-    * 
-    * Example: 2 ^ 3 ^ 2 = 2 ^ (3 ^ 2) = 2 ^ 9 = 512
-    * 
-    * Note the difference from left-associative:
-    * - Left builds: opcon(opcon(e1, e2), e3)
-    * - Right builds: opcon(e1, opcon(e2, e3))
-    */
+
+  /** Parse right-associative infix operator (OCaml: parse_right_infix) */
   def parseRightInfix[A](
-    opsym: String,
+    opsym: Token,
     opcon: (A, A) => A
-  )(subparser: List[String] => ParseResult[A])(inp: List[String]): ParseResult[A] =
+  )(subparser: List[Token] => ParseResult[A])(inp: List[Token]): ParseResult[A] =
     parseGinfix(
       opsym,
       (f: A => A, e1: A) => ((x: A) => f(opcon(e1, x))),
       identity[A],
       subparser
     )(inp)
-  
-  /** Parse comma-separated list (OCaml: parse_list)
-    * 
-    * OCaml implementation:
-    *   let parse_list opsym =
-    *     parse_ginfix opsym (fun f e1 e2 -> (f e1)@[e2]) (fun x -> [x])
-    * 
-    * For: e1, e2, e3
-    * Result: List(e1, e2, e3)
-    */
+
+  /** Parse comma-separated list (OCaml: parse_list) */
   def parseList[A](
-    opsym: String
-  )(subparser: List[String] => ParseResult[A])(inp: List[String]): ParseResult[List[A]] =
+    opsym: Token
+  )(subparser: List[Token] => ParseResult[A])(inp: List[Token]): ParseResult[List[A]] =
     parseGinfix[List[A]](
       opsym,
       (f: List[A] => List[A], e1: List[A]) => ((x: List[A]) => f(e1) :+ x.head),
       (x: List[A]) => List(x.head),
-      (inp: List[String]) => {
+      (inp: List[Token]) => {
         val (result, rest) = subparser(inp)
         (List(result), rest)
       }
     )(inp)
-  
-  /** Apply function to parse result (OCaml: papply)
-    * 
-    * OCaml implementation:
-    *   let papply f (ast,rest) = (f ast,rest)
-    * 
-    * Transforms the parsed value while keeping remaining tokens unchanged.
-    * This is like functor map for parsers.
-    */
+
+  /** Apply function to parse result (OCaml: papply) */
   def papply[A, B](f: A => B)(result: ParseResult[A]): ParseResult[B] =
     val (ast, rest) = result
     (f(ast), rest)
-  
-  /** Check if next token matches (OCaml: nextin)
-    * 
-    * OCaml implementation:
-    *   let nextin inp tok = inp <> [] & hd inp = tok
-    * 
-    * Returns true if the next token in the stream equals tok.
-    */
-  def nextin(inp: List[String], tok: String): Boolean =
+
+  /** Check if next token matches (OCaml: nextin) */
+  def nextin(inp: List[Token], tok: Token): Boolean =
     inp.nonEmpty && inp.head == tok
-  
-  /** Parse bracketed expression (OCaml: parse_bracketed)
-    * 
-    * OCaml implementation:
-    *   let parse_bracketed subparser cbra inp =
-    *     let ast,rest = subparser inp in
-    *     if nextin rest cbra then ast,tl rest
-    *     else failwith "Closing bracket expected"
-    * 
-    * Parses content with subparser, then expects closing bracket.
-    * 
-    * Example: parse_bracketed(parseExpr, ")", "(", "x", "+", "1", ")")
-    * Result: (parsed_expr, remaining_tokens)
-    */
+
+  /** Parse bracketed expression (OCaml: parse_bracketed) */
   def parseBracketed[A](
-    subparser: List[String] => ParseResult[A],
-    cbra: String
-  )(inp: List[String]): ParseResult[A] =
+    subparser: List[Token] => ParseResult[A],
+    cbra: Token
+  )(inp: List[Token]): ParseResult[A] =
     val (ast, rest) = subparser(inp)
     if nextin(rest, cbra) then
       (ast, rest.tail)
     else
-      throw new ParseFailure(s"Closing bracket '$cbra' expected, but got: ${rest.headOption.getOrElse("end of input")}")
-  
+      throw new ParseFailure(
+        s"Closing bracket '${tokenLabel(cbra)}' expected, but got: ${rest.headOption.map(tokenLabel).getOrElse("end of input")}"
+      )
+
   /** Helper to check if token list is empty */
-  def isEmpty(inp: List[String]): Boolean = inp.isEmpty
-  
+  def isEmpty(inp: List[Token]): Boolean = inp.isEmpty
+
   /** Helper to get head of token list safely */
-  def headOption(inp: List[String]): Option[String] = inp.headOption
+  def headOption(inp: List[Token]): Option[Token] = inp.headOption
+
+  /** Render a single [[Token]] back to its surface-syntax string for error
+    * messages — preserves the look of OCaml-original `failwith` strings while
+    * stripping ADT noise.
+    */
+  def tokenLabel(t: Token): String = t match
+    case Token.Word(s)      => s
+    case Token.OpSym(s)     => s
+    case Token.StringLit(s) => "\"" + s + "\""
+    case Token.LParen       => "("
+    case Token.RParen       => ")"
+    case Token.LBracket     => "["
+    case Token.RBracket     => "]"
+    case Token.LBrace       => "{"
+    case Token.RBrace       => "}"
+    case Token.Comma        => ","
+    case Token.Dot          => "."
+
+  /** Render a token stream back to a space-separated string for error messages. */
+  def tokensLabel(ts: List[Token]): String =
+    ts.map(tokenLabel).mkString(" ")

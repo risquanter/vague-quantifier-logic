@@ -6,28 +6,29 @@ import logic.Formula.*
 import parser.FormulaParser.*
 import parser.Combinators.*
 import util.StringUtil.*
+import lexer.{Lexer, Token}
 import lexer.Lexer.*
 
 class FormulaParserSpec extends FunSuite:
   
-  /** Simple propositional atom parser for testing
-    * 
-    * An atom is just an identifier (alphanumeric token).
+  /** Simple propositional atom parser for testing.
+    *
+    * An atom is a [[Token.Word]] payload (alphanumeric run).
     * This is a minimal parser to test the formula infrastructure.
-    * 
-    * Note: vs (bound variables) is ignored for propositional logic
+    *
+    * Note: vs (bound variables) is ignored for propositional logic.
     */
-  def parsePropAtom(vs: List[String], inp: List[String]): ParseResult[String] =
+  def parsePropAtom(vs: List[String], inp: List[Token]): ParseResult[String] =
     inp match
       case Nil =>
         throw new Exception("Expected atom")
-      case tok :: rest if tok.forall(c => alphanumeric(c) || numeric(c)) =>
+      case Token.Word(tok) :: rest =>
         (tok, rest)
-      case tok :: _ =>
-        throw new Exception(s"Expected atom, got: $tok")
+      case other :: _ =>
+        throw new Exception(s"Expected atom, got: $other")
   
   /** No infix atoms for simple propositional logic */
-  def parseNoInfix(vs: List[String], inp: List[String]): ParseResult[String] =
+  def parseNoInfix(vs: List[String], inp: List[Token]): ParseResult[String] =
     throw new ParseFailure("No infix atoms in propositional logic")
   
   /** Helper to parse from string */
@@ -37,7 +38,7 @@ class FormulaParserSpec extends FunSuite:
     if rest.isEmpty then
       result
     else
-      throw new Exception(s"Unparsed input: ${rest.mkString(" ")}")
+      throw new Exception(s"Unparsed input: ${tokensLabel(rest)}")
   
   test("parse true constant") {
     val result = parseFromString("true")

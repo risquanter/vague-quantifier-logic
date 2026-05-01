@@ -26,7 +26,8 @@ class TermParserSpec extends FunSuite:
     // VagueQueryParser.mergeDecimalTokens pre-merges ["0", ".", "05"] → ["0.05"].
     // TermParser receives the merged token; isConstName must recognise it via
     // StringUtil.isDecimalLiteral so QueryBinder gets Term.Const("0.05") not Var("0.05").
-    val (result, rest) = parse(List("0.05"))
+    import lexer.Token.*
+    val (result, rest) = parse(List(Word("0.05")))
     assertEquals(result, Const("0.05"))
     assertEquals(rest, Nil)
   }
@@ -305,4 +306,63 @@ class TermParserSpec extends FunSuite:
         ))
       ))
     )
+  }
+
+  // -----------------------------------------------------------------------
+  // F2 tests (PLAN-QUERY-NODE-NAME-LITERALS §5.2)
+  // Token.StringLit → Term.Const, plus regression coverage for adjacent paths.
+  // -----------------------------------------------------------------------
+
+  test("T1: StringLit token → Term.Const carrying inner content (multi-word)") {
+    import lexer.Token.*
+    val (result, rest) = parse(List(StringLit("IT Risk")))
+    assertEquals(result, Const("IT Risk"))
+    assertEquals(rest, Nil)
+  }
+
+  test("T2: StringLit '42' → Term.Const('42') (string-typed, not numeric path)") {
+    import lexer.Token.*
+    // Quoted "42" must take the StringLit arm — same Const value as the
+    // numeric path, but the path itself is the F2 contribution.
+    val (result, rest) = parse(List(StringLit("42")))
+    assertEquals(result, Const("42"))
+    assertEquals(rest, Nil)
+  }
+
+  test("T3: bare alphanumeric Word → Term.Var (unchanged behaviour)") {
+    val result = parseFromString("Cyber")
+    assertEquals(result, Var("Cyber"))
+  }
+
+  test("T4: bare numeric Word → Term.Const (numeric path, unchanged)") {
+    val result = parseFromString("42")
+    assertEquals(result, Const("42"))
+  }
+
+  test("F2 end-to-end via lex+parse: \"IT Risk\" round-trips to Term.Const") {
+    val result = parseFromString("\"IT Risk\"")
+    assertEquals(result, Const("IT Risk"))
+  }
+
+  test("F2: StringLit inside a function call — f(\"IT Risk\")") {
+    val result = parseFromString("f(\"IT Risk\")")
+    assertEquals(result, Fn("f", List(Const("IT Risk"))))
+  }
+
+  test("F2: mixed bare + quoted args — f(x, \"IT Risk\")") {
+    val result = parseFromString("f(x, \"IT Risk\")")
+    assertEquals(result, Fn("f", List(Var("x"), Const("IT Risk"))))
+  }
+
+  // -----------------------------------------------------------------------
+  // Regression: parseAtomicTerm Nil arm must raise ParseFailure (not the
+  // implicit MatchError it produced before the F1 rewrite). Without this,
+  // formula-level callers cannot backtrack from `term-expected` failures to
+  // sibling alternatives such as the bracketed-formula branch reached by
+  // inputs like `~(~p)`. See FOLAtomParserSpec "regression: ~(~p) ...".
+  // -----------------------------------------------------------------------
+  test("regression: parseAtomicTerm on empty input raises ParseFailure (catchable for backtracking)") {
+    intercept[parser.Combinators.ParseFailure] {
+      parse(Nil)
+    }
   }

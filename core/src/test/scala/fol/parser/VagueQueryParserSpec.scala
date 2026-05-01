@@ -347,3 +347,37 @@ class VagueQueryParserSpec extends munit.FunSuite:
         fail("Expected parse error")
   }
 
+  // -----------------------------------------------------------------------
+  // F1 + F2 end-to-end tests (PLAN-QUERY-NODE-NAME-LITERALS §5.3)
+  // Quoted node-name literals must round-trip through lex → parse → ParsedQuery
+  // as Term.Const carrying the inner content (no surrounding quotes).
+  // -----------------------------------------------------------------------
+
+  test("P1: quoted multi-word literal in range arg becomes Term.Const") {
+    val q = parseOk("Q[>=]^{2/3} x (leaf_descendant_of(x, \"IT Risk\"), large(x))")
+    assertEquals(q.range.predicate, "leaf_descendant_of")
+    assertEquals(q.range.terms.length, 2)
+    // First arg is the bound variable x; second arg is the quoted literal.
+    assertEquals(q.range.terms.head, Term.Var("x"))
+    assertEquals(q.range.terms(1), Term.Const("IT Risk"))
+  }
+
+  test("P2: single-word quoted literal carries content without surrounding quotes") {
+    val q = parseOk(
+      "Q[~]^{1/2} x (child_of(x, \"Operations\"), gt_loss(p95(x), 5000000))"
+    )
+    assertEquals(q.range.predicate, "child_of")
+    assertEquals(q.range.terms.length, 2)
+    assertEquals(q.range.terms(1), Term.Const("Operations"))
+  }
+
+  test("P3: mixed bare + quoted args — bare stays Var, quoted becomes Const") {
+    val q = parseOk(
+      "Q[>=]^{1/2} x (capital(x, \"Vienna\"), large(x))(y)"
+    )
+    assertEquals(q.range.predicate, "capital")
+    assertEquals(q.range.terms.length, 2)
+    assertEquals(q.range.terms.head, Term.Var("x"))
+    assertEquals(q.range.terms(1), Term.Const("Vienna"))
+  }
+

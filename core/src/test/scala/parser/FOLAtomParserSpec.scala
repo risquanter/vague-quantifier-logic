@@ -228,6 +228,17 @@ class FOLAtomParserSpec extends FunSuite:
     val result = parseFromString("~ ~ P(x)")
     assertEquals(result, Not(Not(Atom(FOL("P", List(Var("x")))))))
   }
+
+  // Regression: `~(~p)` (no space, parenthesised inner negation). Before the
+  // F1 token-shape rewrite, parseAtomicTerm's Nil arm produced an implicit
+  // MatchError that the combinator layer could not catch as a ParseFailure;
+  // the parser failed to backtrack from the term-atom branch to the
+  // bracketed-formula branch and rejected this input. See TermParserSpec
+  // "regression: parseAtomicTerm on empty input raises ParseFailure ...".
+  test("regression: ~(~p) parses as Not(Not(p)) via combinator backtracking") {
+    val result = parseFromString("~(~p)")
+    assertEquals(result, Not(Not(Atom(FOL("p", List())))))
+  }
   
   test("parse relation with function terms") {
     val result = parseFromString("f(x) = g(y)")
