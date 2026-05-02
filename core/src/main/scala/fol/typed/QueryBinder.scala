@@ -129,9 +129,8 @@ object QueryBinder:
       case Term.Const(name) =>
         catalog.constants.get(name) match
           case Some(actual) if actual == expected =>
-            // Named constant: raw carrier is the source text itself; resolution
-            // to a domain entity happens at evaluation time via the model.
-            Right((BoundTerm.ConstRef(name, expected, name), env))
+            // Named constant: resolved by the model at eval time.
+            Right((BoundTerm.ConstRef(name, expected), env))
           case Some(actual) =>
             Left(List(TypeCheckError.TypeMismatch(expected, actual, s"constant '$name'")))
           case None =>
@@ -139,7 +138,7 @@ object QueryBinder:
               case Some(v) =>
                 v(name) match
                   case Some(raw) =>
-                    Right((BoundTerm.ConstRef(name, expected, raw), env))
+                    Right((BoundTerm.LiteralRef(name, expected, raw), env))
                   case None =>
                     Left(List(TypeCheckError.UnparseableConstant(name, expected, name)))
               case None =>

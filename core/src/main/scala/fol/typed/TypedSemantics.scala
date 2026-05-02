@@ -206,14 +206,19 @@ object TypedSemantics:
           ))
         }
 
-      case BoundTerm.ConstRef(_, sort, raw) =>
-        // raw is the parsed literal carrier (Any) produced by the sort's
-        // literalValidator (ADR-015 §1, §4 / PLAN-symmetric-value-boundaries
-        // Phase 3). Dispatcher lambdas recover the typed view via
-        // value.extract[A] (ADR-015 §2). No asInstanceOf, no LiteralValue match.
-        Right(Value(sort, raw))
+      case BoundTerm.ConstRef(name, sort) =>
+        // Named constant: resolved by the runtime model. The IR carries no
+        // payload. Projects the name as raw carrier until a dedicated
+        // evalConstant lands on RuntimeDispatcher (see TODOS T-002).
+        Right(Value(sort, name))
 
-      case BoundTerm.FnApp(name, args, resultSort) =>
+      case BoundTerm.LiteralRef(_, sort, value) =>
+        // value is the parsed literal carrier (Any) produced by the sort's
+        // literalValidator (ADR-015 §1, §4 / ADR-016). Dispatcher lambdas
+        // recover the typed view via value.extract[A] (ADR-015 §2).
+        Right(Value(sort, value))
+
+      case BoundTerm.FnApp(name, args, sort) =>
         for
           argValues <- evalTerms(args, env, model)
           result    <- model.dispatcher.evalFunction(name, argValues).left.map(msg =>
@@ -222,7 +227,7 @@ object TypedSemantics:
               phase = s"function:${name.value}"
             )
           )
-        yield Value(resultSort, result)
+        yield Value(sort, result)
 
   private def emptyResult(quantifier: VagueQuantifier): VagueQueryResult =
     VagueQueryResult(
