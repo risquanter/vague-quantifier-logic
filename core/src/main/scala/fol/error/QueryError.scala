@@ -216,6 +216,18 @@ object QueryError:
       s"No domain found for type '$typeName'. " +
       s"Available types with domains: ${availableTypes.mkString(", ")}"
 
+  /** Raised during the typed bind phase when a constant or literal token is not
+    * found in the TypeCatalog: the name is neither a registered constant nor
+    * does a literal validator exist for the expected sort.
+    * Indicates a user query error — maps to HTTP 400 UNKNOWN_REFERENCE.
+    *
+    * Distinguished from [[BindError]] (which covers arity/type mismatches) so
+    * callers can surface targeted "did you mean …" guidance.
+    */
+  case class UnknownConstantOrLiteralError(name: String) extends QueryError:
+    def message = s"Unknown constant or literal: '$name'"
+    override val context = Map("constant" -> name)
+
   /** Raised when a query fails the typed bind phase (type-check errors).
     * Indicates a user query error — all instances map to HTTP 400.
     * Individual error messages are rendered strings; raw TypeCheckError

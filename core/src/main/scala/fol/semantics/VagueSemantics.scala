@@ -48,7 +48,14 @@ object VagueSemantics:
     QueryBinder
       .bind(query, catalog)
       .left
-      .map(errors => QueryError.BindError(errors = renderTypeErrors(errors)))
+      .map { errors =>
+        val unknowns = errors.collect { case TypeCheckError.UnknownConstantOrLiteral(name) => name }
+        val others   = errors.filterNot { case _: TypeCheckError.UnknownConstantOrLiteral => true; case _ => false }
+        if others.isEmpty && unknowns.nonEmpty then
+          QueryError.UnknownConstantOrLiteralError(unknowns.head)
+        else
+          QueryError.BindError(errors = renderTypeErrors(errors))
+      }
 
   private def renderTypeErrors(errors: List[TypeCheckError]): List[String] =
     errors.map {
