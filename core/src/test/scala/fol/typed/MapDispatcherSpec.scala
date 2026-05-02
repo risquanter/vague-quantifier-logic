@@ -58,6 +58,59 @@ class MapDispatcherSpec extends FunSuite:
     val d = MapDispatcher(predicates = Map(symLeaf -> (_ => Right(true))))
     assertEquals(d.functionSymbols, Set.empty[SymbolName])
 
+  // ─── Phase 4: primitive Any returns + value.extract[A] (PLAN §6) ──────────
+
+  test("Phase 4: function lambda returns primitive Any, evalFunction surfaces it unchanged"):
+    val d = MapDispatcher(
+      predicates = Map(symLeaf -> (_ => Right(true))),
+      // Native primitive return: NOT wrapped in FloatLiteral. The dispatcher
+      // boundary is `Either[String, Any]` after Phase 4.
+      functions  = Map(symLec -> (_ => Right(0.07)))
+    )
+    assertEquals(d.evalFunction(symLec, Nil), Right(0.07))
+
+  test("Phase 4: dispatcher lambda consumes args via value.extract[A]"):
+    // gt_loss(a, b): both args are Loss-sorted Long carriers. The lambda
+    // recovers Long via Extract[Long] (ADR-015 §2) — no asInstanceOf, no
+    // LiteralValue match.
+    val d = MapDispatcher(
+      predicates = Map(
+        symGtLoss -> { args =>
+          for
+            a <- args(0).extract[Long]
+            b <- args(1).extract[Long]
+          yield a > b
+        }
+      )
+    )
+    assertEquals(
+      d.evalPredicate(symGtLoss, List(Value(tLoss, 10L), Value(tLoss, 3L))),
+      Right(true)
+    )
+    assertEquals(
+      d.evalPredicate(symGtLoss, List(Value(tLoss, 1L), Value(tLoss, 9L))),
+      Right(false)
+    )
+
+  test("Phase 4: value.extract[Long] returns Left for wrong-carrier Value"):
+    // A dispatcher lambda that miscalls the typeclass on a wrong-carrier
+    // Value receives a descriptive Left rather than a runtime cast crash.
+    val d = MapDispatcher(
+      predicates = Map(
+        symGtLoss -> { args =>
+          for
+            a <- args(0).extract[Long]
+            b <- args(1).extract[Long]
+          yield a > b
+        }
+      )
+    )
+    val r = d.evalPredicate(symGtLoss, List(Value(tLoss, "10"), Value(tLoss, 3L)))
+    assert(r.isLeft, s"expected Left, got $r")
+    assert(r.left.exists(_.toLowerCase.contains("long")),
+      s"expected diagnostic to mention 'Long', got $r")
+
+
   test("adding symbol to map immediately reflected in symbol set — no separate declaration"):
     val base  = MapDispatcher(predicates = Map(symLeaf -> (_ => Right(true))))
     val extended = base.copy(predicates = base.predicates + (symGtProb -> (_ => Right(false))))
