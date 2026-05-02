@@ -2,7 +2,6 @@ package fol.typed
 
 import fol.logic.ParsedQuery
 import logic.{FOL, Formula, Term}
-import LiteralValue.*
 
 object QueryBinder:
 
@@ -130,9 +129,9 @@ object QueryBinder:
       case Term.Const(name) =>
         catalog.constants.get(name) match
           case Some(actual) if actual == expected =>
-            // Named constant: no LiteralValue — stored as TextLiteral of source text.
-            // See TODOS.md T-002 for the open design question on named constants.
-            Right((BoundTerm.ConstRef(name, expected, TextLiteral(name)), env))
+            // Named constant: raw carrier is the source text itself; resolution
+            // to a domain entity happens at evaluation time via the model.
+            Right((BoundTerm.ConstRef(name, expected, name), env))
           case Some(actual) =>
             Left(List(TypeCheckError.TypeMismatch(expected, actual, s"constant '$name'")))
           case None =>

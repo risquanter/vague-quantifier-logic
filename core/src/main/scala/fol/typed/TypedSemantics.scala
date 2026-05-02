@@ -207,21 +207,22 @@ object TypedSemantics:
         }
 
       case BoundTerm.ConstRef(_, sort, raw) =>
-        // raw is a LiteralValue (IntLiteral, FloatLiteral, or TextLiteral).
-        // Dispatcher lambdas receive this as Value.raw; use a sealed match
-        // to handle each case without asInstanceOf. See ADR-015.
+        // raw is the parsed literal carrier (Any) produced by the sort's
+        // literalValidator (ADR-015 §1, §4 / PLAN-symmetric-value-boundaries
+        // Phase 3). Dispatcher lambdas recover the typed view via
+        // value.extract[A] (ADR-015 §2). No asInstanceOf, no LiteralValue match.
         Right(Value(sort, raw))
 
       case BoundTerm.FnApp(name, args, resultSort) =>
         for
-          argValues    <- evalTerms(args, env, model)
-          literalResult <- model.dispatcher.evalFunction(name, argValues).left.map(msg =>
+          argValues <- evalTerms(args, env, model)
+          result    <- model.dispatcher.evalFunction(name, argValues).left.map(msg =>
             QueryError.EvaluationError(
               message = msg,
               phase = s"function:${name.value}"
             )
           )
-        yield Value(resultSort, literalResult)
+        yield Value(resultSort, result)
 
   private def emptyResult(quantifier: VagueQuantifier): VagueQueryResult =
     VagueQueryResult(

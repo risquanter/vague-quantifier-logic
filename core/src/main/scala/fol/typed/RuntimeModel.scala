@@ -30,7 +30,7 @@ object Value:
       else None
 
 trait RuntimeDispatcher:
-  def evalFunction(name: SymbolName, args: List[Value]): Either[String, LiteralValue]
+  def evalFunction(name: SymbolName, args: List[Value]): Either[String, Any]
   def evalPredicate(name: SymbolName, args: List[Value]): Either[String, Boolean]
   def functionSymbols: Set[SymbolName]
   def predicateSymbols: Set[SymbolName]
