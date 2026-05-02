@@ -169,7 +169,6 @@ See [ADR-002](ADR-002.md).
 | [ADR-009](ADR-009.md) | Symmetric Relation Support via Schema Metadata |
 | [ADR-010](ADR-010.md) | Typed Relation Names — `RelationName` Opaque Type |
 | [ADR-012](ADR-012.md) | Error Channel Policy — `require` vs `Either` |
-| [ADR-013](ADR-013.md) | Typed Result Projection — `TypeRepr[A]` for consumer domain extraction |
 
 ---
 
@@ -182,7 +181,7 @@ Test framework: munit 1.0.0.
 
 ```
 sbt test          # 854 tests
-sbt publishLocal  # com.risquanter::fol-engine:0.2.0-SNAPSHOT
+sbt publishLocal  # com.risquanter::vql-engine:0.10.0-SNAPSHOT
 ```
 
 ---

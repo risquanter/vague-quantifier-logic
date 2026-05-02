@@ -5,7 +5,7 @@
 **Date:** 2026-05-01
 **Parent ADRs:** [ADR-015](ADR-015.md) (Proposed; under refactor),
 [ADR-001](ADR-001.md), [ADR-008](ADR-008.md),
-[ADR-013](ADR-013.md) (to be superseded), [ADR-014](ADR-014.md)
+[ADR-014](ADR-014.md)
 **Related TODOs:** `docs/TODOS.md` T-002 (named-constants gap),
 T-003 (typed function-return pipeline)
 **Depends on:** ADR-015 §1–§5 design (already merged in commit
@@ -98,8 +98,7 @@ revised first; this plan is rebased afterwards.
 1. Every Decision §1–§5 has a corresponding row in § Implementation.
 2. Every § Code Smell maps to a positive Decision that prevents it.
 3. Every § Cross-ADR Relationship clause is consistent with the
-   referenced ADRs in their current state (ADR-001, ADR-006, ADR-008,
-   ADR-013).
+   referenced ADRs in their current state (ADR-001, ADR-006, ADR-008).
 4. Every § Alternatives Rejected entry remains rejected for the reason
    stated (no new evidence in REVISIT-NOTES contradicts it).
 5. The `literalValidators: Map[TypeId, String => Option[Any]]`
@@ -514,9 +513,6 @@ in their own commits), update `docs/ADR-015.md`:
 - `Status: Accepted (2026-05-XX)`
 - Strike the § Status Note (Pre-Acceptance) section, replacing it with
   a brief acceptance note pointing to the consistency-review files.
-- Update `docs/ADR-013.md` Status banner to reflect formal supersession
-  (the existing "Superseded by ADR-015 (2026-05-01 revision)" banner
-  may need a date refresh).
 
 **Pass criterion:**
 - `sbt publishLocal` succeeds in `vague-quantifier-logic`.
