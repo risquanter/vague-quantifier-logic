@@ -148,8 +148,9 @@ class QueryBinderSpec extends FunSuite:
   // ==================== Phase 3: named-constant rewrite (closes T-002) ====================
   // PLAN-symmetric-value-boundaries.md §5; ADR-015 §4.
   //
-  // Validators now carry a parsed `Any` carrier into `ConstRef.raw` (was a
-  // `LiteralValue` stopgap). A validator returning `None` produces
+  // Validators now carry a parsed `Any` carrier into `LiteralRef.value` (was a
+  // `LiteralValue` stopgap, since folded into a dedicated literal IR node in
+  // PLAN Phase 5a). A validator returning `None` produces
   // `TypeCheckError.UnparseableConstant`. Sorts with no validator continue
   // to fall through to `UnknownConstantOrLiteral`.
 
@@ -171,13 +172,13 @@ class QueryBinderSpec extends FunSuite:
     )
   )
 
-  /** Walk a bound query and find the first ConstRef in any atom argument. */
-  private def firstConstRef(bq: BoundQuery): BoundTerm.ConstRef =
-    def fromTerm(t: BoundTerm): Option[BoundTerm.ConstRef] = t match
-      case c: BoundTerm.ConstRef => Some(c)
+  /** Walk a bound query and find the first LiteralRef in any atom argument. */
+  private def firstLiteralRef(bq: BoundQuery): BoundTerm.LiteralRef =
+    def fromTerm(t: BoundTerm): Option[BoundTerm.LiteralRef] = t match
+      case c: BoundTerm.LiteralRef => Some(c)
       case BoundTerm.FnApp(_, args, _) => args.iterator.flatMap(fromTerm).nextOption()
-      case _: BoundTerm.VarRef => None
-    def fromFormula(f: BoundFormula): Option[BoundTerm.ConstRef] = f match
+      case _: BoundTerm.VarRef | _: BoundTerm.ConstRef => None
+    def fromFormula(f: BoundFormula): Option[BoundTerm.LiteralRef] = f match
       case BoundFormula.Atom(a) => a.args.iterator.flatMap(fromTerm).nextOption()
       case BoundFormula.Not(p) => fromFormula(p)
       case BoundFormula.And(p, q) => fromFormula(p).orElse(fromFormula(q))
@@ -189,9 +190,9 @@ class QueryBinderSpec extends FunSuite:
       case BoundFormula.True | BoundFormula.False => None
     fromFormula(bq.scope)
       .orElse(bq.range.args.iterator.flatMap(fromTerm).nextOption())
-      .getOrElse(fail("no ConstRef found in bound query"))
+      .getOrElse(fail("no LiteralRef found in bound query"))
 
-  test("Phase 3: validator parses inline literal, ConstRef.raw is parsed Any (Long)"):
+  test("Phase 3/5a: validator parses inline literal, LiteralRef.value is parsed Any (Long)"):
     val query = ParsedQuery(
       quantifier = Quantifier.mkAtLeast(1, 2),
       variable = "x",
@@ -202,16 +203,16 @@ class QueryBinderSpec extends FunSuite:
     )
     QueryBinder.bind(query, catalogPrim) match
       case Right(bq) =>
-        val cr = firstConstRef(bq)
+        val cr = firstLiteralRef(bq)
         assertEquals(cr.sourceText, "5000000")
-        assertEquals(cr.typeId, loss)
-        assertEquals(cr.raw, 5000000L: Any)
+        assertEquals(cr.sort, loss)
+        assertEquals(cr.value, 5000000L: Any)
         // Carrier must be the parsed primitive, NOT the source text:
-        assert(cr.raw.isInstanceOf[Long],
-          s"expected Long carrier, got ${cr.raw.getClass.getName}: ${cr.raw}")
+        assert(cr.value.isInstanceOf[Long],
+          s"expected Long carrier, got ${cr.value.getClass.getName}: ${cr.value}")
       case Left(errs) => fail(s"expected Right, got Left($errs)")
 
-  test("Phase 3: validator parses Double literal, ConstRef.raw is Double"):
+  test("Phase 3/5a: validator parses Double literal, LiteralRef.value is Double"):
     val query = ParsedQuery(
       quantifier = Quantifier.mkAtLeast(1, 2),
       variable = "x",
@@ -222,19 +223,17 @@ class QueryBinderSpec extends FunSuite:
     )
     QueryBinder.bind(query, catalogPrim) match
       case Right(bq) =>
-        // The first ConstRef encountered in the scope is the Long literal "10000000"
-        // inside lec(...); the Double literal "0.05" is the second argument of gt_prob.
-        // Walk the scope explicitly to grab the Double one.
+        // Walk the scope explicitly to grab the Double literal (2nd arg of gt_prob).
         val scope = bq.scope match
           case BoundFormula.Atom(a) => a
           case other => fail(s"expected Atom scope, got $other")
         val probArg = scope.args(1) match
-          case c: BoundTerm.ConstRef => c
-          case other => fail(s"expected ConstRef as 2nd arg, got $other")
+          case c: BoundTerm.LiteralRef => c
+          case other => fail(s"expected LiteralRef as 2nd arg, got $other")
         assertEquals(probArg.sourceText, "0.05")
-        assertEquals(probArg.typeId, prob)
-        assertEquals(probArg.raw, 0.05: Any)
-        assert(probArg.raw.isInstanceOf[Double])
+        assertEquals(probArg.sort, prob)
+        assertEquals(probArg.value, 0.05: Any)
+        assert(probArg.value.isInstanceOf[Double])
       case Left(errs) => fail(s"expected Right, got Left($errs)")
 
   test("Phase 3: validator returns None -> UnparseableConstant(name, sort, sourceText)"):
