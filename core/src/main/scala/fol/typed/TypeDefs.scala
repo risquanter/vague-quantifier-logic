@@ -38,38 +38,4 @@ enum TypeDecl:
     case DomainType(id) => id
     case ValueType(id)  => id
 
-/** Declares that consumer type `A` is the JVM carrier for a specific `TypeId`.
-  *
-  * Provided by the consumer (e.g. register), not the library. One `given`
-  * instance per sort→type mapping. Multiple sorts may share the same JVM carrier
-  * (e.g. both `LeafId` and `RiskId` backed by `String`) — each gets its own
-  * `TypeRepr` instance with a distinct `typeId`.
-  *
-  * Used with `Value.as[A]` to project `EvaluationOutput[Value]` results back into
-  * consumer domain types. See ADR-013.
-  */
-trait TypeRepr[A]:
-  def typeId: TypeId
 
-/** A parsed inline literal value produced by a `literalValidators` entry in
-  * [[TypeCatalog]].
-  *
-  * Enum so the library controls the finite set of possible raw forms.
-  * Dispatcher lambdas receive `LiteralValue` inside `Value.raw` for any
-  * argument that came from an inline query literal (as opposed to a domain
-  * element or a function return value). Pattern-match exhaustively — no
-  * `asInstanceOf` required. See ADR-006 (enum encoding) and ADR-015 (injection boundary).
-  */
-enum LiteralValue:
-  /** An integer literal (source text was a decimal integer, parsed as `Long`). */
-  case IntLiteral(value: Long)
-
-  /** A floating-point literal (source text was a decimal fraction, parsed as `Double`). */
-  case FloatLiteral(value: Double)
-
-  /** A text/opaque literal. Currently used as a stopgap for named constants
-    * (see TODOS.md T-002) — the `value` is the raw source token, not a
-    * consumer-typed value. Do not use for new literal types; prefer `IntLiteral`
-    * or `FloatLiteral` where the type is known.
-    */
-  case TextLiteral(value: String)

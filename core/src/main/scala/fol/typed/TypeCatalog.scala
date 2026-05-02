@@ -15,9 +15,7 @@ enum TypeCatalogError:
   case UnknownType(name: String, location: String)
   case NameCollision(name: String)
   /** A function declares a [[DomainType]] sort as its return type, which is
-    * unsupported. Functions must return [[ValueType]] sorts — the framework
-    * wraps the return in `Value(resultSort, literalResult: LiteralValue)` and
-    * `LiteralValue` cannot represent domain entities. See ADR-015 §1 and T-004.
+    * unsupported. Functions must return [[ValueType]] sorts. See ADR-015 §1 and T-004.
     */
   case FunctionReturnIsDomainType(functionName: String, returnType: String)
 
