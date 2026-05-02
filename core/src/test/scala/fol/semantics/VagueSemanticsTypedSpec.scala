@@ -4,7 +4,8 @@ import fol.error.QueryError
 import fol.logic.ParsedQuery
 import fol.quantifier.Quantifier
 import fol.sampling.SamplingParams
-import fol.typed.{BoundAtom, BoundFormula, BoundQuery, BoundTerm, BoundVar, FolModel, LiteralValue, PredicateSig, RuntimeDispatcher, RuntimeModel, TypeCatalog, TypedSemantics, TypeId, TypeRepr, SymbolName, Value}
+import fol.typed.{BoundAtom, BoundFormula, BoundQuery, BoundTerm, BoundVar, FolModel, PredicateSig, RuntimeDispatcher, RuntimeModel, TypeCatalog, TypedSemantics, TypeId, SymbolName, Value, extract}
+import fol.typed.Extract.*
 import fol.typed.TypeDecl.{DomainType, ValueType}
 import logic.{FOL, Formula, Term}
 import munit.FunSuite
@@ -34,7 +35,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
 
   test("evaluateTyped returns expected proportion for simple unary predicates"):
     val dispatcher = new RuntimeDispatcher:
-      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, LiteralValue] =
+      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Any] =
         Left(s"No function implementation for '${name.value}'")
 
       override def evalPredicate(name: SymbolName, args: List[Value]): Either[String, Boolean] =
@@ -66,7 +67,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
 
   test("evaluateTyped returns ModelValidationError when runtime model is missing declared predicate"):
     val dispatcher = new RuntimeDispatcher:
-      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, LiteralValue] =
+      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Any] =
         Left(s"No function implementation for '${name.value}'")
 
       override def evalPredicate(name: SymbolName, args: List[Value]): Either[String, Boolean] =
@@ -91,16 +92,13 @@ class VagueSemanticsTypedSpec extends FunSuite:
       case Left(other) => fail(s"Expected ModelValidationError, got $other")
       case Right(_)    => fail("Expected Left for invalid runtime model")
 
-  test("Value.as[A] projects satisfyingElements to consumer domain type via TypeRepr"):
+  test("Value.extract[A] projects satisfyingElements to consumer domain type"):
     // Represents the register use case: after evaluation, project Value witness
     // set back to a consumer domain type. Here String is the JVM carrier for
     // the Asset sort — in register this would be LeafId backed by String.
 
-    given TypeRepr[String] with
-      val typeId = asset
-
     val dispatcher = new RuntimeDispatcher:
-      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, LiteralValue] =
+      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Any] =
         Left(s"No function implementation for '${name.value}'")
       override def evalPredicate(name: SymbolName, args: List[Value]): Either[String, Boolean] =
         name.value match
@@ -122,13 +120,13 @@ class VagueSemanticsTypedSpec extends FunSuite:
       samplingParams = SamplingParams.exact
     ).toOption.get
 
-    // Project Value witness set to consumer String — no asInstanceOf at call site
-    val satisfying: Set[String] = output.satisfyingElements.flatMap(_.as[String])
+    // Project Value witness set to consumer String via Extract[String] — no asInstanceOf at call site
+    val satisfying: Set[String] = output.satisfyingElements.flatMap(_.extract[String].toOption)
     assertEquals(satisfying, Set("A"))
 
-    // A Value with a mismatched sort returns None, not a cast exception
-    val wrongSortValue = Value(TypeId("Risk"), "something")
-    assertEquals(wrongSortValue.as[String], None)
+    // A Value whose raw carrier is not a String returns Left, not an exception
+    val wrongCarrierValue = Value(TypeId("Loss"), 42L)
+    assert(wrongCarrierValue.extract[String].isLeft)
   // ==================== BindError tests ====================
 
   test("bindTyped returns BindError (not ValidationError) on type-check failure"):
@@ -156,7 +154,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
       answerVars = Nil
     )
     val dispatcher = new RuntimeDispatcher:
-      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, LiteralValue] =
+      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Any] =
         Left("no function")
       override def evalPredicate(name: SymbolName, args: List[Value]): Either[String, Boolean] =
         name.value match
@@ -187,7 +185,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
   )
 
   private val losslessDispatcher = new RuntimeDispatcher:
-    override def evalFunction(name: SymbolName, args: List[Value]): Either[String, LiteralValue] =
+    override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Any] =
       Left("no function")
     override def evalPredicate(name: SymbolName, args: List[Value]): Either[String, Boolean] =
       name.value match
@@ -293,7 +291,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
             onSentinelCalled()
             Left(s"SHOULD NOT BE DISPATCHED: $s")
           case other => Left(s"unknown predicate: $other")
-      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, LiteralValue] =
+      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Any] =
         Left("no functions")
       override def functionSymbols: Set[SymbolName] = Set.empty
       override def predicateSymbols: Set[SymbolName] = Set(SymbolName("leaf"), sentinel)

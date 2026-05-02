@@ -1,7 +1,6 @@
 package fol.typed
 
 import TypeDecl.*
-import LiteralValue.*
 import munit.FunSuite
 import fol.logic.ParsedQuery
 import fol.quantifier.Quantifier
@@ -26,8 +25,8 @@ class QueryBinderSpec extends FunSuite:
       SymbolName("gt_prob") -> PredicateSig(List(prob, prob))
     ),
     literalValidators = Map(
-      loss -> (s => s.toLongOption.map(IntLiteral(_))),
-      prob -> (s => s.toDoubleOption.map(FloatLiteral(_)))
+      loss -> (s => s.toLongOption),
+      prob -> (s => s.toDoubleOption)
     )
   )
 

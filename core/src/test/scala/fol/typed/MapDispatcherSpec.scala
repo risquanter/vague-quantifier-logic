@@ -1,7 +1,6 @@
 package fol.typed
 
 import TypeDecl.*
-import LiteralValue.*
 import fol.error.QueryError
 import fol.logic.ParsedQuery
 import fol.quantifier.Quantifier
@@ -43,8 +42,8 @@ class MapDispatcherSpec extends FunSuite:
   test("functionSymbols derived from functions map keys"):
     val d = MapDispatcher(
       predicates = Map(symLeaf -> (_ => Right(true))),
-      functions  = Map(symLec -> (_ => Right(FloatLiteral(0.1))),
-                       symP95 -> (_ => Right(IntLiteral(42L))))
+      functions  = Map(symLec -> (_ => Right(0.1)),
+                       symP95 -> (_ => Right(42L)))
     )
     assertEquals(d.functionSymbols, Set(symLec, symP95))
 
@@ -71,8 +70,7 @@ class MapDispatcherSpec extends FunSuite:
 
   test("Phase 4: dispatcher lambda consumes args via value.extract[A]"):
     // gt_loss(a, b): both args are Loss-sorted Long carriers. The lambda
-    // recovers Long via Extract[Long] (ADR-015 §2) — no asInstanceOf, no
-    // LiteralValue match.
+    // recovers Long via Extract[Long] (ADR-015 §2) — no asInstanceOf.
     val d = MapDispatcher(
       predicates = Map(
         symGtLoss -> { args =>
@@ -150,18 +148,18 @@ class MapDispatcherSpec extends FunSuite:
     val d = MapDispatcher(
       predicates = Map.empty,
       functions  = Map(
-        symLec -> { _ => lecCalled = true; Right(FloatLiteral(0.07)) },
-        symP95 -> { _ => Right(IntLiteral(100L)) }
+        symLec -> { _ => lecCalled = true; Right(0.07) },
+        symP95 -> { _ => Right(100L) }
       )
     )
     val r = d.evalFunction(symLec, List(Value(tAsset, 1), Value(tLoss, 10000000L)))
-    assertEquals(r, Right(FloatLiteral(0.07)))
+    assertEquals(r, Right(0.07))
     assert(lecCalled, "lec lambda was not called")
 
   test("evalFunction returns Left for unknown symbol"):
     val d = MapDispatcher(
       predicates = Map.empty,
-      functions  = Map(symP95 -> (_ => Right(IntLiteral(0L))))
+      functions  = Map(symP95 -> (_ => Right(0L)))
     )
     val r = d.evalFunction(symLec, Nil)
     assert(r.isLeft)
@@ -190,7 +188,7 @@ class MapDispatcherSpec extends FunSuite:
     var received: List[Value] = Nil
     val d = MapDispatcher(
       predicates = Map.empty,
-      functions  = Map(symLec -> { args => received = args; Right(FloatLiteral(0.0)) })
+      functions  = Map(symLec -> { args => received = args; Right(0.0) })
     )
     d.evalFunction(symLec, List(vAsset, vLoss))
     assertEquals(received, List(vAsset, vLoss))
@@ -209,7 +207,7 @@ class MapDispatcherSpec extends FunSuite:
     val d = MapDispatcher(
       predicates = Map(symLeaf   -> (_ => Right(true)),
                        symGtProb -> (_ => Right(true))),
-      functions  = Map(symLec    -> (_ => Right(FloatLiteral(0.0))))
+      functions  = Map(symLec    -> (_ => Right(0.0)))
     )
     val model = RuntimeModel(domains = Map(tAsset -> Set(Value(tAsset, "A"))), dispatcher = d)
     assert(model.validateAgainst(catalog).isRight)
@@ -261,8 +259,8 @@ class MapDispatcherSpec extends FunSuite:
   //   gt_prob : Probability × Probability → Boolean
   //
   // Asset raw type: String (asset identifier)
-  // Loss  raw type: LiteralValue (IntLiteral for inline integer literals like "10000000")
-  // Probability raw type: LiteralValue (FloatLiteral for inline decimals like "0.05")
+  // Loss  raw type: Long  (inline integer literals like "10000000" produce Long via literalValidator)
+  // Probability raw type: Double (inline decimals like "0.05" produce Double via literalValidator)
 
   private val catalog = TypeCatalog.unsafe(
     types = Set(
@@ -280,11 +278,11 @@ class MapDispatcherSpec extends FunSuite:
     ),
     // Numeric literals appearing as Loss or Probability tokens in queries are
     // validated by these validators at bind time.  The validator produces the
-    // parsed LiteralValue that flows through ConstRef.raw → Value.raw into
-    // dispatcher lambdas.  See ADR-015.
+    // parsed Any carrier that flows into Value.raw in dispatcher lambdas.
+    // See ADR-015.
     literalValidators = Map(
-      tLoss -> (s => s.toLongOption.map(IntLiteral(_))),
-      tProb -> (s => s.toDoubleOption.map(FloatLiteral(_)))
+      tLoss -> (s => s.toLongOption),
+      tProb -> (s => s.toDoubleOption)
     )
   )
 
@@ -301,21 +299,20 @@ class MapDispatcherSpec extends FunSuite:
   //      put into Value(sort, raw) when constructing RuntimeModel.domains.
   //      In this test, Asset domain elements are Value(tAsset, "A"), so raw is String.
   //
-  //   2. Literals from query text — ConstRef.raw is a LiteralValue produced by the
-  //      sort's literalValidator.  In this test:
-  //        - "10000000" (Loss)  → IntLiteral(10000000L)
-  //        - "0.05" (Prob)     → FloatLiteral(0.05)
-  //      Use a sealed match — no asInstanceOf in the good path (ADR-015).
+  //   2. Literals from query text — raw is the Any produced by the sort's
+  //      literalValidator.  In this test:
+  //        - "10000000" (Loss)  → Long 10000000L  (via s.toLongOption)
+  //        - "0.05" (Prob)     → Double 0.05      (via s.toDoubleOption)
+  //      Recover via value.extract[A] (ADR-015 §2) — no asInstanceOf required.
   //
-  //   3. Function return values — the framework wraps the lambda's LiteralValue
-  //      return as Value(resultSort, literalResult).  In this test lec returns
-  //      FloatLiteral(0.07), so downstream consumers of lec's result also see a
-  //      LiteralValue — the same shape as an inline literal.  No rawToDouble
-  //      helper is needed; a single FloatLiteral match suffices.  See ADR-015 §1.
+  //   3. Function return values — the framework wraps the lambda's Any return
+  //      as Value(sort, result).  In this test lec returns Double 0.07, so
+  //      downstream consumers of lec's result see Double as raw — the same
+  //      shape as an inline Probability literal.  Use value.extract[Double].
   //
-  // Consequence: lambdas receiving ValueType arguments always see LiteralValue
-  // as raw.  Only DomainType arguments (domain elements) carry consumer-owned
-  // raw types.  The consumer owns the DomainType raw contract on both sides.
+  // Consequence: lambdas receiving ValueType arguments always see a raw primitive
+  // (Long, Double, or consumer-chosen Any).  Use extract[A] to recover typed A.
+  // DomainType arguments carry consumer-owned raw types (String here).
 
   private val dispatcher = MapDispatcher(
     predicates = Map(
@@ -324,35 +321,30 @@ class MapDispatcherSpec extends FunSuite:
         Right(true)
       },
       symGtProb -> { args =>
-        // args(0): result of lec(x, ...) — raw is FloatLiteral (wrapped by framework)
-        // args(1): literal "0.05"        — raw is FloatLiteral(0.05) (from literalValidator)
-        // Both are LiteralValue; a single sealed match covers both.
-        (args(0).raw, args(1).raw) match
-          case (FloatLiteral(a), FloatLiteral(b)) => Right(a > b)
-          case other => Left(s"gt_prob: unexpected arg types: $other")
+        // args(0): result of lec(x, ...) — raw is Double (function return)
+        // args(1): literal "0.05"        — raw is Double 0.05 (from literalValidator)
+        for
+          a <- args(0).extract[Double]
+          b <- args(1).extract[Double]
+        yield a > b
       }
     ),
     functions = Map(
       symLec -> { args =>
         // args(0): domain element Value(tAsset, "A") — raw is String
-        // args(1): literal "10000000" — raw is IntLiteral(10000000L) (from literalValidator)
-        val assetId   = args(0).raw.asInstanceOf[String]
-        val threshold = args(1).raw match
-          case IntLiteral(n) => n
-          case other => throw IllegalArgumentException(s"expected IntLiteral for lec threshold, got $other")
-        // [ILLUSTRATIVE computation]: A has lec=0.07, B has lec=0.02
-        val lec = assetId match
+        // args(1): literal "10000000" — raw is Long (from literalValidator)
+        val assetId = args(0).raw.asInstanceOf[String]
+        for threshold <- args(1).extract[Long]
+        yield assetId match
           case "A" => 0.07
           case _   => 0.02
-        Right(FloatLiteral(lec))  // framework wraps as Value(tProb, FloatLiteral(lec))
       },
       symP95 -> { args =>
         // args(0): domain element — raw is String
         val assetId = args(0).raw.asInstanceOf[String]
-        val p95 = assetId match
+        Right(assetId match
           case "A" => 5000000L
-          case _   => 1000000L
-        Right(IntLiteral(p95))  // framework wraps as Value(tLoss, IntLiteral(p95))
+          case _   => 1000000L)
       }
     )
   )
@@ -398,8 +390,8 @@ class MapDispatcherSpec extends FunSuite:
         symGtProb -> (_ => Left("deliberate predicate failure"))
       ),
       functions = Map(
-        symLec -> (_ => Right(FloatLiteral(0.07))),
-        symP95 -> (_ => Right(IntLiteral(5000000L)))
+        symLec -> (_ => Right(0.07)),
+        symP95 -> (_ => Right(5000000L))
       )
     )
     val failingModel = RuntimeModel(
@@ -419,8 +411,8 @@ class MapDispatcherSpec extends FunSuite:
     val incompleteDispatcher = MapDispatcher(
       predicates = Map(symLeaf -> (_ => Right(true))), // gt_prob absent
       functions  = Map(
-        symLec -> (_ => Right(FloatLiteral(0.07))),
-        symP95 -> (_ => Right(IntLiteral(5000000L)))
+        symLec -> (_ => Right(0.07)),
+        symP95 -> (_ => Right(5000000L))
       )
     )
     val incompleteModel = RuntimeModel(
@@ -448,7 +440,7 @@ class MapDispatcherSpec extends FunSuite:
       predicates = Map(
         symLeaf   -> (_ => Right(true)),
         symGtProb -> { args =>
-          // Deliberate wrong cast: lec returns FloatLiteral, but this casts to Int.
+          // Deliberate wrong cast: lec returns Double, but this casts to Int.
           // The evaluateTyped return type is Either but no try/catch wraps lambdas,
           // so ClassCastException propagates uncaught through the Either boundary.
           val _ = args(0).raw.asInstanceOf[Int]  // will throw ClassCastException
@@ -456,8 +448,8 @@ class MapDispatcherSpec extends FunSuite:
         }
       ),
       functions = Map(
-        symLec -> (_ => Right(FloatLiteral(0.07))),
-        symP95 -> (_ => Right(IntLiteral(5000000L)))
+        symLec -> (_ => Right(0.07)),
+        symP95 -> (_ => Right(5000000L))
       )
     )
     val badModel = RuntimeModel(

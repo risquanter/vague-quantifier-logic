@@ -1,7 +1,6 @@
 package fol.typed
 
 import TypeDecl.*
-import LiteralValue.*
 import munit.FunSuite
 
 class TypeCatalogSpec extends FunSuite:
@@ -20,7 +19,7 @@ class TypeCatalogSpec extends FunSuite:
       predicates = Map(
         SymbolName("gt_loss") -> PredicateSig(List(loss, loss))
       ),
-      literalValidators = Map(loss -> (s => s.toLongOption.map(IntLiteral(_))))
+      literalValidators = Map(loss -> (s => s.toLongOption))
     )
 
     assert(result.isRight)
