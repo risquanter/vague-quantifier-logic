@@ -44,7 +44,9 @@ scope) and §8 Phase 6 (Step 6.1).
 
 ## T-002 — Named constants: design review and correctness gap
 
-**Status:** DEFERRED (documented as-is, 2026-04-03).
+**Status:** ✅ RESOLVED by ADR-015 §4 + Phase 3 of `PLAN-symmetric-value-boundaries.md` (2026-05-02). `BoundTerm.ConstRef.raw` is now `Any` and inline literals carry the parsed primitive (or consumer-chosen wrapper) produced by the registered `literalValidator`, not `TextLiteral` of the source text. A validator returning `None` produces the new `TypeCheckError.UnparseableConstant(name, sort, sourceText)`. Named constants registered via `catalog.constants` (option (a)/(c) of the original design space) are still treated as a separate path; the design space below is preserved for the historical record.
+
+**Original status (2026-04-03):** DEFERRED.
 
 The `catalog.constants: Map[String, TypeId]` feature is an OCaml-heritage artifact. A named constant bound through `QueryBinder` currently falls into the `catalog.constants.get(name)` branch in `bindTermExpected` and produces `ConstRef(name, expected, TextLiteral(name))` — the raw value is a `TextLiteral` of the source text, which is semantically incorrect for typed consumers expecting a `Long` or `Double` value at evaluation time.
 

@@ -23,12 +23,15 @@ enum BoundTerm:
     *
     * @param sourceText The original source token (e.g. "10000000", "0.05").
     * @param typeId     The sort the literal was validated against.
-    * @param raw        The parsed literal value produced by the sort's validator.
-    *                   This becomes `Value.raw` at evaluation time, so dispatcher
-    *                   lambdas receive a `LiteralValue` (not a String) for any
-    *                   argument that came from an inline literal. See ADR-015.
+    * @param raw        The parsed literal carrier produced by the sort's
+    *                   validator. After ADR-015 §4 /
+    *                   PLAN-symmetric-value-boundaries Phase 3 this is
+    *                   the consumer's chosen carrier as `Any` (e.g. `Long`,
+    *                   `Double`, or a consumer wrapper) and flows into
+    *                   `Value.raw` at evaluation time. Dispatcher lambdas
+    *                   recover the typed view via `Extract[A]` (ADR-015 §2).
     */
-  case ConstRef(sourceText: String, typeId: TypeId, raw: LiteralValue)
+  case ConstRef(sourceText: String, typeId: TypeId, raw: Any)
 
   case FnApp(name: SymbolName, args: List[BoundTerm], resultSort: TypeId)
 
