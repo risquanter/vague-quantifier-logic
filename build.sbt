@@ -15,7 +15,7 @@ lazy val folEngine = crossProject(JVMPlatform, JSPlatform)
   .crossType(CrossType.Pure)
   .in(file("core"))
   .settings(
-    name := "fol-engine",
+    name := "vql-engine",
     libraryDependencies ++= Seq(
       "org.scalameta"  %%% "munit"   % "1.0.0"          % Test,
       "com.risquanter" %%% "hdr-rng" % "0.1.0-SNAPSHOT"
