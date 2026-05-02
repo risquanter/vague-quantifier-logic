@@ -32,7 +32,9 @@ plan executes that ADR in seven phases:
 | 2 | `TypeCatalog.literalValidators: Map[TypeId, String => Option[Any]]` | **Opus 4.7** | HARD STOP |
 | 3 | `QueryBinder` named-constant branch routes through validator (closes T-002) | **Opus 4.7** | HARD STOP |
 | 4 | Threading `Any` through `TypedSemantics` / `MapDispatcher` / `TypedFunctionImpl` | **Opus 4.7** | HARD STOP |
-| 5 | Removal of `LiteralValue` enum and `TypeRepr`; full test green | **Opus 4.7** | HARD STOP |
+| 5a | Split `BoundTerm.ConstRef` → `ConstRef` + `LiteralRef` (ADR-016) | **Opus 4.7** | HARD STOP |
+| 5b | Removal of `LiteralValue` enum and `TypeRepr`; full test green | **Opus 4.7** | HARD STOP |
+| 5c | _DEFERRED_ — `Carrier[A]` GADT for `LiteralRef.value` (ADR-016 Decision §2, §5); follow-up TODO | n/a | — |
 | 6 | Artifact rename (`fol-engine` → `vql-engine`), publish, code-consistency review, ADR-015 → `Accepted` | **Opus 4.7** | HARD STOP |
 
 > ⚠️ **Per WORKING-INSTRUCTIONS § Mandatory Review Halt**, after every
@@ -343,41 +345,119 @@ ADR-015 § Status Note (Pre-Acceptance) sequencing.)
 
 ---
 
-## 7. Phase 5 — Remove `LiteralValue` and `TypeRepr`
+## 7. Phase 5 — IR-node split, `LiteralValue`/`TypeRepr` removal, optional `Carrier[A]` GADT
+
+**Parent ADR for this phase:** [ADR-016](ADR-016-carrier-witness-on-symmetric-value-typeclasses.md)
+(records the typeclass / GADT composition rationale and the third-door
+storage option ADR-015 elided).
+
+Phase 5 is split into three sub-phases. 5a and 5b are mandatory and
+mechanical. 5c is **optional** and gated on a user decision at the
+Phase 5b HARD STOP.
+
+### 7.1 Phase 5a — Split `BoundTerm.ConstRef` into `ConstRef` + `LiteralRef`
+
+**Goal:** Separate the two unrelated jobs the current `ConstRef` node
+does (named constant vs parsed literal). Compiler best-practice; see
+ADR-016 Decision §3.
+
+**Implementation:**
+- `core/src/main/scala/fol/typed/BoundQuery.scala`: replace
+  `case ConstRef(sourceText: String, typeId: TypeId, raw: Any)` with two
+  cases:
+  - `case ConstRef(name: String, sort: TypeId)` — named constant; no
+    payload. Eval routes through `model.evalConstant(name)`.
+  - `case LiteralRef(sourceText: String, sort: TypeId, value: Any)` —
+    parsed literal; `value` is the typed result of `LiteralParser[A]`.
+- `core/src/main/scala/fol/typed/QueryBinder.scala`: route the named-
+  constant branch to `ConstRef(name, sort)` and the literal-validator
+  branch to `LiteralRef(sourceText, sort, raw)`.
+- `core/src/main/scala/fol/typed/TypedSemantics.scala`: split the
+  evaluation case accordingly.
+- All tests that pattern-match `ConstRef` adjust to the new shape;
+  walker helpers (`firstConstRef`) become `firstLiteralRef` where they
+  meant the literal case.
+
+**Pass criterion:**
+- `sbt folEngineJVM/test folEngineJS/test` green.
+- No `BoundTerm.ConstRef(_, _, _)` (3-arity) references remain.
+
+**TDD discipline:** strict RED → GREEN, separate signed commits.
+
+**HARD STOP** — Recommended agent for next step: **Opus 4.7**.
+
+### 7.2 Phase 5b — Remove `LiteralValue` and `TypeRepr`
 
 **Goal:** Complete the design by removing the two abstractions ADR-015
 declares dead.
 
-**Decision point:** Hard-delete vs `@deprecated` for one cycle.
+**Decision (recorded 2026-05-02):** **Hard-delete.** No external
+consumer besides `register` depends on `LiteralValue` / `TypeRepr`,
+and `register` migrates in the same release window.
 
-- **Hard-delete** (recommended if no external consumer besides
-  `register` depends on the symbols, and `register` migrates in the
-  same release window): cleanest, smaller surface.
-- **`@deprecated` for one cycle**: re-export `LiteralValue` and
-  `TypeRepr` with `@deprecated("Use Value(sort, raw: Any) and Extract[A]
-  per ADR-015", "0.10.0-SNAPSHOT")` annotations; remove in the next
-  minor release.
+- **Hard-delete** (chosen): cleanest, smaller surface.
+- ~~`@deprecated` for one cycle~~: re-export with `@deprecated` annotations;
+  rejected because no external migrators justify the carrying cost.
 
-The agent **must not** pick a default. The user decides at the Phase 4
-HARD STOP.
-
-**Implementation (either branch):**
-- `core/src/main/scala/fol/typed/TypeDefs.scala` (line ~70–71): remove
-  or `@deprecated`-mark `LiteralValue` enum.
-- `core/src/main/scala/fol/typed/TypeRepr.scala`: remove file or convert
-  to `@deprecated` re-export of `Extract`.
+**Implementation:**
+- `core/src/main/scala/fol/typed/TypeDefs.scala` (line ~70–71): delete
+  the `LiteralValue` enum.
+- `core/src/main/scala/fol/typed/TypeRepr.scala`: delete the file.
 - All test files: remove `LiteralValue.*` constructors; replace with
   raw value injection (`Value(sort, 42L)`).
 
 **Pass criterion:**
 - `sbt folEngineJVM/test folEngineJS/test` green.
-- Grep: no production references to `LiteralValue` or `TypeRepr`
-  (deprecated re-exports excepted).
+- Grep: no references to `LiteralValue` or `TypeRepr` anywhere.
+
+**HARD STOP** — Recommended agent for next step: **Opus 4.7**.
+
+### 7.3 Phase 5c — `Carrier[A]` GADT for `LiteralRef.value` (DEFERRED)
+
+**Status:** **DEFERRED** to follow-up TODO (decision recorded
+2026-05-02; see Decision block below). Not executed as part of this
+plan. Listed here so the design rationale and implementation sketch
+are preserved for the future re-evaluation.
+
+**Goal:** Replace `LiteralRef.value: Any` with a `Carrier[A]`-tagged
+GADT payload, recovering static exhaustivity over registered carriers
+and aligning with LLVM / Roslyn / GHC IR conventions. See
+[ADR-016](ADR-016-carrier-witness-on-symmetric-value-typeclasses.md)
+Decision §2 / §5 for cost/benefit and adoption gate.
+
+**Decision (recorded 2026-05-02):** **Defer to follow-up TODO.**
+`Extract[A]` is the sole consumption surface today; the GADT's
+marginal benefit does not justify its ceremony at this point. ADR-016
+stays filed; the option remains open and re-evaluable when a second
+literal-walking consumer (serializer, codegen, debugger) appears.
+
+- ~~Adopt now~~: rejected — no second consumer in flight.
+- **Defer to follow-up TODO** (chosen).
+- ~~Reject~~: not chosen — design remains valid; only the timing slips.
+
+**Implementation sketch (if adopted):**
+- `core/src/main/scala/fol/typed/Carrier.scala` (new): `sealed trait
+  Carrier[A]`; givens for `Long`, `Double`, `String`. User-extensible.
+- `BoundTerm.LiteralRef` becomes `LiteralRef[A](..., carrier:
+  Carrier[A], value: A)`; `BoundTerm` enum gains an existential at
+  the literal case.
+- Derive `Extract[A]` and `LiteralParser[A]` from a registered
+  `Carrier[A]` where possible (potential consolidation into a single
+  `LiteralType[A]` typeclass — see ADR-016 Decision §4).
+- `MapDispatcher.functions` may keep `Any` storage (the heterogeneous
+  map is a separate concern from per-node payload typing) **or** be
+  upgraded to `Carrier`-tagged entries — design call within the phase.
+
+**Pass criterion (if adopted):**
+- `sbt folEngineJVM/test folEngineJS/test` green.
+- No `LiteralRef.value: Any`; all literal payloads carrier-tagged.
+- `compiletime.testing.typeChecks` test for "missing `Carrier`
+  registration ⇒ compile error".
 
 **HARD STOP** — Recommended agent for next step: **Opus 4.7**
 (Phase 6 combines the artifact rename, code-consistency review against
-ADR-015, and the ADR-015 `Proposed → Accepted` promotion. The review
-step requires architectural judgement about whether implementation
+ADR-015 + ADR-016, and the ADR-015 `Proposed → Accepted` promotion. The
+review step requires architectural judgement about whether implementation
 matches design or whether the ADR must be amended.)
 
 ---

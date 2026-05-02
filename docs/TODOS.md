@@ -111,3 +111,25 @@ T-004 is resolved.
 
 **Context:** `PLAN-function-return-normalisation.md` §Q2, `fol/typed/TypeCatalog.scala`
 `collectErrors`, conversation history 2026-04-04.
+
+---
+
+## T-005 — `Carrier[A]` GADT for `LiteralRef.value` (deferred from PLAN Phase 5c)
+
+**Status:** Deferred (recorded 2026-05-02 at PLAN-symmetric-value-boundaries.md
+Phase 5b HARD STOP). Re-evaluate when a second literal-walking consumer appears.
+
+**Trigger to re-open:** introduction of any consumer that walks `LiteralRef`
+nodes directly without going through `Extract[A]` — e.g. a serializer, a code
+generator, a debugger/printer that needs static exhaustivity over carriers.
+
+**Scope:** Replace `BoundTerm.LiteralRef(sourceText, sort, value: Any)` with
+`LiteralRef[A](sourceText, sort, carrier: Carrier[A], value: A)`. Add
+`sealed trait Carrier[A]` with library givens for `Long`, `Double`, `String`
+and a user-extensible registration path. Optionally consolidate
+`LiteralParser[A]` / `Extract[A]` / `Carrier[A]` into a single `LiteralType[A]`
+super-typeclass.
+
+**Authoritative design:** [ADR-016](ADR-016-carrier-witness-on-symmetric-value-typeclasses.md).
+
+**Implementation sketch:** see `PLAN-symmetric-value-boundaries.md` §7.3.
