@@ -137,8 +137,21 @@ object QueryBinder:
             Left(List(TypeCheckError.TypeMismatch(expected, actual, s"constant '$name'")))
           case None =>
             catalog.literalValidators.get(expected).flatMap(v => v(name)) match
-              case Some(literal) => Right((BoundTerm.ConstRef(name, expected, literal), env))
-              case None          => Left(List(TypeCheckError.UnknownConstantOrLiteral(name)))
+              // Phase 2 transition (PLAN-symmetric-value-boundaries §4):
+              // validators now return `Option[Any]`, but `ConstRef.raw` is
+              // still typed `LiteralValue` until Phase 3.
+              //   * If the validator's carrier is already a LiteralValue,
+              //     thread it through unchanged (preserves all pre-Phase-2
+              //     semantics for existing consumers and tests).
+              //   * Otherwise, fall back to the T-002 stopgap of carrying
+              //     the source text via `TextLiteral(name)`. Phase 3
+              //     replaces this with full `Any` threading.
+              case Some(lv: LiteralValue) =>
+                Right((BoundTerm.ConstRef(name, expected, lv), env))
+              case Some(_) =>
+                Right((BoundTerm.ConstRef(name, expected, TextLiteral(name)), env))
+              case None =>
+                Left(List(TypeCheckError.UnknownConstantOrLiteral(name)))
 
       case Term.Fn(name, args) =>
         val symbol = SymbolName(name)

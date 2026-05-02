@@ -67,6 +67,38 @@ class TypeCatalogSpec extends FunSuite:
     assertEquals(catalog.domainTypes, Set(asset))
     assertEquals(catalog.typeIds, Set(asset, loss))
 
+  // PLAN-symmetric-value-boundaries §4 (Phase 2) regression: name-collision
+  // detection must not be sensitive to the validator-map signature change.
+  test("nameCollisions detected even when validators are present"):
+    val asset = TypeId("Asset")
+    val loss  = TypeId("Loss")
+
+    val result = TypeCatalog(
+      types = Set(DomainType(asset), ValueType(loss)),
+      functions = Map(SymbolName("foo") -> FunctionSig(List(asset), loss)),
+      predicates = Map(SymbolName("foo") -> PredicateSig(List(loss))),
+      literalValidators = Map(loss -> (s => s.toLongOption.map(_ => s)))
+    )
+
+    assert(result.isLeft)
+    assert(result.left.exists(_.exists {
+      case TypeCatalogError.NameCollision("foo") => true
+      case _                                     => false
+    }))
+
+  // PLAN-symmetric-value-boundaries §4 (Phase 2): validators may now produce
+  // any consumer carrier; e.g. parse Long literals into Long carriers.
+  test("validator returning Some(parsedValue: Any) is accepted"):
+    val asset = TypeId("Asset")
+    val loss  = TypeId("Loss")
+
+    val result = TypeCatalog(
+      types = Set(DomainType(asset), ValueType(loss)),
+      literalValidators = Map(loss -> LiteralParser.asValidator[Long])
+    )
+
+    assert(result.isRight)
+
   // ==================== S-3: UnknownType.location ====================
 
   test("UnknownType carries location string for function return type"):

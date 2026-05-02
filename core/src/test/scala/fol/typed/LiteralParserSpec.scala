@@ -32,3 +32,19 @@ class LiteralParserSpec extends FunSuite:
 
   test("LiteralParser[Double] rejects non-numeric input"):
     assert(summon[LiteralParser[Double]].parse("abc").isLeft)
+
+  // ----- asValidator: lift a LiteralParser[A] to TypeCatalog shape -----
+  // (PLAN-symmetric-value-boundaries §4: the only sanctioned A → Any
+  // widening on the injection side.)
+
+  test("asValidator[Long] returns Some(parsed) for valid input"):
+    val v: String => Option[Any] = LiteralParser.asValidator[Long]
+    assertEquals(v("42"), Some(42L))
+
+  test("asValidator[Long] returns None for non-numeric"):
+    val v: String => Option[Any] = LiteralParser.asValidator[Long]
+    assertEquals(v("abc"), None)
+
+  test("asValidator[Double] returns Some(parsed) widening from integer text"):
+    val v: String => Option[Any] = LiteralParser.asValidator[Double]
+    assertEquals(v("42"), Some(42.0))

@@ -37,3 +37,17 @@ object LiteralParser:
     * `LiteralParser[String]` (or wrapper carrier) so that the carrier
     * shape for a `String`-backed sort is an explicit consumer choice.
     */
+
+  /** Lift a `LiteralParser[A]` into the
+    * `String => Option[Any]` shape required by
+    * `TypeCatalog.literalValidators`.
+    *
+    * This is the **only** sanctioned location for the widening from
+    * the consumer's carrier `A` to the catalog's `Any` (ADR-015 §
+    * Code Smells "❌ String => Option[Any] + asInstanceOf at the
+    * dispatcher" — here the widening is safe because the parser's
+    * result type is `A` and the catalog re-tightens via `Extract[A]`
+    * at the extraction boundary).
+    */
+  def asValidator[A](using p: LiteralParser[A]): String => Option[Any] =
+    s => p.parse(s).toOption
