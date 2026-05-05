@@ -1126,19 +1126,18 @@ src/test/scala/              # Test structure mirrors main/
 - ✅ Numeric constant handling
 - ✅ FOLUtil integration for variable extraction
 
-### 📋 **Phase 5: Parser** - PENDING
-- [ ] Parse paper syntax: `Q[op]^{k/n} x (R, φ)(y)`
-- [ ] Lexer extensions for special tokens
-- [ ] Combinator-based parsing following FOLParser patterns
-- [ ] Integration tests with paper examples
-- [ ] Error handling and validation
+### ✅ **Phase 5: Parser** - COMPLETE
+- ✅ Parse paper syntax: `Q[op]^{k/n} x (R, φ)(y)` (`fol/parser/VagueQueryParser.scala`, 41 tests)
+- ✅ Supports all quantifier operators: About (~), AtLeast (>=), AtMost (<=)
+- ✅ Custom tolerance syntax: `Q[~]^{1/2}[0.05]`
+- ✅ Complex FOL formulas in scope (∧, ∨, ¬, ∃, ∀, ⟹, ⟺)
+- ✅ Paper examples (q₁, q₃) parsing correctly
 
-### 📋 **Phase 6: Paper Examples** - PENDING
-- [ ] MONDIAL-style geography dataset
-- [ ] Paper queries q₁, q₃ implemented
-- [ ] Exact and sampling evaluation demonstrations
-- [ ] Output formatting and visualization
-- [ ] Validation against paper expected results
+### ✅ **Phase 6: Examples** - COMPLETE
+- ✅ `CyberSecurityDomain.scala` — realistic domain (21 assets, 20 risks, 16 mitigations)
+- ✅ `CyberSecurityExamples.scala` — four executable demonstration queries
+- ✅ End-to-end: Parser → Evaluation → Results
+- ✅ Working demo: `sbt "runMain fol.examples.VagueQuantifierDemo"`
 
 ### 📋 **Phase 7: Documentation** - PENDING
 - [ ] README.md updated with vague quantifier section
@@ -1366,22 +1365,16 @@ Core FOL infrastructure: 358+ tests (all passing)
 ```
 Phase 1-4: ✅ COMPLETE (229 tests passing)
     ↓
-Phase 5: Parser 📋 NEXT (no dependencies, can start immediately)
+Phase 5: Parser ✅ COMPLETE (41 tests passing)
     ↓
-Phase 6: Paper Examples (depends on Phase 5 for parsing, or can use constructors)
+Phase 6: Examples ✅ COMPLETE (cybersecurity domain + 4 demo queries)
     ↓
-Phase 7: Documentation (depends on Phases 5-6 for completeness)
+Phase 7: Documentation 📋 NEXT
 ```
 
 **Recommended Next Steps:**
-1. **Immediate**: Phase 5 (Parser) - enables paper syntax usage
-2. **Near-term**: Phase 6 (Paper Examples) - validates end-to-end functionality
-3. **Final**: Phase 7 (Documentation) - polish and release preparation
-
-**Alternative Approach:**
-- Can proceed with Phase 6 using `VagueQuery` constructors (skip parser temporarily)
-- Demonstrates functionality while deferring parsing complexity
-- Parser can be added later as syntactic sugar
+1. **Immediate**: Phase 7 (Documentation) — update README, `docs/VagueQuantifiers.md`, scaladoc review
+2. **After T-000**: Package rename `fol.*` → `vql.*` — see `docs/TODOS.md` T-000
 
 ---
 

@@ -5,7 +5,9 @@ Items here are acknowledged — not bugs, not forgotten.
 
 ---
 
-## TD-001: KnowledgeSource Trait Returns Set/Throws Instead of Either
+## ~~TD-001: KnowledgeSource Trait Returns Set/Throws Instead of Either~~ ✅ CLOSED
+
+**Closed by:** commit `09815e7` (`TD-001: migrate state-dependent methods to Either[QueryError, A]`). All `KnowledgeBase` / `KnowledgeSource` state-dependent methods (`getDomain`, `query`, `contains`, `count`, `addRelation`, `addFact`, `addFacts`) now return `Either[QueryError, A]`. The three `hasRelation` guard duplications in `ResolvedQuery` and `RangeExtractor` were removed; the throw-to-catch trampoline in `VagueSemantics` was eliminated. See ADR-012.
 
 ### Description
 
